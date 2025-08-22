@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CLionExternalBuildManager">
+    <target id="65f75111-ed59-4981-a3bd-0fa09404ea58" name="Cargo Debug" defaultType="TOOL">
+      <configuration id="cc37d13a-5da3-423f-a3b7-4cb33fccedef" name="Cargo Debug" toolchainName="Rust Embedded STM32F7">
+        <build type="TOOL">
+          <tool actionId="Tool_External Tools_BuildDebug" />
+        </build>
+        <clean type="TOOL">
+          <tool actionId="Tool_External Tools_Clean" />
+        </clean>
+      </configuration>
+    </target>
+  </component>
+</project>
