@@ -3,14 +3,6 @@
 version = 4
 
 [[package]]
-name = "SmolOS"
-version = "0.1.0"
-dependencies = [
- "cortex-m-rt",
- "kernel",
-]
-
-[[package]]
 name = "aligned"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

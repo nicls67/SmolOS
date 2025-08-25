@@ -1,1 +1,3 @@
 /target
+/libs/kernel/target/
+/libs/hal_interface/target

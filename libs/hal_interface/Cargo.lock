@@ -3,14 +3,6 @@
 version = 4
 
 [[package]]
-name = "SmolOS"
-version = "0.1.0"
-dependencies = [
- "cortex-m-rt",
- "kernel",
-]
-
-[[package]]
 name = "aligned"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -90,7 +82,6 @@ checksum = "8ec610d8f49840a5b376c69663b6369e71f4b34484b9b2eb29fb918d92516cb9"
 dependencies = [
  "bare-metal",
  "bitfield",
- "critical-section",
  "embedded-hal 0.2.7",
  "volatile-register",
 ]
@@ -113,15 +104,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "cortex-m-semihosting"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c23234600452033cc77e4b761e740e02d2c4168e11dbf36ab14a0f58973592b0"
-dependencies = [
- "cortex-m",
 ]
 
 [[package]]
@@ -389,17 +371,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel"
-version = "0.1.0"
-dependencies = [
- "cortex-m",
- "cortex-m-rt",
- "cortex-m-semihosting",
- "hal_interface",
- "panic-semihosting",
-]
-
-[[package]]
 name = "litrs"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -427,16 +398,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "panic-semihosting"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee8a3e1233d9073d76a870223512ce4eeea43c067a94a445c13bd6d792d7b1ab"
-dependencies = [
- "cortex-m",
- "cortex-m-semihosting",
 ]
 
 [[package]]

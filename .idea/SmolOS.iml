@@ -2,7 +2,11 @@
 <module type="CPP_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/libs/hal_interface/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/kernel/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/libs/hal_interface/target" />
+      <excludeFolder url="file://$MODULE_DIR$/libs/kernel/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
