@@ -24,5 +24,6 @@ fn SysTick() {
 
 #[exception]
 fn PendSV() {
-    Kernel::hal().invert_pin();
+    let id = Kernel::hal().get_interface_id("ACT_LED").unwrap();
+    Kernel::hal().interface_write(id).unwrap();
 }

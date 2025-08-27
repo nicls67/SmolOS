@@ -4,15 +4,15 @@ mod errors;
 mod interfaces;
 pub use interfaces::{Interface, InterfaceType};
 
-use crate::HalError::{HalAlreadyLocked, InterfaceInitError};
-use crate::HalErrorLevel::Error;
+use crate::HalError::{HalAlreadyLocked, HalNotLocked};
+use crate::HalErrorLevel::{Critical, Error, Fatal};
+use crate::interfaces::InterfaceVect;
 use embassy_stm32::rcc::{
     AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource, Sysclk,
 };
 use embassy_stm32::time::Hertz;
 use embassy_stm32::{Config, Peripherals};
 pub use errors::*;
-use heapless::Vec;
 
 pub enum CoreClkConfig {
     Max,
@@ -23,7 +23,7 @@ pub struct HalConfig {
 }
 
 pub struct Hal {
-    interface: Vec<Interface<'static>, 256>,
+    interface: InterfaceVect,
     locked: bool,
 }
 
@@ -102,16 +102,17 @@ impl Hal {
         (embassy_stm32::init(config), core_freq)
     }
 
-    /// Creates and returns a new instance of the struct with default values.
+    /// Creates a new instance of the structure.
     ///
     /// # Returns
-    /// A new instance of the struct with the following default values:
-    /// - `interface`: An empty `Vec`
-    /// - `locked`: `false`
+    ///
+    /// Returns an instance of `Self` initialized with default values:
+    /// - `interface`: A new, empty `InterfaceVect`.
+    /// - `locked`: A boolean flag set to `false`.
     ///
     pub fn new() -> Self {
         Self {
-            interface: Vec::new(),
+            interface: InterfaceVect::new(),
             locked: false,
         }
     }
@@ -137,58 +138,61 @@ impl Hal {
         }
     }
 
-    /// Adds a new `Interface` to the list of interfaces managed by this structure.
+    /// Adds a new interface to the current instance of the hardware abstraction layer (HAL).
     ///
-    /// # Arguments
-    ///
-    /// * `interface` - An `Interface<'a>` instance to be added to the current list of interfaces.
+    /// # Parameters
+    /// - `interface`: The `Interface` object to be added to the HAL instance.
     ///
     /// # Returns
-    ///
-    /// * `HalResult<()>` - Returns `Ok(())` if the interface is successfully added to the list.
+    /// - `Ok(())`: If the interface is successfully added.
+    /// - `Err(HalAlreadyLocked)`: If the HAL instance is locked and cannot accept new interfaces.
     ///
     /// # Errors
-    ///
-    /// * Returns `HalAlreadyLocked` error if the structure is in a locked state, indicating no modifications are allowed.
-    /// * Returns `InterfaceInitError` if the interface cannot be added because the interfaces list is full.
+    /// Returns an error of type `HalAlreadyLocked` if the HAL is in a locked state, indicating
+    /// that no changes can be made to the interfaces.
     ///
     /// # Notes
-    ///
-    /// * The method first checks if the structure is in a locked state (`self.locked`).
-    /// * If locked, it returns an error, preventing modifications.
-    /// * Otherwise, it tries to push the provided interface to the `self.interface` list.
-    /// * Any failure to add the interface results in an `InterfaceInitError`.
-    /// * If successful, returns `Ok(())`.
-    pub fn add_interface(&mut self, interface: Interface<'static>) -> HalResult<()> {
+    /// Once the HAL instance
+    pub fn add_interface(&mut self, interface: Interface) -> HalResult<()> {
         if self.locked {
-            Err(HalAlreadyLocked(Error))
+            Err(HalAlreadyLocked(Fatal))
         } else {
-            self.interface
-                .push(interface)
-                .map_err(|_| InterfaceInitError(Error, "interfaces list is full"))?;
+            self.interface.add_interface(interface)?;
             Ok(())
         }
     }
 
-    // temporary function
-    pub fn invert_pin(&mut self) {
-        match &mut self.interface.get_mut(0).unwrap().interface {
-            InterfaceType::GpioOutput(pin) => {
-                if pin.is_set_high() {
-                    pin.set_low();
-                } else {
-                    pin.set_high();
-                }
-            }
+    /// Retrieves the interface ID associated with the given name.
+    ///
+    /// # Parameters
+    /// - `name`: A static string slice (`&'static str`) representing the name of the interface
+    ///           whose ID is to be retrieved.
+    ///
+    /// # Returns
+    /// - `Ok(usize)`: On success, returns the unique ID (`usize`) associated with the specified interface name.
+    /// - `Err(HalNotLocked)`: Returns an error if the system is not in a locked state.
+    ///
+    /// # Errors
+    /// - This function returns a `HalNotLocked` error if the `locked` flag is `false`.
+    ///   This indicates that the system state is not secured or locked, and the operation cannot proceed.
+    ///
+    /// # Preconditions
+    /// - The system must be in a locked state (`self.locked == true`) before calling this method to successfully
+    ///   retrieve the interface ID.
+    ///
+    pub fn get_interface_id(&self, name: &'static str) -> HalResult<usize> {
+        if !self.locked {
+            Err(HalNotLocked(Critical))
+        } else {
+            self.interface.get_interface_id(name)
         }
-        match &mut self.interface.get_mut(1).unwrap().interface {
-            InterfaceType::GpioOutput(pin) => {
-                if pin.is_set_high() {
-                    pin.set_low();
-                } else {
-                    pin.set_high();
-                }
-            }
+    }
+
+    pub fn interface_write(&mut self, id: usize) -> HalResult<()> {
+        if !self.locked {
+            Err(HalNotLocked(Critical))
+        } else {
+            self.interface.interface_write(id)
         }
     }
 }
