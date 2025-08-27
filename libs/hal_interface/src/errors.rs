@@ -1,7 +1,10 @@
 //! This module defines the `HalError` and `HalErrorLevel` enumerations and their associated
 //! functionality. It provides a structured way to represent hardware abstraction layer (HAL)
 //! related errors with different severity levels and format
-use crate::HalError::{HalAlreadyLocked, HalNotLocked, InterfaceInitError, InterfaceNotFound};
+use crate::HalError::{
+    HalAlreadyLocked, HalNotLocked, InterfaceInitError, InterfaceNotFound, ReadOnlyInterface,
+    WrongInterfaceId,
+};
 use heapless::{String, format};
 
 pub type HalResult<T> = Result<T, HalError>;
@@ -61,6 +64,7 @@ pub enum HalError {
     InterfaceInitError(HalErrorLevel, &'static str),
     InterfaceNotFound(HalErrorLevel, &'static str),
     WrongInterfaceId(HalErrorLevel, usize),
+    ReadOnlyInterface(HalErrorLevel, &'static str),
 }
 
 impl HalError {
@@ -89,10 +93,19 @@ impl HalError {
                 )
                 .unwrap();
             }
-            HalError::WrongInterfaceId(lvl, id) => {
+            WrongInterfaceId(lvl, id) => {
                 msg.push_str(lvl.as_str()).unwrap();
                 msg.push_str(
                     format!(30; "Interface ID {} does not exist", id)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            ReadOnlyInterface(lvl, name) => {
+                msg.push_str(lvl.as_str()).unwrap();
+                msg.push_str(
+                    format!(30; "Interface {} is read-only", name)
                         .unwrap()
                         .as_str(),
                 )

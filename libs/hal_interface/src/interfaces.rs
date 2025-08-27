@@ -1,4 +1,4 @@
-use crate::HalError::{InterfaceInitError, WrongInterfaceId};
+use crate::HalError::{InterfaceInitError, ReadOnlyInterface, WrongInterfaceId};
 use crate::HalErrorLevel::{Critical, Error, Fatal};
 use crate::HalResult;
 use embassy_stm32::gpio::Output;
@@ -112,6 +112,7 @@ impl InterfaceVect {
                     pin.set_high();
                 }
             }
+            _ => return Err(ReadOnlyInterface(Error, interface.name)),
         }
 
         Ok(())
