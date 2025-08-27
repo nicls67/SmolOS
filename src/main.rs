@@ -1,9 +1,11 @@
 #![no_std]
 #![no_main]
 
+mod interface_init;
+
+use crate::interface_init::init_interfaces;
 use cortex_m_rt::entry;
-use embassy_stm32::gpio::{Level, Output, Speed};
-use hal_interface::{CoreClkConfig, Hal, HalConfig, Interface, InterfaceType};
+use hal_interface::{CoreClkConfig, Hal, HalConfig};
 use kernel::{BootConfig, Milliseconds};
 
 #[entry]
@@ -15,17 +17,7 @@ fn main() -> ! {
     let mut hal = Hal::new();
 
     // Add interfaces
-    hal.add_interface(Interface::new(
-        "ERR_LED",
-        InterfaceType::GpioOutput(Output::new(peripherals.PJ13, Level::High, Speed::Low)),
-    ))
-    .unwrap();
-    hal.add_interface(Interface::new(
-        "ACT_LED",
-        InterfaceType::GpioOutput(Output::new(peripherals.PJ5, Level::High, Speed::Low)),
-    ))
-    .unwrap();
-
+    init_interfaces(&mut hal, peripherals);
     // Lock HAL
     hal.lock().unwrap();
 
@@ -36,9 +28,6 @@ fn main() -> ! {
         core_freq,
         hal,
     });
-
-    //let mut led = Output::new(p.PJ13, Level::High, Speed::Low);
-    //led.set_low();
 
     loop {}
 }

@@ -6,7 +6,6 @@ pub use interfaces::{Interface, InterfaceType};
 
 use crate::HalError::{HalAlreadyLocked, InterfaceInitError};
 use crate::HalErrorLevel::Error;
-use embassy_stm32::gpio::Level;
 use embassy_stm32::rcc::{
     AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource, Sysclk,
 };
@@ -35,6 +34,44 @@ impl Default for Hal {
 }
 
 impl Hal {
+    /// Initializes the Hardware Abstraction Layer (HAL) with the given configuration.
+    ///
+    /// This function sets up the peripherals and system clocks based on the provided
+    /// `HalConfig` structure. It supports both a default configuration and a configuration
+    /// that maximizes the core clock frequency to 216 MHz.
+    ///
+    /// # Arguments
+    ///
+    /// * `hal_config` - A `HalConfig` instance containing the desired HAL and clock configurations.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing:
+    /// * `Peripherals`: The initialized peripherals structure for the system.
+    /// * `u32`: The core clock frequency in hertz.
+    ///
+    /// # Behavior
+    ///
+    /// - By default, the function assumes a core clock frequency of 16 MHz.
+    /// - If the `hal_config.core_clk_config` is set to `CoreClkConfig::Max`, the function:
+    ///   - Enables the High-Speed Internal (HSI) oscillator.
+    ///   - Configures the High-Speed External (HSE) oscillator with a frequency of 25 MHz.
+    ///   - Sets the system clock source to the PLL (Phase Locked Loop) output (PLL1_P).
+    ///   - Configures the PLL with a divisor, multiplier, and fractional dividers to
+    ///     achieve a core frequency of 216 MHz.
+    ///   - Sets appropriate prescalers for the AHB and APB1/APB2 buses.
+    ///
+    /// # Dependencies
+    ///
+    /// * The function uses the `embassy_stm32::init` method to complete the hardware initialization
+    ///   process using the configured values.
+    ///
+    /// # Note
+    ///
+    /// Ensure the `HalConfig` structure is properly instantiated and all required fields are set
+    /// before calling this function. The configuration assumes that external components connected
+    /// to the microcontroller (e.g., an external clock source) are correctly set up to achieve stable
+    /// operation.
     pub fn init(hal_config: HalConfig) -> (Peripherals, u32) {
         // Initialize HAL
         let mut config = Config::default();
