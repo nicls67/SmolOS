@@ -7,6 +7,7 @@ edition = "2024"
 [dependencies]
 cortex-m-rt = { version = "0.7.0" }
 kernel = { path = "libs/kernel" }
+hal_interface = { path = "libs/hal_interface" }
 
 [[bin]]
 name = "SmolOS"

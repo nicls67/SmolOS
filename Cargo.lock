@@ -7,6 +7,7 @@ name = "SmolOS"
 version = "0.1.0"
 dependencies = [
  "cortex-m-rt",
+ "hal_interface",
  "kernel",
 ]
 
