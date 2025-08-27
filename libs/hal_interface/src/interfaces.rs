@@ -1,8 +1,10 @@
-use crate::HalError::{InterfaceInitError, ReadOnlyInterface, WrongInterfaceId};
+use crate::HalError::{
+    IncompatibleAction, InterfaceInitError, ReadOnlyInterface, WrongInterfaceId,
+};
 use crate::HalErrorLevel::{Critical, Error, Fatal};
-use crate::HalResult;
+use crate::{HalResult, InterfaceWriteActions};
 use embassy_stm32::gpio::Output;
-use heapless::{Vec, format};
+use heapless::Vec;
 
 pub enum InterfaceType {
     GpioOutput(Output<'static>),
@@ -98,7 +100,7 @@ impl InterfaceVect {
         Err(InterfaceInitError(Critical, name))
     }
 
-    pub fn interface_write(&mut self, id: usize) -> HalResult<()> {
+    pub fn interface_write(&mut self, id: usize, action: InterfaceWriteActions) -> HalResult<()> {
         let interface = self
             .vect
             .get_mut(id)
@@ -106,10 +108,10 @@ impl InterfaceVect {
 
         match &mut interface.interface {
             InterfaceType::GpioOutput(pin) => {
-                if pin.is_set_high() {
-                    pin.set_low();
+                if let InterfaceWriteActions::GpioWrite(action) = action {
+                    action.action(pin);
                 } else {
-                    pin.set_high();
+                    return Err(IncompatibleAction(Error, action.name(), interface.name));
                 }
             }
             _ => return Err(ReadOnlyInterface(Error, interface.name)),

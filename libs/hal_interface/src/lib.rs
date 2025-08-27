@@ -1,7 +1,10 @@
 #![no_std]
 
 mod errors;
+mod interface_actions;
 mod interfaces;
+
+pub use interface_actions::*;
 pub use interfaces::{Interface, InterfaceType};
 
 use crate::HalError::{HalAlreadyLocked, HalNotLocked};
@@ -188,11 +191,11 @@ impl Hal {
         }
     }
 
-    pub fn interface_write(&mut self, id: usize) -> HalResult<()> {
+    pub fn interface_write(&mut self, id: usize, action: InterfaceWriteActions) -> HalResult<()> {
         if !self.locked {
             Err(HalNotLocked(Critical))
         } else {
-            self.interface.interface_write(id)
+            self.interface.interface_write(id, action)
         }
     }
 }

@@ -2,8 +2,8 @@
 //! functionality. It provides a structured way to represent hardware abstraction layer (HAL)
 //! related errors with different severity levels and format
 use crate::HalError::{
-    HalAlreadyLocked, HalNotLocked, InterfaceInitError, InterfaceNotFound, ReadOnlyInterface,
-    WrongInterfaceId,
+    HalAlreadyLocked, HalNotLocked, IncompatibleAction, InterfaceInitError, InterfaceNotFound,
+    ReadOnlyInterface, WrongInterfaceId,
 };
 use heapless::{String, format};
 
@@ -65,6 +65,7 @@ pub enum HalError {
     InterfaceNotFound(HalErrorLevel, &'static str),
     WrongInterfaceId(HalErrorLevel, usize),
     ReadOnlyInterface(HalErrorLevel, &'static str),
+    IncompatibleAction(HalErrorLevel, &'static str, &'static str),
 }
 
 impl HalError {
@@ -106,6 +107,15 @@ impl HalError {
                 msg.push_str(lvl.as_str()).unwrap();
                 msg.push_str(
                     format!(30; "Interface {} is read-only", name)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            IncompatibleAction(lvl, action, interface) => {
+                msg.push_str(lvl.as_str()).unwrap();
+                msg.push_str(
+                    format!(70; "Action {} is not compatible with interface {}", action, interface)
                         .unwrap()
                         .as_str(),
                 )
