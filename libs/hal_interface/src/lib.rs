@@ -1,14 +1,19 @@
 #![no_std]
 
 mod errors;
+mod interfaces;
+pub use interfaces::{Interface, InterfaceType};
 
-use embassy_stm32::Config;
+use crate::HalError::{HalAlreadyLocked, InterfaceInitError};
+use crate::HalErrorLevel::Error;
+use embassy_stm32::gpio::Level;
 use embassy_stm32::rcc::{
     AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource, Sysclk,
 };
 use embassy_stm32::time::Hertz;
-
+use embassy_stm32::{Config, Peripherals};
 pub use errors::*;
+use heapless::Vec;
 
 pub enum CoreClkConfig {
     Max,
@@ -19,12 +24,18 @@ pub struct HalConfig {
 }
 
 pub struct Hal {
-    peripherals: embassy_stm32::Peripherals,
-    pub core_clk_freq: u32,
+    interface: Vec<Interface<'static>, 256>,
+    locked: bool,
+}
+
+impl Default for Hal {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Hal {
-    pub fn init(hal_config: HalConfig) -> Self {
+    pub fn init(hal_config: HalConfig) -> (Peripherals, u32) {
         // Initialize HAL
         let mut config = Config::default();
         let mut core_freq = 16_000_000;
@@ -51,9 +62,96 @@ impl Hal {
             core_freq = 216_000_000;
         }
 
+        (embassy_stm32::init(config), core_freq)
+    }
+
+    /// Creates and returns a new instance of the struct with default values.
+    ///
+    /// # Returns
+    /// A new instance of the struct with the following default values:
+    /// - `interface`: An empty `Vec`
+    /// - `locked`: `false`
+    ///
+    pub fn new() -> Self {
         Self {
-            peripherals: embassy_stm32::init(config),
-            core_clk_freq: core_freq,
+            interface: Vec::new(),
+            locked: false,
+        }
+    }
+
+    /// Locks the HAL (Hardware Abstraction Layer) and associates it with the provided peripherals.
+    ///
+    /// This method ensures exclusive access to the hardware peripherals by marking the HAL as locked.
+    /// Once locked, subsequent attempts to lock the HAL will return an error until it is unlocked again.
+    ///
+    /// # Returns
+    /// - `Ok(())` if the HAL is successfully locked and the peripherals are associated.
+    /// - `Err(HalAlreadyLocked)` if the HAL is already locked and cannot be locked again.
+    ///
+    /// # Errors
+    /// Returns `HalAlreadyLocked` if an attempt is made to lock the HAL while it is already locked.
+    ///
+    pub fn lock(&mut self) -> HalResult<()> {
+        if self.locked {
+            Err(HalAlreadyLocked(Error))
+        } else {
+            self.locked = true;
+            Ok(())
+        }
+    }
+
+    /// Adds a new `Interface` to the list of interfaces managed by this structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `interface` - An `Interface<'a>` instance to be added to the current list of interfaces.
+    ///
+    /// # Returns
+    ///
+    /// * `HalResult<()>` - Returns `Ok(())` if the interface is successfully added to the list.
+    ///
+    /// # Errors
+    ///
+    /// * Returns `HalAlreadyLocked` error if the structure is in a locked state, indicating no modifications are allowed.
+    /// * Returns `InterfaceInitError` if the interface cannot be added because the interfaces list is full.
+    ///
+    /// # Notes
+    ///
+    /// * The method first checks if the structure is in a locked state (`self.locked`).
+    /// * If locked, it returns an error, preventing modifications.
+    /// * Otherwise, it tries to push the provided interface to the `self.interface` list.
+    /// * Any failure to add the interface results in an `InterfaceInitError`.
+    /// * If successful, returns `Ok(())`.
+    pub fn add_interface(&mut self, interface: Interface<'static>) -> HalResult<()> {
+        if self.locked {
+            Err(HalAlreadyLocked(Error))
+        } else {
+            self.interface
+                .push(interface)
+                .map_err(|_| InterfaceInitError(Error, "interfaces list is full"))?;
+            Ok(())
+        }
+    }
+
+    // temporary function
+    pub fn invert_pin(&mut self) {
+        match &mut self.interface.get_mut(0).unwrap().interface {
+            InterfaceType::GpioOutput(pin) => {
+                if pin.is_set_high() {
+                    pin.set_low();
+                } else {
+                    pin.set_high();
+                }
+            }
+        }
+        match &mut self.interface.get_mut(1).unwrap().interface {
+            InterfaceType::GpioOutput(pin) => {
+                if pin.is_set_high() {
+                    pin.set_low();
+                } else {
+                    pin.set_high();
+                }
+            }
         }
     }
 }

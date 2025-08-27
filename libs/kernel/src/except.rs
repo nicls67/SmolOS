@@ -1,3 +1,4 @@
+use crate::data::Kernel;
 use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m::peripheral::SCB;
 use cortex_m_rt::exception;
@@ -24,5 +25,5 @@ fn SysTick() {
 
 #[exception]
 fn PendSV() {
-    hprintln!("a");
+    Kernel::hal().invert_pin();
 }

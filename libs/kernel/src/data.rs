@@ -21,6 +21,7 @@ use panic_semihosting as _;
 pub static mut KERNEL_DATA: Kernel = Kernel {
     cortex_peripherals: None,
     hal: None,
+    core_freq: 0,
 };
 
 /// The `Kernel` struct represents the core entity responsible for managing
@@ -45,6 +46,7 @@ pub static mut KERNEL_DATA: Kernel = Kernel {
 pub struct Kernel {
     cortex_peripherals: Option<Peripherals>,
     hal: Option<Hal>,
+    core_freq: u32,
 }
 
 impl Kernel {
@@ -64,10 +66,11 @@ impl Kernel {
     /// This function will panic if the Cortex-M peripherals cannot be acquired using `Peripherals::take()`.
     /// Ensure that this function is not called more than once or after the peripherals are already taken.
     ///
-    pub fn init_kernel_data(hal: Hal) {
+    pub fn init_kernel_data(hal: Hal, core_freq: u32) {
         unsafe {
             KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
             KERNEL_DATA.hal = Some(hal);
+            KERNEL_DATA.core_freq = core_freq;
         }
     }
 
@@ -96,10 +99,10 @@ impl Kernel {
     /// If `KERNEL_DATA.hal` is uninitialized, calling this function will result in a panic.
     ///
     #[allow(static_mut_refs)]
-    pub fn hal() -> &'static Hal {
+    pub fn hal() -> &'static mut Hal {
         unsafe {
             if KERNEL_DATA.hal.is_some() {
-                KERNEL_DATA.hal.as_ref().unwrap()
+                KERNEL_DATA.hal.as_mut().unwrap()
             } else {
                 panic!("Hal not initialized");
             }
