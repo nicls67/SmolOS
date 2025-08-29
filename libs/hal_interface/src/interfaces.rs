@@ -4,10 +4,13 @@ use crate::HalError::{
 use crate::HalErrorLevel::{Critical, Error, Fatal};
 use crate::{HalResult, InterfaceWriteActions};
 use embassy_stm32::gpio::Output;
+use embassy_stm32::mode::Async;
+use embassy_stm32::usart::Uart;
 use heapless::Vec;
 
 pub enum InterfaceType {
     GpioOutput(Output<'static>),
+    Uart(Uart<'static, Async>),
 }
 
 pub struct Interface {
@@ -110,6 +113,13 @@ impl InterfaceVect {
             InterfaceType::GpioOutput(pin) => {
                 if let InterfaceWriteActions::GpioWrite(action) = action {
                     action.action(pin);
+                } else {
+                    return Err(IncompatibleAction(Error, action.name(), interface.name));
+                }
+            }
+            InterfaceType::Uart(uart) => {
+                if let InterfaceWriteActions::UartWrite(action) = action {
+                    action.action(uart);
                 } else {
                     return Err(IncompatibleAction(Error, action.name(), interface.name));
                 }
