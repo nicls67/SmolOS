@@ -57,6 +57,27 @@ pub fn boot(config: BootConfig) {
     /////////////////////////
     Kernel::init_kernel_data(config.hal, config.core_freq);
 
+    let serial_id = Kernel::hal().get_interface_id("SERIAL_MAIN").unwrap();
+
+    // Clear console
+    Kernel::hal()
+        .interface_write(
+            serial_id,
+            hal_interface::InterfaceWriteActions::UartWrite(
+                hal_interface::UartWriteActions::SendString("\x1B[2J\x1B[H"),
+            ),
+        )
+        .unwrap();
+
+    Kernel::hal()
+        .interface_write(
+            serial_id,
+            hal_interface::InterfaceWriteActions::UartWrite(
+                hal_interface::UartWriteActions::SendString("Booting SmolOS...\r\n"),
+            ),
+        )
+        .unwrap();
+
     ////////////////////////////////////
     // Timers initialization
     ////////////////////////////////////
@@ -78,4 +99,13 @@ pub fn boot(config: BootConfig) {
 
     // Start Systick
     cortex_p.SYST.enable_counter();
+
+    Kernel::hal()
+        .interface_write(
+            serial_id,
+            hal_interface::InterfaceWriteActions::UartWrite(
+                hal_interface::UartWriteActions::SendString("Kernel ready !\r\n"),
+            ),
+        )
+        .unwrap();
 }

@@ -2,6 +2,7 @@ use crate::HalErrorLevel::Error;
 use crate::InterfaceReadActions::UartRead;
 use crate::InterfaceWriteActions::{GpioWrite, UartWrite};
 use crate::UartReadActions::Read;
+use crate::UartWriteActions::{SendChar, SendString};
 use crate::async_block::block_on;
 use crate::{HalError, HalResult};
 use embassy_stm32::gpio::Output;
@@ -49,15 +50,18 @@ impl GpioWriteActions {
 
 pub enum UartWriteActions {
     SendChar(u8),
+    SendString(&'static str),
 }
 
 impl UartWriteActions {
     pub fn action(&self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
         match self {
-            UartWriteActions::SendChar(c) => {
+            SendChar(c) => {
                 let data_arr = [*c];
                 block_on(uart.write(&data_arr)).map_err(|_| HalError::WriteError(Error, "UART"))
             }
+            SendString(str) => block_on(uart.write(str.as_bytes()))
+                .map_err(|_| HalError::WriteError(Error, "UART")),
         }
     }
 }
