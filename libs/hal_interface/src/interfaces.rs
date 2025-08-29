@@ -112,22 +112,20 @@ impl InterfaceVect {
         match &mut interface.interface {
             InterfaceType::GpioOutput(pin) => {
                 if let InterfaceWriteActions::GpioWrite(action) = action {
-                    action.action(pin);
+                    action.action(pin)
                 } else {
-                    return Err(IncompatibleAction(Error, action.name(), interface.name));
+                    Err(IncompatibleAction(Error, action.name(), interface.name))
                 }
             }
             InterfaceType::Uart(uart) => {
                 if let InterfaceWriteActions::UartWrite(action) = action {
-                    action.action(uart);
+                    action.action(uart)
                 } else {
-                    return Err(IncompatibleAction(Error, action.name(), interface.name));
+                    Err(IncompatibleAction(Error, action.name(), interface.name))
                 }
             }
-            _ => return Err(ReadOnlyInterface(Error, interface.name)),
+            _ => Err(ReadOnlyInterface(Error, interface.name)),
         }
-
-        Ok(())
     }
 
     pub fn interface_read(&mut self, id: usize, action: InterfaceReadActions) -> HalResult<()> {
@@ -139,14 +137,12 @@ impl InterfaceVect {
         match &mut interface.interface {
             InterfaceType::Uart(uart) => {
                 if let InterfaceReadActions::UartRead(mut action) = action {
-                    action.action(uart);
+                    action.action(uart)
                 } else {
-                    return Err(IncompatibleAction(Error, action.name(), interface.name));
+                    Err(IncompatibleAction(Error, action.name(), interface.name))
                 }
             }
-            _ => return Err(WriteOnlyInterface(Error, interface.name)),
+            _ => Err(WriteOnlyInterface(Error, interface.name)),
         }
-
-        Ok(())
     }
 }
