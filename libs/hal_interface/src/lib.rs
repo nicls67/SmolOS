@@ -1,5 +1,7 @@
 #![no_std]
+extern crate alloc;
 
+mod async_block;
 mod errors;
 mod interface_actions;
 mod interfaces;

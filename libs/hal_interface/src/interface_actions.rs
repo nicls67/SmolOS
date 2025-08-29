@@ -1,10 +1,9 @@
+use crate::HalErrorLevel::Error;
 use crate::InterfaceReadActions::UartRead;
 use crate::InterfaceWriteActions::{GpioWrite, UartWrite};
 use crate::UartReadActions::Read;
-use core::cell::Cell;
-use core::pin::Pin;
-use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-use cortex_m::asm::wfi;
+use crate::async_block::block_on;
+use crate::{HalError, HalResult};
 use embassy_stm32::gpio::Output;
 use embassy_stm32::mode::Async;
 use embassy_stm32::usart::Uart;
@@ -30,11 +29,20 @@ pub enum GpioWriteActions {
 }
 
 impl GpioWriteActions {
-    pub fn action(&self, pin: &mut Output) {
+    pub fn action(&self, pin: &mut Output) -> HalResult<()> {
         match self {
-            GpioWriteActions::Set => pin.set_high(),
-            GpioWriteActions::Clear => pin.set_low(),
-            GpioWriteActions::Toggle => pin.toggle(),
+            GpioWriteActions::Set => {
+                pin.set_high();
+                Ok(())
+            }
+            GpioWriteActions::Clear => {
+                pin.set_low();
+                Ok(())
+            }
+            GpioWriteActions::Toggle => {
+                pin.toggle();
+                Ok(())
+            }
         }
     }
 }
@@ -44,48 +52,13 @@ pub enum UartWriteActions {
 }
 
 impl UartWriteActions {
-    pub fn action(&self, uart: &mut Uart<'static, Async>) {
+    pub fn action(&self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
         match self {
             UartWriteActions::SendChar(c) => {
                 let data_arr = [*c];
-                block_on(uart.write(&data_arr)).unwrap();
+                block_on(uart.write(&data_arr)).map_err(|_| HalError::WriteError(Error, "UART"))
             }
         }
-    }
-}
-
-fn block_on<F: Future>(mut fut: F) -> F::Output {
-    let woke = Cell::new(true); // true pour un premier poll immédiat
-
-    fn raw_waker(woke: *const Cell<bool>) -> RawWaker {
-        unsafe fn clone(p: *const ()) -> RawWaker {
-            raw_waker(p as *const Cell<bool>)
-        }
-        unsafe fn wake(p: *const ()) {
-            let cell = &*(p as *const Cell<bool>);
-            cell.set(true);
-        }
-        unsafe fn wake_by_ref(p: *const ()) {
-            let cell = &*(p as *const Cell<bool>);
-            cell.set(true);
-        }
-        unsafe fn drop(_: *const ()) {}
-        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
-        RawWaker::new(woke as *const (), &VTABLE)
-    }
-
-    let waker = unsafe { Waker::from_raw(raw_waker(&woke as *const _)) };
-    let mut cx = Context::from_waker(&waker);
-    // Épingler la future
-    let mut fut = unsafe { Pin::new_unchecked(&mut fut) };
-
-    loop {
-        if woke.replace(false) {
-            if let Poll::Ready(v) = fut.as_mut().poll(&mut cx) {
-                return v;
-            }
-        }
-        wfi(); // dormir jusqu'à la prochaine IRQ
     }
 }
 
@@ -106,10 +79,10 @@ pub enum UartReadActions<'a> {
 }
 
 impl UartReadActions<'_> {
-    pub fn action(&mut self, uart: &mut Uart<'static, Async>) {
+    pub fn action(&mut self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
         match self {
-            Read(c) => {
-                block_on(uart.read_until_idle(c)).unwrap();
+            Read(buffer) => {
+                block_on(uart.read(buffer)).map_err(|_| HalError::ReadError(Error, "UART"))
             }
         }
     }

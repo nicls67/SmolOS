@@ -3,7 +3,7 @@
 //! related errors with different severity levels and format
 use crate::HalError::{
     HalAlreadyLocked, HalNotLocked, IncompatibleAction, InterfaceInitError, InterfaceNotFound,
-    ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
+    ReadError, ReadOnlyInterface, WriteError, WriteOnlyInterface, WrongInterfaceId,
 };
 use heapless::{String, format};
 
@@ -67,6 +67,8 @@ pub enum HalError {
     ReadOnlyInterface(HalErrorLevel, &'static str),
     WriteOnlyInterface(HalErrorLevel, &'static str),
     IncompatibleAction(HalErrorLevel, &'static str, &'static str),
+    WriteError(HalErrorLevel, &'static str),
+    ReadError(HalErrorLevel, &'static str),
 }
 
 impl HalError {
@@ -126,6 +128,24 @@ impl HalError {
                 msg.push_str(lvl.as_str()).unwrap();
                 msg.push_str(
                     format!(70; "Action {} is not compatible with interface {}", action, interface)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            WriteError(lvl, ift) => {
+                msg.push_str(lvl.as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Error during write on interface {} ", ift)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            ReadError(lvl, ift) => {
+                msg.push_str(lvl.as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Error during read on interface {}", ift)
                         .unwrap()
                         .as_str(),
                 )
