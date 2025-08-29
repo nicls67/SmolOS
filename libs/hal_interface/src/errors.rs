@@ -111,7 +111,7 @@ impl HalError {
                         .unwrap()
                         .as_str(),
                 )
-                    .unwrap();
+                .unwrap();
             }
             WriteOnlyInterface(lvl, name) => {
                 msg.push_str(lvl.as_str()).unwrap();
