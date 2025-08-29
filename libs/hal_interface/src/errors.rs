@@ -3,7 +3,7 @@
 //! related errors with different severity levels and format
 use crate::HalError::{
     HalAlreadyLocked, HalNotLocked, IncompatibleAction, InterfaceInitError, InterfaceNotFound,
-    ReadOnlyInterface, WrongInterfaceId,
+    ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
 };
 use heapless::{String, format};
 
@@ -65,6 +65,7 @@ pub enum HalError {
     InterfaceNotFound(HalErrorLevel, &'static str),
     WrongInterfaceId(HalErrorLevel, usize),
     ReadOnlyInterface(HalErrorLevel, &'static str),
+    WriteOnlyInterface(HalErrorLevel, &'static str),
     IncompatibleAction(HalErrorLevel, &'static str, &'static str),
 }
 
@@ -107,6 +108,15 @@ impl HalError {
                 msg.push_str(lvl.as_str()).unwrap();
                 msg.push_str(
                     format!(30; "Interface {} is read-only", name)
+                        .unwrap()
+                        .as_str(),
+                )
+                    .unwrap();
+            }
+            WriteOnlyInterface(lvl, name) => {
+                msg.push_str(lvl.as_str()).unwrap();
+                msg.push_str(
+                    format!(30; "Interface {} is write-only", name)
                         .unwrap()
                         .as_str(),
                 )

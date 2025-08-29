@@ -1,4 +1,6 @@
+use crate::InterfaceReadActions::UartRead;
 use crate::InterfaceWriteActions::{GpioWrite, UartWrite};
+use crate::UartReadActions::Read;
 use core::cell::Cell;
 use core::pin::Pin;
 use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
@@ -83,8 +85,32 @@ fn block_on<F: Future>(mut fut: F) -> F::Output {
                 return v;
             }
         }
-        unsafe {
-            wfi();
-        } // dormir jusqu'à la prochaine IRQ
+        wfi(); // dormir jusqu'à la prochaine IRQ
+    }
+}
+
+pub enum InterfaceReadActions<'a> {
+    UartRead(UartReadActions<'a>),
+}
+
+impl InterfaceReadActions<'_> {
+    pub fn name(&self) -> &'static str {
+        match self {
+            UartRead(_) => "UART Read",
+        }
+    }
+}
+
+pub enum UartReadActions<'a> {
+    Read(&'a mut [u8]),
+}
+
+impl UartReadActions<'_> {
+    pub fn action(&mut self, uart: &mut Uart<'static, Async>) {
+        match self {
+            Read(c) => {
+                block_on(uart.read_until_idle(c)).unwrap();
+            }
+        }
     }
 }

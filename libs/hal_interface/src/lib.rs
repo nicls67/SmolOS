@@ -191,11 +191,59 @@ impl Hal {
         }
     }
 
+    /// Writes to an interface using the provided ID and action.
+    ///
+    /// # Parameters
+    /// - `id`: The unique identifier of the interface to write to.
+    /// - `action`: The action to be performed on the interface, represented by an `InterfaceWriteActions` value.
+    ///
+    /// # Returns
+    /// - `Ok(())`: If the write operation is successful.
+    /// - `Err(HalNotLocked(Critical))`: If the system is not in a locked state when attempting the operation.
+    ///
+    /// # Errors
+    /// This function returns an error if the system is not in a locked state (`self.locked` is `false`).
+    ///
+    /// # Notes
+    /// - The function ensures that write operations are only executed when the system is locked to
+    ///   maintain synchronization and safety.
+    /// - Delegates the actual write operation to the `self.interface.interface_write` method.
     pub fn interface_write(&mut self, id: usize, action: InterfaceWriteActions) -> HalResult<()> {
         if !self.locked {
             Err(HalNotLocked(Critical))
         } else {
             self.interface.interface_write(id, action)
+        }
+    }
+
+    /// Attempts to perform a read operation on the interface identified by the given `id`
+    /// with the specified `action`. The operation is conditional on the locking state of
+    /// the system.
+    ///
+    /// # Parameters
+    /// - `id`: The unique identifier for the target interface to perform the read operation on.
+    /// - `action`: The specific read action to execute, encapsulated by `InterfaceReadActions`.
+    ///
+    /// # Returns
+    /// - `Ok(())` if the read operation is successfully executed.
+    /// - `Err(HalNotLocked(Critical))` if the system is not in a locked state and the operation is denied.
+    ///
+    /// # Behavior
+    /// - If `self.locked` is `false`, the function immediately returns an error with a
+    ///   `HalNotLocked(Critical)` variant, indicating that the interface is inaccessible without locking.
+    /// - Otherwise, it delegates the read operation to the `interface_read` method of the
+    ///   underlying `self.interface` object.
+    ///
+    /// # Errors
+    /// The function may return an error under the following conditions:
+    /// - The system is not in a locked state (`self.locked` is `false`).
+    /// - Any other error encountered by the `interface_read` method of `self.interface`.
+    ///
+    pub fn interface_read(&mut self, id: usize, action: InterfaceReadActions) -> HalResult<()> {
+        if !self.locked {
+            Err(HalNotLocked(Critical))
+        } else {
+            self.interface.interface_read(id, action)
         }
     }
 }

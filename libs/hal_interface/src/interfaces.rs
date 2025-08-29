@@ -1,8 +1,8 @@
 use crate::HalError::{
-    IncompatibleAction, InterfaceInitError, ReadOnlyInterface, WrongInterfaceId,
+    IncompatibleAction, InterfaceInitError, ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::HalErrorLevel::{Critical, Error, Fatal};
-use crate::{HalResult, InterfaceWriteActions};
+use crate::{HalResult, InterfaceReadActions, InterfaceWriteActions};
 use embassy_stm32::gpio::Output;
 use embassy_stm32::mode::Async;
 use embassy_stm32::usart::Uart;
@@ -125,6 +125,26 @@ impl InterfaceVect {
                 }
             }
             _ => return Err(ReadOnlyInterface(Error, interface.name)),
+        }
+
+        Ok(())
+    }
+
+    pub fn interface_read(&mut self, id: usize, action: InterfaceReadActions) -> HalResult<()> {
+        let interface = self
+            .vect
+            .get_mut(id)
+            .ok_or(WrongInterfaceId(Critical, id))?;
+
+        match &mut interface.interface {
+            InterfaceType::Uart(uart) => {
+                if let InterfaceReadActions::UartRead(mut action) = action {
+                    action.action(uart);
+                } else {
+                    return Err(IncompatibleAction(Error, action.name(), interface.name));
+                }
+            }
+            _ => return Err(WriteOnlyInterface(Error, interface.name)),
         }
 
         Ok(())

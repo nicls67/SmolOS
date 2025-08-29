@@ -1,7 +1,7 @@
 use embassy_stm32::gpio::{Level, Output, Speed};
 use embassy_stm32::usart::Uart;
 use embassy_stm32::usart::{Config as UartConfig, Parity, StopBits};
-use embassy_stm32::{Peripherals, bind_interrupts, dma, interrupt, usart};
+use embassy_stm32::{Peripherals, bind_interrupts, usart};
 use hal_interface::{Hal, Interface, InterfaceType};
 
 bind_interrupts!(struct Irqs {
