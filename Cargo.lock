@@ -410,6 +410,7 @@ dependencies = [
  "cortex-m-rt",
  "cortex-m-semihosting",
  "hal_interface",
+ "heapless 0.9.1",
  "panic-semihosting",
 ]
 

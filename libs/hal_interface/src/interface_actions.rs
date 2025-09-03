@@ -9,12 +9,12 @@ use embassy_stm32::gpio::Output;
 use embassy_stm32::mode::Async;
 use embassy_stm32::usart::Uart;
 
-pub enum InterfaceWriteActions {
+pub enum InterfaceWriteActions<'a> {
     GpioWrite(GpioWriteActions),
-    UartWrite(UartWriteActions),
+    UartWrite(UartWriteActions<'a>),
 }
 
-impl InterfaceWriteActions {
+impl InterfaceWriteActions<'_> {
     pub fn name(&self) -> &'static str {
         match self {
             GpioWrite(_) => "GPIO Write",
@@ -48,12 +48,12 @@ impl GpioWriteActions {
     }
 }
 
-pub enum UartWriteActions {
+pub enum UartWriteActions<'a> {
     SendChar(u8),
-    SendString(&'static str),
+    SendString(&'a str),
 }
 
-impl UartWriteActions {
+impl UartWriteActions<'_> {
     pub fn action(&self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
         match self {
             SendChar(c) => {

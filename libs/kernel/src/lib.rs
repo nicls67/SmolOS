@@ -1,13 +1,16 @@
 #![no_std]
 mod data;
 mod except;
+mod ident;
 mod types;
 
 use crate::data::Kernel;
 use crate::except::set_ticks_target;
+use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
 use cortex_m::peripheral::scb::SystemHandler;
 use cortex_m::peripheral::syst::SystClkSource;
 use hal_interface::Hal;
+use heapless::format;
 pub use types::*;
 
 pub struct BootConfig {
@@ -73,7 +76,20 @@ pub fn boot(config: BootConfig) {
         .interface_write(
             serial_id,
             hal_interface::InterfaceWriteActions::UartWrite(
-                hal_interface::UartWriteActions::SendString("Booting SmolOS...\r\n"),
+                hal_interface::UartWriteActions::SendString("Booting...\r\n"),
+            ),
+        )
+        .unwrap();
+
+    Kernel::hal()
+        .interface_write(
+            serial_id,
+            hal_interface::InterfaceWriteActions::UartWrite(
+                hal_interface::UartWriteActions::SendString(
+                    format!(30; "{} version {}\r\n", KERNEL_NAME, KERNEL_VERSION)
+                        .unwrap()
+                        .as_str(),
+                ),
             ),
         )
         .unwrap();
