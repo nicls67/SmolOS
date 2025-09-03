@@ -3,11 +3,13 @@ mod data;
 mod errors_mgt;
 mod except;
 mod ident;
+mod terminal;
 mod types;
 
 use crate::data::Kernel;
 use crate::except::set_ticks_target;
 use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
+pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 use cortex_m::peripheral::scb::SystemHandler;
 use cortex_m::peripheral::syst::SystClkSource;
 use hal_interface::Hal;
@@ -19,6 +21,8 @@ pub struct BootConfig {
     pub systick_period: Milliseconds,
     pub core_freq: u32,
     pub hal: Hal,
+    pub system_terminal_name: &'static str,
+    pub system_terminal_type: TerminalType,
 }
 
 /**
@@ -59,40 +63,24 @@ pub fn boot(config: BootConfig) {
     /////////////////////////
     // Kernel initialization
     /////////////////////////
-    Kernel::init_kernel_data(config.hal, config.core_freq);
+    Kernel::init_kernel_data(
+        config.hal,
+        config.core_freq,
+        Terminal::new(config.system_terminal_name, config.system_terminal_type),
+    );
 
-    let serial_id = Kernel::hal().get_interface_id("SERIAL_MAIN").unwrap();
-
-    // Clear console
-    Kernel::hal()
-        .interface_write(
-            serial_id,
-            hal_interface::InterfaceWriteActions::UartWrite(
-                hal_interface::UartWriteActions::SendString("\x1B[2J\x1B[H"),
-            ),
-        )
+    let terminal = Kernel::terminal();
+    terminal.set_kernel_state().unwrap();
+    terminal.write(&TerminalFormatting::Clear).unwrap();
+    terminal
+        .write(&TerminalFormatting::StrNewLineAfter("Booting..."))
         .unwrap();
-
-    Kernel::hal()
-        .interface_write(
-            serial_id,
-            hal_interface::InterfaceWriteActions::UartWrite(
-                hal_interface::UartWriteActions::SendString("Booting...\r\n"),
-            ),
-        )
-        .unwrap();
-
-    Kernel::hal()
-        .interface_write(
-            serial_id,
-            hal_interface::InterfaceWriteActions::UartWrite(
-                hal_interface::UartWriteActions::SendString(
-                    format!(30; "{} version {}\r\n", KERNEL_NAME, KERNEL_VERSION)
-                        .unwrap()
-                        .as_str(),
-                ),
-            ),
-        )
+    terminal
+        .write(&TerminalFormatting::StrNewLineAfter(
+            format!(30; "{} version {}", KERNEL_NAME, KERNEL_VERSION)
+                .unwrap()
+                .as_str(),
+        ))
         .unwrap();
 
     ////////////////////////////////////
@@ -117,12 +105,8 @@ pub fn boot(config: BootConfig) {
     // Start Systick
     cortex_p.SYST.enable_counter();
 
-    Kernel::hal()
-        .interface_write(
-            serial_id,
-            hal_interface::InterfaceWriteActions::UartWrite(
-                hal_interface::UartWriteActions::SendString("Kernel ready !\r\n"),
-            ),
-        )
+    //Boot completed
+    terminal
+        .write(&TerminalFormatting::StrNewLineAfter("Kernel ready !"))
         .unwrap();
 }

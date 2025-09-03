@@ -1,27 +1,49 @@
 use cortex_m::Peripherals;
 use hal_interface::Hal;
 
+use crate::terminal::Terminal;
 use panic_semihosting as _;
 
-/// A mutable static variable holding the global kernel data.
+/// A mutable static instance of the `Kernel` structure.
 ///
-/// # Description
-/// `KERNEL_DATA` is a mutable static instance of the [`Kernel`] struct.
-/// It is initialized with default values, where:
-/// - `cortex_peripherals` is set to `None`
-/// - `hal` is set to `None`
+/// # Overview
+/// The `KERNEL_DATA` variable serves as a global instance of the `Kernel` structure.
+/// It is mutable and uninitialized by default, allowing it to be configured
+/// during runtime. This data structure holds necessary details regarding the
+/// kernel's context, including its peripherals, HAL (Hardware Abstraction Layer),
+/// core frequency, and terminal.
 ///
-/// This variable is a central point to store global references to core
-/// peripherals and hardware abstraction layers (HALs) for the system.
+/// # Fields
+/// - `cortex_peripherals`: (Optional) Represents the Cortex-M peripherals,
+///   such as system control or NVIC. Initialized to `None` by default.
+/// - `hal`: (Optional) Represents the Hardware Abstraction Layer instance for
+///   interacting with hardware components. Initialized to `None` by default.
+/// - `core_freq`: Represents the frequency of the core in Hz. Initialized
+///   to `0` by default.
+/// - `terminal`: (Optional) Represents the kernel's terminal instance,
+///   typically used for I/O (Input/Output) operations. Initialized to `None`
+///   by default.
 ///
 /// # Safety
-/// Since `KERNEL_DATA` is mutable and static, it introduces the possibility of
-/// undefined behavior if misused in a multi-threaded context. Accessing or
-/// modifying this variable must be done
+/// Since `KERNEL_DATA` is declared as `pub static mut`, it is inherently unsafe
+/// due to potential data races or undefined behavior when accessed by multiple
+/// threads. It must be used with caution, and any access to this variable
+/// should be wrapped in appropriate synchronization mechanisms (e.g., critical
+/// sections, mutexes) to ensure thread safety.
+///
+/// # Note
+/// Modification of this static should always occur in a controlled environment
+/// where no other threads can access the variable simultaneously. Mismanagement
+/// may introduce undefined behavior or system instability.
+///
+/// # Context
+/// This `Kernel` structure and its fields are essential for coordinating
+/// hardware
 pub static mut KERNEL_DATA: Kernel = Kernel {
     cortex_peripherals: None,
     hal: None,
     core_freq: 0,
+    terminal: None,
 };
 
 /// The `Kernel` struct represents the core entity responsible for managing
@@ -47,30 +69,34 @@ pub struct Kernel {
     cortex_peripherals: Option<Peripherals>,
     hal: Option<Hal>,
     core_freq: u32,
+    terminal: Option<Terminal>,
 }
 
 impl Kernel {
-    /// Initializes the kernel data with the provided hardware abstraction layer (HAL) and stores
-    /// the Cortex-M peripherals for further use.
+    /// Initializes the kernel data with the given hardware abstraction layer, core frequency, and terminal instance.
     ///
     /// # Parameters
-    /// - `hal`: An instance of the `Hal` structure that represents the hardware abstraction layer to
-    ///          initialize the kernel with.
+    /// - `hal`: An instance of the hardware abstraction layer (`Hal`) which provides access to hardware-specific functionality.
+    /// - `core_freq`: The core frequency of the system, represented as a `u32`.
+    /// - `terminal`: An instance of the `Terminal` structure, used for output or logging operations.
     ///
     /// # Safety
-    /// This function involves unsafe operations to directly modify the global `KERNEL_DATA`. The caller
-    /// must ensure that this function is invoked in a single-threaded context during system initialization
-    /// to prevent data races or undefined behavior.
+    /// This function modifies a global static structure (`KERNEL_DATA`) within an `unsafe` block. It relies on the assumption
+    /// that:
+    /// - `Peripherals::take()` is called only once during the lifetime of the program (i.e., peripherals are not re-initialized).
+    /// - The provided `hal`, `core_freq`, and `terminal` arguments are valid and properly initialized before being passed to this function.
     ///
-    /// # Panics
-    /// This function will panic if the Cortex-M peripherals cannot be acquired using `Peripherals::take()`.
-    /// Ensure that this function is not called more than once or after the peripherals are already taken.
+    /// # Side Effects
+    /// - Updates the `KERNEL_DATA` structure with the provided `hal`, `core_freq`, and `terminal`.
+    /// - Sets `KERNEL_DATA.cortex_peripherals` to the system's core peripherals using `Peripherals::take()`.
     ///
-    pub fn init_kernel_data(hal: Hal, core_freq: u32) {
+    /// **Warning:** Improper invocation of this function or passing invalid parameters may lead to undefined behavior.
+    pub fn init_kernel_data(hal: Hal, core_freq: u32, terminal: Terminal) {
         unsafe {
             KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
             KERNEL_DATA.hal = Some(hal);
             KERNEL_DATA.core_freq = core_freq;
+            KERNEL_DATA.terminal = Some(terminal);
         }
     }
 
@@ -134,6 +160,17 @@ impl Kernel {
                 KERNEL_DATA.cortex_peripherals.as_mut().unwrap()
             } else {
                 panic!("Cortex-M peripherals not initialized");
+            }
+        }
+    }
+
+    #[allow(static_mut_refs)]
+    pub fn terminal() -> &'static mut Terminal {
+        unsafe {
+            if KERNEL_DATA.terminal.is_some() {
+                KERNEL_DATA.terminal.as_mut().unwrap()
+            } else {
+                panic!("Terminal not initialized");
             }
         }
     }

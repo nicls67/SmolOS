@@ -6,7 +6,7 @@ mod interface_init;
 use crate::interface_init::init_interfaces;
 use cortex_m_rt::entry;
 use hal_interface::{CoreClkConfig, Hal, HalConfig};
-use kernel::{BootConfig, Milliseconds};
+use kernel::{BootConfig, Milliseconds, TerminalType};
 
 #[entry]
 fn main() -> ! {
@@ -27,7 +27,10 @@ fn main() -> ! {
         systick_period: Milliseconds(1),
         core_freq,
         hal,
+        system_terminal_name: "SERIAL_MAIN",
+        system_terminal_type: TerminalType::Usart,
     });
 
+    #[allow(clippy::empty_loop)]
     loop {}
 }

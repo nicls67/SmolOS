@@ -50,9 +50,9 @@ impl HalErrorLevel {
     /// be used for logging or display purposes.
     pub fn as_str(&self) -> &str {
         match self {
-            HalErrorLevel::Fatal => "Fatal error : ",
-            HalErrorLevel::Critical => "Critical error : ",
-            HalErrorLevel::Error => "Error : ",
+            HalErrorLevel::Fatal => "HAL Fatal error : ",
+            HalErrorLevel::Critical => "HAL Critical error : ",
+            HalErrorLevel::Error => "HAL Error : ",
         }
     }
 }
