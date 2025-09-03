@@ -2,7 +2,6 @@ use cortex_m::Peripherals;
 use hal_interface::Hal;
 
 use crate::terminal::Terminal;
-use panic_semihosting as _;
 
 /// A mutable static instance of the `Kernel` structure.
 ///

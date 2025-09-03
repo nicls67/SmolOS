@@ -1,3 +1,5 @@
+use crate::ident::KERNEL_NAME;
+use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
 
@@ -38,4 +40,18 @@ unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
 
     #[allow(clippy::empty_loop)]
     loop {}
+}
+
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    // Print the panic message
+    hprintln!("{} has panicked !!!!!", KERNEL_NAME);
+    hprintln!("{}", info);
+    hprintln!("\r\nSystem will reboot in 5 seconds...");
+
+    // Wait for 3 seconds
+    cortex_m::asm::delay(216_000_000 * 5);
+
+    // Reset the system
+    cortex_m::peripheral::SCB::sys_reset();
 }
