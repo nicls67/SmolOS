@@ -1,5 +1,6 @@
 #![no_std]
 mod data;
+mod errors_mgt;
 mod except;
 mod ident;
 mod types;
