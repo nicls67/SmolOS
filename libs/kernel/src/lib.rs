@@ -15,7 +15,7 @@ use crate::scheduler::{App, Scheduler};
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 use cortex_m::peripheral::syst::SystClkSource;
 use hal_interface::Hal;
-use heapless::{String, format};
+use heapless::format;
 pub use types::*;
 
 pub struct BootConfig {

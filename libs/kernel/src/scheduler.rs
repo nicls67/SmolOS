@@ -1,8 +1,8 @@
 use crate::KernelError::CannotAddNewPeriodicApp;
 use crate::data::Kernel;
 use crate::except::set_ticks_target;
-use crate::{KernelError, KernelErrorLevel, KernelResult, Milliseconds, TerminalFormatting};
-use cortex_m::peripheral::scb::{FpuAccessMode, SystemHandler};
+use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
+use cortex_m::peripheral::scb::SystemHandler;
 use heapless::{String, Vec};
 
 pub type App = fn() -> KernelResult<()>;

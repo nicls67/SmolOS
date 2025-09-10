@@ -2,8 +2,6 @@ use crate::data::Kernel;
 use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m::peripheral::SCB;
 use cortex_m_rt::exception;
-use hal_interface::GpioWriteActions::Toggle;
-use hal_interface::InterfaceWriteActions;
 
 static SCHED_TICKS_COUNTER: AtomicU32 = AtomicU32::new(0);
 static SCHED_TICKS_TARGET: AtomicU32 = AtomicU32::new(0);

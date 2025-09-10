@@ -1,6 +1,6 @@
 use crate::data::Kernel;
 use crate::{KernelError, KernelResult, Milliseconds};
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 use hal_interface::GpioWriteActions::Toggle;
 use hal_interface::InterfaceWriteActions;
 
