@@ -1,101 +1,103 @@
+use crate::scheduler::Scheduler;
+use crate::terminal::Terminal;
+use crate::{Mhz, Milliseconds};
 use cortex_m::Peripherals;
 use hal_interface::Hal;
 
-use crate::terminal::Terminal;
-
-/// A mutable static instance of the `Kernel` structure.
-///
-/// # Overview
-/// The `KERNEL_DATA` variable serves as a global instance of the `Kernel` structure.
-/// It is mutable and uninitialized by default, allowing it to be configured
-/// during runtime. This data structure holds necessary details regarding the
-/// kernel's context, including its peripherals, HAL (Hardware Abstraction Layer),
-/// core frequency, and terminal.
-///
-/// # Fields
-/// - `cortex_peripherals`: (Optional) Represents the Cortex-M peripherals,
-///   such as system control or NVIC. Initialized to `None` by default.
-/// - `hal`: (Optional) Represents the Hardware Abstraction Layer instance for
-///   interacting with hardware components. Initialized to `None` by default.
-/// - `core_freq`: Represents the frequency of the core in Hz. Initialized
-///   to `0` by default.
-/// - `terminal`: (Optional) Represents the kernel's terminal instance,
-///   typically used for I/O (Input/Output) operations. Initialized to `None`
-///   by default.
-///
-/// # Safety
-/// Since `KERNEL_DATA` is declared as `pub static mut`, it is inherently unsafe
-/// due to potential data races or undefined behavior when accessed by multiple
-/// threads. It must be used with caution, and any access to this variable
-/// should be wrapped in appropriate synchronization mechanisms (e.g., critical
-/// sections, mutexes) to ensure thread safety.
-///
-/// # Note
-/// Modification of this static should always occur in a controlled environment
-/// where no other threads can access the variable simultaneously. Mismanagement
-/// may introduce undefined behavior or system instability.
-///
-/// # Context
-/// This `Kernel` structure and its fields are essential for coordinating
-/// hardware
 pub static mut KERNEL_DATA: Kernel = Kernel {
     cortex_peripherals: None,
     hal: None,
-    core_freq: 0,
+    kernel_time_data: None,
     terminal: None,
+    scheduler: None,
 };
 
-/// The `Kernel` struct represents the core entity responsible for managing
-/// hardware peripherals and hardware abstraction layer (HAL) components
-/// within the application.
+/// A data structure representing timing-related configuration for the system kernel.
 ///
-/// This structure encapsulates two key optional elements:
-/// - `cortex_peripherals`: An optional field representing the peripherals
-///   specific to the Cortex microcontroller, typically used for interacting
-///   with hardware at a low level. This uses the `Peripherals` type.
-/// - `hal`: An optional field encapsulating the hardware abstraction layer,
-///   which provides higher-level functionality over the raw hardware peripherals.
+/// This structure contains information regarding the core processor's frequency
+/// and the system tick (systick) period, which are essential for coordinating time-sensitive
+/// operations within the kernel.
 ///
 /// # Fields
-/// * `cortex_peripherals` - Optionally holds the `Peripherals` object,
-///   enabling direct control over the underlying microcontroller features.
-/// * `hal` - Optionally holds the `Hal` object, providing a layer of abstraction
-///   for easier access to the microcontroller's features.
 ///
-/// The `Kernel` struct is designed to allow modular and flexible initialization
-/// for embedded systems, enabling the user to configure these components as required.
+/// * `core_frequency` (`Mhz`):
+///   The operating frequency of the core processor in megahertz. This value defines the
+///   speed at which the processor operates and is used for timing calculations.
+///
+/// * `systick_period` (`Milliseconds`):
+///   The period of the system tick in milliseconds. This value represents the interval
+///   between systick interrupts, which are used for task scheduling, kernel timing,
+///   and system timekeeping.
+///
+/// Both fields must be configured appropriately to ensure proper kernel operation,
+/// particularly for accurate timing and synchronization.
+
+#[derive(Clone)]
+pub struct KernelTimeData {
+    pub core_frequency: Mhz,
+    pub systick_period: Milliseconds,
+}
+
+/// Represents the central structure of the operating system kernel, containing various components
+/// required for its operation.
+///
+/// The `Kernel` struct encapsulates the core components of the system, utilizing optional fields
+/// for flexibility during initialization and configuration. Each field governs a critical aspect
+/// of kernel functionality, ranging from low-level peripherals to high-level scheduling.
+///
+/// Fields:
+/// - `cortex_peripherals`: Optionally holds the Cortex-M microcontroller's peripherals,
+///   providing access to essential hardware features such as system timers, interrupts, and
+///   other on-chip components.
+/// - `hal`: Optionally stores the Hardware Abstraction Layer (HAL) implementation, offering
+///   a consistent interface to underlying hardware interactions and abstractions.
+/// - `kernel_time_data`: Optionally contains timing-related data and utilities crucial for
+///   measuring and managing system time, delays, or scheduling operations.
+/// - `terminal`: Optionally provides a text-based terminal interface for user interaction,
+///   logging, or debugging purposes.
+/// - `scheduler`: Optionally manages task scheduling and context switching, ensuring efficient
+///   execution and multitasking within the kernel.
+///
+/// The `Kernel` struct is designed to allow lazy initialization of its components, enabling
+/// modular development and customization of the kernel according to specific use cases or hardware
+/// configurations.
 pub struct Kernel {
     cortex_peripherals: Option<Peripherals>,
     hal: Option<Hal>,
-    core_freq: u32,
+    kernel_time_data: Option<KernelTimeData>,
     terminal: Option<Terminal>,
+    scheduler: Option<Scheduler>,
 }
 
 impl Kernel {
-    /// Initializes the kernel data with the given hardware abstraction layer, core frequency, and terminal instance.
+    /// Initializes the kernel data structure with the provided components.
+    ///
+    /// This function sets up essential components of the kernel by assigning
+    /// values to the global `KERNEL_DATA` structure. It is used to configure
+    /// and prepare the kernel for operation. The function leverages unsafe
+    /// blocks to directly modify static data, which requires caution to ensure
+    /// proper synchronization and safety.
     ///
     /// # Parameters
-    /// - `hal`: An instance of the hardware abstraction layer (`Hal`) which provides access to hardware-specific functionality.
-    /// - `core_freq`: The core frequency of the system, represented as a `u32`.
-    /// - `terminal`: An instance of the `Terminal` structure, used for output or logging operations.
     ///
-    /// # Safety
-    /// This function modifies a global static structure (`KERNEL_DATA`) within an `unsafe` block. It relies on the assumption
-    /// that:
-    /// - `Peripherals::take()` is called only once during the lifetime of the program (i.e., peripherals are not re-initialized).
-    /// - The provided `hal`, `core_freq`, and `terminal` arguments are valid and properly initialized before being passed to this function.
-    ///
-    /// # Side Effects
-    /// - Updates the `KERNEL_DATA` structure with the provided `hal`, `core_freq`, and `terminal`.
-    /// - Sets `KERNEL_DATA.cortex_peripherals` to the system's core peripherals using `Peripherals::take()`.
-    ///
-    /// **Warning:** Improper invocation of this function or passing invalid parameters may lead to undefined behavior.
-    pub fn init_kernel_data(hal: Hal, core_freq: u32, terminal: Terminal) {
+    /// - `hal`: The hardware abstraction layer (HAL) used to interface with the
+    ///   hardware of the system.
+    /// - `kernel_time_data`: Data related to the kernel's timekeeping mechanisms.
+    /// - `terminal`: The terminal interface used for input/output operations in
+    ///   the kernel environment.
+    /// - `scheduler`: The task
+    pub fn init_kernel_data(
+        hal: Hal,
+        kernel_time_data: KernelTimeData,
+        terminal: Terminal,
+        scheduler: Scheduler,
+    ) {
         unsafe {
             KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
             KERNEL_DATA.hal = Some(hal);
-            KERNEL_DATA.core_freq = core_freq;
+            KERNEL_DATA.kernel_time_data = Some(kernel_time_data);
             KERNEL_DATA.terminal = Some(terminal);
+            KERNEL_DATA.scheduler = Some(scheduler);
         }
     }
 
@@ -163,6 +165,25 @@ impl Kernel {
         }
     }
 
+    /// Provides mutable access to the global `Terminal` instance safely.
+    ///
+    /// # Returns
+    /// A mutable reference to the global `Terminal` instance, if it has been initialized successfully.
+    ///
+    /// # Panics
+    /// This function will panic if the `terminal` field in `KERNEL_DATA` is not initialized.
+    /// Ensure that the `terminal` field is properly set up before calling this function.
+    ///
+    /// # Safety
+    /// This function internally uses unsafe blocks to access a static mutable reference,
+    /// which can potentially lead to undefined behavior if improperly used.
+    /// The caller must ensure synchronization and prevent concurrent access to this data
+    /// to avoid data races in a multithreaded context.
+    ///
+    /// # Note
+    /// The improper usage of static mutable references is usually considered unsafe in Rust.
+    /// However, this function makes use of `#[allow(static_mut_refs)]` to suppress warnings
+    /// related to static mutable references
     #[allow(static_mut_refs)]
     pub fn terminal() -> &'static mut Terminal {
         unsafe {
@@ -170,6 +191,59 @@ impl Kernel {
                 KERNEL_DATA.terminal.as_mut().unwrap()
             } else {
                 panic!("Terminal not initialized");
+            }
+        }
+    }
+
+    /// Returns a mutable reference to the global `Scheduler` instance if it is initialized.
+    ///
+    /// # Safety
+    /// This function uses an unsafe block to access and return a mutable reference
+    /// to a static variable. This introduces the risk of undefined behavior if improper
+    /// access occurs, for example, if the `scheduler` is accessed concurrently without
+    /// proper synchronization. Ensure that this function is only called in a single-threaded
+    /// context or that proper synchronization mechanisms are in place.
+    ///
+    /// # Panics
+    /// This function will panic if the global `Scheduler` is not initialized (i.e., if
+    /// `KERNEL_DATA.scheduler` is `None`).
+    ///
+    /// # Returns
+    /// * A mutable reference to the global `Scheduler` instance.
+    ///
+    #[allow(static_mut_refs)]
+    pub fn scheduler() -> &'static mut Scheduler {
+        unsafe {
+            if KERNEL_DATA.scheduler.is_some() {
+                KERNEL_DATA.scheduler.as_mut().unwrap()
+            } else {
+                panic!("Scheduler not initialized");
+            }
+        }
+    }
+
+    /// Returns a static reference to the `KernelTimeData` if it has been initialized.
+    ///
+    /// # Safety
+    /// This function performs an unsafe block to obtain a mutable reference to a static
+    /// instance, which is then converted into an immutable reference. This is safe only
+    /// under the assumption that no other part of the code violates Rust's aliasing rules
+    /// by attempting to modify the static data concurrently.
+    ///
+    /// # Panics
+    /// This function will panic if the `kernel_time_data` field in `KERNEL_DATA`
+    /// is not initialized (`None`).
+    ///
+    /// # Notes
+    /// - The `#[allow(static_mut_refs)]` attribute is used to suppress warnings for the
+    ///   unsafe
+    #[allow(static_mut_refs)]
+    pub fn time_data() -> &'static KernelTimeData {
+        unsafe {
+            if KERNEL_DATA.kernel_time_data.is_some() {
+                KERNEL_DATA.kernel_time_data.as_mut().unwrap()
+            } else {
+                panic!("Time data not initialized");
             }
         }
     }

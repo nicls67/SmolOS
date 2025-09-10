@@ -9,6 +9,7 @@ use core::fmt::Display;
 ///
 /// * `0` - The inner `u32` value representing the duration in milliseconds.
 ///
+#[derive(Clone)]
 pub struct Milliseconds(pub u32);
 
 impl Display for Milliseconds {
@@ -68,6 +69,7 @@ impl Milliseconds {
 ///
 /// Note: The maximum value is `u32::MAX` seconds (approximately 136 years).
 ///
+#[derive(Clone)]
 pub struct Seconds(pub u32);
 
 impl Display for Seconds {
@@ -114,6 +116,60 @@ impl Seconds {
     /// A `u32` representation of the inner value.
     ///
     /// This method assumes that the inner value of the type can be directly represented as a `u32`.
+    pub fn to_u32(&self) -> u32 {
+        self.0
+    }
+}
+
+/// A struct representing a frequency in megahertz (MHz).
+///
+/// This struct is a simple wrapper around a `u32` value. It is used to provide
+/// additional type safety and semantic meaning to a value that represents a
+/// frequency measured in MHz.
+///
+/// # Fields
+///
+/// * `0`: A `u32` value representing the frequency in MHz.
+///
+/// # Note
+///
+/// While this struct does not implement additional methods or validation,
+/// it provides clarity when working with values that specifically represent
+/// frequencies in MHz.
+#[derive(Clone)]
+pub struct Mhz(pub u32);
+
+impl Display for Mhz {
+    /// Implements the `fmt` method for a custom type to enable it to be displayed using the
+    /// `Display` trait. This implementation formats the type's value, assumed to be
+    /// frequency data, as a string with "MHz" appended.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - A mutable reference to a `core::fmt::Formatter` used to build the display string.
+    ///
+    /// # Returns
+    ///
+    /// A `core::fmt::Result` indicating success or failure of the formatting process.
+    ///
+    /// # Behavior
+    ///
+    /// Writes the frequency value (stored in `self.0`) followed by the "MHz" unit
+    /// into the provided formatter. For example, if the value of `self.0` is `100`,
+    /// this will produce the string "100 MHz".
+    ///
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{} MHz", self.0)
+    }
+}
+
+impl Mhz {
+    /// Converts the inner value of the type into a `u32`.
+    ///
+    /// # Returns
+    ///
+    /// This method returns the `u32` representation of the inner value stored in the type.
+    ///
     pub fn to_u32(&self) -> u32 {
         self.0
     }

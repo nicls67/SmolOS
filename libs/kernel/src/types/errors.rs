@@ -1,4 +1,5 @@
-use crate::KernelError::{HalError, TerminalError};
+use crate::KernelError::{AppInitError, CannotAddNewPeriodicApp, HalError, TerminalError};
+use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use hal_interface::HalError as HalErrorDef;
 use heapless::{String, format};
 
@@ -14,9 +15,9 @@ pub enum KernelErrorLevel {
 impl KernelErrorLevel {
     pub fn as_str(&self) -> &str {
         match self {
-            KernelErrorLevel::Fatal => "Fatal error : ",
-            KernelErrorLevel::Critical => "Critical error : ",
-            KernelErrorLevel::Error => "Error : ",
+            Fatal => "Fatal error : ",
+            Critical => "Critical error : ",
+            Error => "Error : ",
         }
     }
 }
@@ -25,6 +26,8 @@ impl KernelErrorLevel {
 pub enum KernelError {
     HalError(HalErrorDef),
     TerminalError(KernelErrorLevel, &'static str, &'static str),
+    CannotAddNewPeriodicApp(String<32>),
+    AppInitError(String<32>),
 }
 
 impl KernelError {
@@ -36,6 +39,24 @@ impl KernelError {
                 msg.push_str(lvl.as_str()).unwrap();
                 msg.push_str(
                     format!(200; "Error in terminal {} : {}", name, err)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            CannotAddNewPeriodicApp(name) => {
+                msg.push_str(Critical.as_str()).unwrap();
+                msg.push_str(
+                    format!(200; "Cannot add periodic app {} : app vector is full", name)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            AppInitError(name) => {
+                msg.push_str(Critical.as_str()).unwrap();
+                msg.push_str(
+                    format!(200; "Cannot initialize app {}", name)
                         .unwrap()
                         .as_str(),
                 )

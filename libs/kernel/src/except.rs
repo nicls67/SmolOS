@@ -26,8 +26,5 @@ fn SysTick() {
 
 #[exception]
 fn PendSV() {
-    let id = Kernel::hal().get_interface_id("ACT_LED").unwrap();
-    Kernel::hal()
-        .interface_write(id, InterfaceWriteActions::GpioWrite(Toggle))
-        .unwrap();
+    Kernel::scheduler().periodic_task().unwrap();
 }

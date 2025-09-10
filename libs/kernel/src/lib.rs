@@ -3,23 +3,24 @@ mod data;
 mod errors_mgt;
 mod except;
 mod ident;
+mod kernel_apps;
+mod scheduler;
 mod terminal;
 mod types;
 
 use crate::data::Kernel;
-use crate::except::set_ticks_target;
+pub use crate::data::KernelTimeData;
 use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
+use crate::scheduler::{App, Scheduler};
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
-use cortex_m::peripheral::scb::SystemHandler;
 use cortex_m::peripheral::syst::SystClkSource;
 use hal_interface::Hal;
-use heapless::format;
+use heapless::{String, format};
 pub use types::*;
 
 pub struct BootConfig {
     pub sched_period: Milliseconds,
-    pub systick_period: Milliseconds,
-    pub core_freq: u32,
+    pub kernel_time_data: KernelTimeData,
     pub hal: Hal,
     pub system_terminal_name: &'static str,
     pub system_terminal_type: TerminalType,
@@ -63,10 +64,13 @@ pub fn boot(config: BootConfig) {
     /////////////////////////
     // Kernel initialization
     /////////////////////////
+
+    let sched = Scheduler::new(config.sched_period);
     Kernel::init_kernel_data(
         config.hal,
-        config.core_freq,
+        config.kernel_time_data.clone(),
         Terminal::new(config.system_terminal_name, config.system_terminal_type),
+        sched,
     );
 
     let terminal = Kernel::terminal();
@@ -91,22 +95,40 @@ pub fn boot(config: BootConfig) {
     let cortex_p = Kernel::cortex_peripherals();
     cortex_p.SYST.set_clock_source(SystClkSource::Core);
     cortex_p.SYST.clear_current();
-    cortex_p
-        .SYST
-        .set_reload(config.core_freq * config.systick_period.to_u32() / 1000);
+    cortex_p.SYST.set_reload(
+        config.kernel_time_data.core_frequency.to_u32()
+            * config.kernel_time_data.systick_period.to_u32()
+            / 1000,
+    );
     cortex_p.SYST.enable_interrupt();
-
-    // Initialize scheduler periodic IT
-    unsafe {
-        cortex_p.SCB.set_priority(SystemHandler::PendSV, 0xFF);
-        set_ticks_target(config.sched_period.to_u32() / config.systick_period.to_u32())
-    }
-
-    // Start Systick
-    cortex_p.SYST.enable_counter();
 
     //Boot completed
     terminal
         .write(&TerminalFormatting::StrNewLineAfter("Kernel ready !"))
         .unwrap();
+}
+
+/// Starts the system scheduler.
+///
+/// This function initializes and starts the kernel's scheduler. It retrieves the scheduler
+/// instance from the `Kernel`, and then attempts to start it. The `unwrap()` is used on the result
+/// of the `start()` method, meaning that this function will panic if the scheduler fails to start.
+///
+/// # Panics
+///
+/// This function will panic if the `start()` method of the scheduler returns an error.
+///
+/// Ensure that the system is properly set up and ready for scheduling before calling this function.
+pub fn start_scheduler() {
+    Kernel::scheduler()
+        .start(Kernel::time_data().clone().systick_period)
+        .unwrap();
+}
+
+pub fn add_periodic_app(name: &str, app: App, init: App, period: Milliseconds) -> KernelResult<()> {
+    Kernel::scheduler().add_periodic_app(name, app, init, period)
+}
+
+pub fn start_kernel_apps() {
+    kernel_apps::initialize_kernel_apps().unwrap()
 }
