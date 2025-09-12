@@ -1,4 +1,6 @@
+use crate::data::Kernel;
 use crate::ident::KERNEL_NAME;
+use crate::{KernelError, KernelErrorLevel};
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
@@ -82,4 +84,12 @@ fn panic(info: &PanicInfo) -> ! {
 
     // Reset the system
     cortex_m::peripheral::SCB::sys_reset();
+}
+
+pub fn error_handler(err: &KernelError) {
+    match err.severity() {
+        KernelErrorLevel::Fatal => panic!("{}", err.to_string()),
+        KernelErrorLevel::Critical => Kernel::scheduler().abort_task(),
+        KernelErrorLevel::Error => {}
+    }
 }

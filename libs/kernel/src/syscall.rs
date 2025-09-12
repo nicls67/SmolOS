@@ -1,4 +1,5 @@
 use crate::data::Kernel;
+use crate::errors_mgt::error_handler;
 use crate::{KernelError, KernelResult};
 use hal_interface::{InterfaceReadActions, InterfaceWriteActions};
 
@@ -14,7 +15,7 @@ pub enum Syscall<'a> {
 }
 
 pub fn syscall(syscall_type: Syscall) -> KernelResult<()> {
-    match syscall_type {
+    let result = match syscall_type {
         Syscall::Hal(args) => {
             if let Some(write_action) = args.write_action {
                 if args.read_action.is_none() {
@@ -43,5 +44,13 @@ pub fn syscall(syscall_type: Syscall) -> KernelResult<()> {
             }
             Err(e) => Err(KernelError::HalError(e)),
         },
+    };
+
+    match result {
+        Ok(..) => Ok(()),
+        Err(err) => {
+            error_handler(&err);
+            Err(err)
+        }
     }
 }

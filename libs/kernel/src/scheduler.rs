@@ -1,7 +1,8 @@
 use crate::KernelError::CannotAddNewPeriodicApp;
 use crate::data::Kernel;
-use crate::except::set_ticks_target;
+use crate::except::{return_from_exception, set_ticks_target};
 use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
+use cortex_m::peripheral::SCB;
 use cortex_m::peripheral::scb::SystemHandler;
 use heapless::{String, Vec};
 
@@ -11,12 +12,14 @@ struct AppWrapper {
     name: String<32>,
     app: App,
     app_period: u32,
+    active: bool,
 }
 pub struct Scheduler {
     tasks: Vec<AppWrapper, 128>,
     cycle_counter: u32,
     sched_period: Milliseconds,
     pub started: bool,
+    current_task_id: Option<usize>,
 }
 
 impl Scheduler {
@@ -26,6 +29,7 @@ impl Scheduler {
             cycle_counter: 0,
             sched_period: period,
             started: false,
+            current_task_id: None,
         }
     }
 
@@ -61,17 +65,43 @@ impl Scheduler {
                 name: app_name.clone(),
                 app,
                 app_period: period.to_u32() / self.sched_period.to_u32(),
+                active: true,
             })
             .map_err(|_| CannotAddNewPeriodicApp(app_name))
     }
 
-    pub fn periodic_task(&mut self) -> KernelResult<()> {
-        for task in self.tasks.iter() {
-            if self.cycle_counter % task.app_period == 0 {
-                (task.app)()?;
+    pub fn periodic_task(&mut self) {
+        let start_id;
+
+        // Find the first active task to run
+        if let Some(id) = self.current_task_id {
+            start_id = id + 1;
+        } else {
+            start_id = 0;
+        }
+
+        // Run all tasks
+        for id in start_id..self.tasks.len() {
+            if self.cycle_counter % self.tasks[id].app_period == 0 {
+                self.current_task_id = Some(id);
+                let _ = (self.tasks[id].app)();
+                self.current_task_id = None;
             }
         }
+
         self.cycle_counter += 1;
-        Ok(())
+    }
+
+    pub fn abort_task(&mut self) {
+        // Set the current task as inactive
+        if let Some(id) = self.current_task_id {
+            self.tasks[id].active = false;
+        }
+
+        // Program new exception handler
+        SCB::set_pendsv();
+
+        // Return from exception
+        return_from_exception();
     }
 }

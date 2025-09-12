@@ -1,6 +1,8 @@
 use crate::data::Kernel;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering, compiler_fence, fence};
+use cortex_m::asm::{dsb, isb};
 use cortex_m::peripheral::SCB;
+use cortex_m::peripheral::scb::VectActive::Exception;
 use cortex_m_rt::exception;
 
 static SCHED_TICKS_COUNTER: AtomicU32 = AtomicU32::new(0);
@@ -24,5 +26,29 @@ fn SysTick() {
 
 #[exception]
 fn PendSV() {
-    Kernel::scheduler().periodic_task().unwrap();
+    Kernel::scheduler().periodic_task();
+}
+
+pub fn return_from_exception() {
+    if let Exception(_) = SCB::vect_active() {
+        let mut exc: u32;
+        unsafe {
+            core::arch::asm!("mov {r}, lr", r = out(reg) exc, options(nomem, nostack, preserves_flags));
+        }
+
+        compiler_fence(Ordering::SeqCst);
+        fence(Ordering::SeqCst);
+
+        dsb();
+        isb();
+
+        unsafe {
+            core::arch::asm!(
+            "mov lr, {exc}",
+            "bx lr",
+            exc = in(reg) exc,
+            options(noreturn)
+            );
+        }
+    }
 }
