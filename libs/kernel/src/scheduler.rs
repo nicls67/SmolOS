@@ -16,6 +16,7 @@ pub struct Scheduler {
     tasks: Vec<AppWrapper, 128>,
     cycle_counter: u32,
     sched_period: Milliseconds,
+    pub started: bool,
 }
 
 impl Scheduler {
@@ -24,6 +25,7 @@ impl Scheduler {
             tasks: Vec::new(),
             cycle_counter: 0,
             sched_period: period,
+            started: false,
         }
     }
 
@@ -37,6 +39,7 @@ impl Scheduler {
         }
 
         cortex_p.SYST.enable_counter();
+        self.started = true;
         Kernel::terminal().write(&TerminalFormatting::StrNewLineBoth("Scheduler started !"))
     }
 
