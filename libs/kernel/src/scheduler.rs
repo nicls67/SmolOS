@@ -1,5 +1,6 @@
 use crate::KernelError::CannotAddNewPeriodicApp;
 use crate::data::Kernel;
+use crate::errors_mgt::error_handler;
 use crate::except::{return_from_exception, set_ticks_target};
 use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
 use cortex_m::peripheral::SCB;
@@ -82,9 +83,12 @@ impl Scheduler {
 
         // Run all tasks
         for id in start_id..self.tasks.len() {
-            if self.cycle_counter % self.tasks[id].app_period == 0 {
+            if self.cycle_counter % self.tasks[id].app_period == 0 && self.tasks[id].active {
                 self.current_task_id = Some(id);
-                let _ = (self.tasks[id].app)();
+                match (self.tasks[id].app)() {
+                    Ok(..) => {}
+                    Err(e) => error_handler(&e),
+                }
                 self.current_task_id = None;
             }
         }

@@ -1,3 +1,4 @@
+use crate::TerminalFormatting::StrNewLineBoth;
 use crate::data::Kernel;
 use crate::ident::KERNEL_NAME;
 use crate::{KernelError, KernelErrorLevel};
@@ -89,7 +90,14 @@ fn panic(info: &PanicInfo) -> ! {
 pub fn error_handler(err: &KernelError) {
     match err.severity() {
         KernelErrorLevel::Fatal => panic!("{}", err.to_string()),
-        KernelErrorLevel::Critical => Kernel::scheduler().abort_task(),
-        KernelErrorLevel::Error => {}
+        KernelErrorLevel::Critical => {
+            Kernel::terminal()
+                .write(&StrNewLineBoth(err.to_string().as_str()))
+                .unwrap_or(());
+            Kernel::scheduler().abort_task()
+        }
+        KernelErrorLevel::Error => Kernel::terminal()
+            .write(&StrNewLineBoth(err.to_string().as_str()))
+            .unwrap_or(()),
     }
 }
