@@ -1,5 +1,6 @@
 use crate::HalError::{
-    IncompatibleAction, InterfaceInitError, ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
+    IncompatibleAction, InterfaceInitError, InterfaceNotFound, ReadOnlyInterface,
+    WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::HalErrorLevel::{Critical, Error, Fatal};
 use crate::{HalResult, InterfaceReadActions, InterfaceWriteActions};
@@ -68,7 +69,7 @@ impl InterfaceVect {
     pub fn add_interface(&mut self, interface: Interface) -> HalResult<()> {
         self.vect
             .push(interface)
-            .map_err(|_| InterfaceInitError(Fatal, "interfaces list is full"))?;
+            .map_err(|_| InterfaceInitError("interfaces list is full"))?;
 
         Ok(())
     }
@@ -100,49 +101,43 @@ impl InterfaceVect {
                 return Ok(i);
             }
         }
-        Err(InterfaceInitError(Critical, name))
+        Err(InterfaceNotFound(name))
     }
 
     pub fn interface_write(&mut self, id: usize, action: InterfaceWriteActions) -> HalResult<()> {
-        let interface = self
-            .vect
-            .get_mut(id)
-            .ok_or(WrongInterfaceId(Critical, id))?;
+        let interface = self.vect.get_mut(id).ok_or(WrongInterfaceId(id))?;
 
         match &mut interface.interface {
             InterfaceType::GpioOutput(pin) => {
                 if let InterfaceWriteActions::GpioWrite(action) = action {
                     action.action(pin)
                 } else {
-                    Err(IncompatibleAction(Error, action.name(), interface.name))
+                    Err(IncompatibleAction(action.name(), interface.name))
                 }
             }
             InterfaceType::Uart(uart) => {
                 if let InterfaceWriteActions::UartWrite(action) = action {
                     action.action(uart)
                 } else {
-                    Err(IncompatibleAction(Error, action.name(), interface.name))
+                    Err(IncompatibleAction(action.name(), interface.name))
                 }
             }
-            _ => Err(ReadOnlyInterface(Error, interface.name)),
+            _ => Err(ReadOnlyInterface(interface.name)),
         }
     }
 
     pub fn interface_read(&mut self, id: usize, action: InterfaceReadActions) -> HalResult<()> {
-        let interface = self
-            .vect
-            .get_mut(id)
-            .ok_or(WrongInterfaceId(Critical, id))?;
+        let interface = self.vect.get_mut(id).ok_or(WrongInterfaceId(id))?;
 
         match &mut interface.interface {
             InterfaceType::Uart(uart) => {
                 if let InterfaceReadActions::UartRead(mut action) = action {
                     action.action(uart)
                 } else {
-                    Err(IncompatibleAction(Error, action.name(), interface.name))
+                    Err(IncompatibleAction(action.name(), interface.name))
                 }
             }
-            _ => Err(WriteOnlyInterface(Error, interface.name)),
+            _ => Err(WriteOnlyInterface(interface.name)),
         }
     }
 }

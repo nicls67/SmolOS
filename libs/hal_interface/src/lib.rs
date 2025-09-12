@@ -134,7 +134,7 @@ impl Hal {
     ///
     pub fn lock(&mut self) -> HalResult<()> {
         if self.locked {
-            Err(HalAlreadyLocked(Error))
+            Err(HalAlreadyLocked)
         } else {
             self.locked = true;
             Ok(())
@@ -158,7 +158,7 @@ impl Hal {
     /// Once the HAL instance
     pub fn add_interface(&mut self, interface: Interface) -> HalResult<()> {
         if self.locked {
-            Err(HalAlreadyLocked(Fatal))
+            Err(HalAlreadyLocked)
         } else {
             self.interface.add_interface(interface)?;
             Ok(())
@@ -185,7 +185,7 @@ impl Hal {
     ///
     pub fn get_interface_id(&self, name: &'static str) -> HalResult<usize> {
         if !self.locked {
-            Err(HalNotLocked(Critical))
+            Err(HalNotLocked)
         } else {
             self.interface.get_interface_id(name)
         }
@@ -210,7 +210,7 @@ impl Hal {
     /// - Delegates the actual write operation to the `self.interface.interface_write` method.
     pub fn interface_write(&mut self, id: usize, action: InterfaceWriteActions) -> HalResult<()> {
         if !self.locked {
-            Err(HalNotLocked(Critical))
+            Err(HalNotLocked)
         } else {
             self.interface.interface_write(id, action)
         }
@@ -241,7 +241,7 @@ impl Hal {
     ///
     pub fn interface_read(&mut self, id: usize, action: InterfaceReadActions) -> HalResult<()> {
         if !self.locked {
-            Err(HalNotLocked(Critical))
+            Err(HalNotLocked)
         } else {
             self.interface.interface_read(id, action)
         }

@@ -5,6 +5,7 @@ use crate::HalError::{
     HalAlreadyLocked, HalNotLocked, IncompatibleAction, InterfaceInitError, InterfaceNotFound,
     ReadError, ReadOnlyInterface, WriteError, WriteOnlyInterface, WrongInterfaceId,
 };
+use crate::HalErrorLevel::{Critical, Error, Fatal};
 use heapless::{String, format};
 
 pub type HalResult<T> = Result<T, HalError>;
@@ -28,7 +29,7 @@ pub type HalResult<T> = Result<T, HalError>;
 ///   Denotes a standard error that indicates a problem or failure in the HAL,
 ///   but is less severe than `Critical` or `Fatal` and might be recoverable.
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum HalErrorLevel {
     Fatal,
     Critical,
@@ -59,14 +60,14 @@ impl HalErrorLevel {
 
 #[derive(Debug)]
 pub enum HalError {
-    HalAlreadyLocked(HalErrorLevel),
-    HalNotLocked(HalErrorLevel),
-    InterfaceInitError(HalErrorLevel, &'static str),
-    InterfaceNotFound(HalErrorLevel, &'static str),
-    WrongInterfaceId(HalErrorLevel, usize),
-    ReadOnlyInterface(HalErrorLevel, &'static str),
-    WriteOnlyInterface(HalErrorLevel, &'static str),
-    IncompatibleAction(HalErrorLevel, &'static str, &'static str),
+    HalAlreadyLocked,
+    HalNotLocked,
+    InterfaceInitError(&'static str),
+    InterfaceNotFound(&'static str),
+    WrongInterfaceId(usize),
+    ReadOnlyInterface(&'static str),
+    WriteOnlyInterface(&'static str),
+    IncompatibleAction(&'static str, &'static str),
     WriteError(HalErrorLevel, &'static str),
     ReadError(HalErrorLevel, &'static str),
 }
@@ -75,21 +76,21 @@ impl HalError {
     pub fn to_string(&self) -> String<256> {
         let mut msg = String::new();
         match self {
-            HalAlreadyLocked(lvl) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            HalAlreadyLocked => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str("HAL already locked").unwrap();
             }
-            HalNotLocked(lvl) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            HalNotLocked => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str("HAL not locked").unwrap();
             }
-            InterfaceInitError(lvl, err) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            InterfaceInitError(err) => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str("Interface initialization error : ").unwrap();
                 msg.push_str(err).unwrap_or(());
             }
-            InterfaceNotFound(lvl, name) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            InterfaceNotFound(name) => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(30; "Interface {} not found", name)
                         .unwrap()
@@ -97,8 +98,8 @@ impl HalError {
                 )
                 .unwrap();
             }
-            WrongInterfaceId(lvl, id) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            WrongInterfaceId(id) => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(30; "Interface ID {} does not exist", id)
                         .unwrap()
@@ -106,8 +107,8 @@ impl HalError {
                 )
                 .unwrap();
             }
-            ReadOnlyInterface(lvl, name) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            ReadOnlyInterface(name) => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(30; "Interface {} is read-only", name)
                         .unwrap()
@@ -115,8 +116,8 @@ impl HalError {
                 )
                 .unwrap();
             }
-            WriteOnlyInterface(lvl, name) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            WriteOnlyInterface(name) => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(30; "Interface {} is write-only", name)
                         .unwrap()
@@ -124,8 +125,8 @@ impl HalError {
                 )
                 .unwrap();
             }
-            IncompatibleAction(lvl, action, interface) => {
-                msg.push_str(lvl.as_str()).unwrap();
+            IncompatibleAction(action, interface) => {
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(70; "Action {} is not compatible with interface {}", action, interface)
                         .unwrap()
@@ -134,7 +135,7 @@ impl HalError {
                 .unwrap();
             }
             WriteError(lvl, ift) => {
-                msg.push_str(lvl.as_str()).unwrap();
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(256; "Error during write on interface {} ", ift)
                         .unwrap()
@@ -143,7 +144,7 @@ impl HalError {
                 .unwrap();
             }
             ReadError(lvl, ift) => {
-                msg.push_str(lvl.as_str()).unwrap();
+                msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(256; "Error during read on interface {}", ift)
                         .unwrap()
@@ -153,5 +154,20 @@ impl HalError {
             }
         }
         msg
+    }
+
+    pub fn severity(&self) -> HalErrorLevel {
+        match self {
+            HalAlreadyLocked => Error,
+            HalNotLocked => Error,
+            InterfaceInitError(_) => Fatal,
+            InterfaceNotFound(_) => Critical,
+            WrongInterfaceId(_) => Critical,
+            ReadOnlyInterface(_) => Error,
+            WriteOnlyInterface(_) => Error,
+            IncompatibleAction(_, _) => Error,
+            WriteError(lvl, _) => *lvl,
+            ReadError(lvl, _) => *lvl,
+        }
     }
 }
