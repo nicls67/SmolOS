@@ -401,7 +401,6 @@ dependencies = [
  "cortex-m-semihosting",
  "hal_interface",
  "heapless 0.9.1",
- "panic-semihosting",
 ]
 
 [[package]]
@@ -432,16 +431,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "panic-semihosting"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee8a3e1233d9073d76a870223512ce4eeea43c067a94a445c13bd6d792d7b1ab"
-dependencies = [
- "cortex-m",
- "cortex-m-semihosting",
 ]
 
 [[package]]

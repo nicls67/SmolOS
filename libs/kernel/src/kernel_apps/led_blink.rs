@@ -1,5 +1,5 @@
 use crate::data::Kernel;
-use crate::{KernelError, KernelResult, Milliseconds};
+use crate::{KernelError, KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall};
 use core::sync::atomic::{AtomicUsize, Ordering};
 use hal_interface::GpioWriteActions::Toggle;
 use hal_interface::InterfaceWriteActions;
@@ -10,20 +10,16 @@ pub const LED_BLINK_NAME: &str = "LED Blink";
 pub const LED_BLINK_PERIOD: Milliseconds = Milliseconds(1000);
 
 pub fn led_blink() -> KernelResult<()> {
-    Kernel::hal()
-        .interface_write(
-            LED_ID.load(Ordering::Relaxed),
-            InterfaceWriteActions::GpioWrite(Toggle),
-        )
-        .map_err(KernelError::HalError)
+    syscall(Syscall::Hal(SysCallHalArgs {
+        id: LED_ID.load(Ordering::Relaxed),
+        write_action: Some(InterfaceWriteActions::GpioWrite(Toggle)),
+        read_action: None,
+    }))
 }
 
 pub fn init_led_blink() -> KernelResult<()> {
-    LED_ID.store(
-        Kernel::hal()
-            .get_interface_id(LED_NAME)
-            .map_err(KernelError::HalError)?,
-        Ordering::Relaxed,
-    );
+    let mut id = 0;
+    syscall(Syscall::HalGetId(LED_NAME, &mut id))?;
+    LED_ID.store(id, Ordering::Relaxed);
     Ok(())
 }

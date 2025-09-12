@@ -28,6 +28,7 @@ pub enum KernelError {
     TerminalError(KernelErrorLevel, &'static str, &'static str),
     CannotAddNewPeriodicApp(String<32>),
     AppInitError(String<32>),
+    WrongSyscallArgs(&'static str),
 }
 
 impl KernelError {
@@ -57,6 +58,15 @@ impl KernelError {
                 msg.push_str(Critical.as_str()).unwrap();
                 msg.push_str(
                     format!(200; "Cannot initialize app {}", name)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            KernelError::WrongSyscallArgs(err) => {
+                msg.push_str(Error.as_str()).unwrap();
+                msg.push_str(
+                    format!(200; "Wrong syscall arguments : {}", err)
                         .unwrap()
                         .as_str(),
                 )

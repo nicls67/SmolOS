@@ -5,6 +5,7 @@ mod except;
 mod ident;
 mod kernel_apps;
 mod scheduler;
+mod syscall;
 mod terminal;
 mod types;
 
@@ -16,6 +17,7 @@ pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 use cortex_m::peripheral::syst::SystClkSource;
 use hal_interface::Hal;
 use heapless::format;
+pub use syscall::*;
 pub use types::*;
 
 pub struct BootConfig {
