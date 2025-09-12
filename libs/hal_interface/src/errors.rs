@@ -73,6 +73,43 @@ pub enum HalError {
 }
 
 impl HalError {
+    /// Converts the current object into a formatted string representation with a maximum size of 256 characters.
+    ///
+    /// This method generates a descriptive string representation for various error scenarios or states that
+    /// the object can represent. Based on the variant of the enum or object in question, it produces a specific
+    /// string with severity information and additional contextual details.
+    ///
+    /// # Returns
+    /// A `String` with the descriptive message for the current object state or error.
+    ///
+    /// # Variants Handling
+    /// - **HalAlreadyLocked**: Produces a message indicating that the hardware abstraction layer (HAL) is already locked.
+    /// - **HalNotLocked**: Produces a message indicating that the HAL is not locked.
+    /// - **InterfaceInitError(err)**: Produces a message describing an initialization error with an interface,
+    ///   incorporating the specific error `err`.
+    /// - **InterfaceNotFound(name)**: Produces a message indicating that an interface with the given `name` is not found.
+    /// - **WrongInterfaceId(id)**: Produces a message indicating that the provided interface ID `id` does not exist.
+    /// - **ReadOnlyInterface(name)**: Produces a message indicating that the interface named `name` is read-only.
+    /// - **WriteOnlyInterface(name)**: Produces a message indicating that the interface named `name` is write-only.
+    /// - **IncompatibleAction(action, interface)**: Produces a message indicating that the `action` is incompatible
+    ///   with the given `interface`.
+    /// - **WriteError(lvl, ift)**: Produces a message indicating an error during a write operation on the specified
+    ///   interface `ift`.
+    /// - **ReadError(lvl, ift)**: Produces a message indicating an error during a read operation on the specified
+    ///   interface `ift`.
+    ///
+    /// # Behavior
+    /// - Uses `self.severity().as_str()` to prefix the severity level to the message.
+    /// - Handles string formatting carefully, limiting the size of the formatted content where applicable.
+    /// - Avoids panics by using `.unwrap_or(())` to handle potential `push_str` failures in constrained environments.
+    ///
+    /// # Errors
+    /// While the function itself does not return Result, it gracefully handles potential string exceeding capacity
+    /// errors by using `unwrap_or(())` during the string construction process.
+    ///
+    /// # Note
+    /// - The method assumes that `self.severity().as_str()` correctly maps the severity levels to a string representation.
+    /// - Enforces a string capacity limit of 256 characters for safety.
     pub fn to_string(&self) -> String<256> {
         let mut msg = String::new();
         match self {
@@ -156,6 +193,27 @@ impl HalError {
         msg
     }
 
+    /// Returns the severity level of the `HalError` instance.
+    ///
+    /// This method analyzes the type of the `HalError` and maps it to a corresponding
+    /// `HalErrorLevel`, which represents how critical the error is. The mapping for
+    /// each specific error variant to its respective severity level is defined as follows:
+    ///
+    /// - `HalAlreadyLocked`: Returns `Error`
+    /// - `HalNotLocked`: Returns `Error`
+    /// - `InterfaceInitError(_)`: Returns `Fatal`
+    /// - `InterfaceNotFound(_)`: Returns `Critical`
+    /// - `WrongInterfaceId(_)`: Returns `Critical`
+    /// - `ReadOnlyInterface(_)`: Returns `Error`
+    /// - `WriteOnlyInterface(_)`: Returns `Error`
+    /// - `IncompatibleAction(_, _)`: Returns `Error`
+    /// - `WriteError(lvl, _)`: Returns the level specified in `lvl`
+    /// - `ReadError(lvl, _)`: Returns the level specified in `lvl`
+    ///
+    /// # Returns
+    ///
+    /// A `HalErrorLevel` enum value, which indicates the severity of the error occurring.
+    ///
     pub fn severity(&self) -> HalErrorLevel {
         match self {
             HalAlreadyLocked => Error,
