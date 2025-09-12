@@ -171,7 +171,7 @@ impl HalError {
                 )
                 .unwrap();
             }
-            WriteError(lvl, ift) => {
+            WriteError(_, ift) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(256; "Error during write on interface {} ", ift)
@@ -180,7 +180,7 @@ impl HalError {
                 )
                 .unwrap();
             }
-            ReadError(lvl, ift) => {
+            ReadError(_, ift) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(256; "Error during read on interface {}", ift)
