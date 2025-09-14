@@ -28,27 +28,3 @@ fn SysTick() {
 fn PendSV() {
     Kernel::scheduler().periodic_task();
 }
-
-pub fn return_from_exception() {
-    if let Exception(_) = SCB::vect_active() {
-        let mut exc: u32;
-        unsafe {
-            core::arch::asm!("mov {r}, lr", r = out(reg) exc, options(nomem, nostack, preserves_flags));
-        }
-
-        compiler_fence(Ordering::SeqCst);
-        fence(Ordering::SeqCst);
-
-        dsb();
-        isb();
-
-        unsafe {
-            core::arch::asm!(
-            "mov lr, {exc}",
-            "bx lr",
-            exc = in(reg) exc,
-            options(noreturn)
-            );
-        }
-    }
-}

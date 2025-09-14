@@ -1,7 +1,7 @@
 use crate::KernelError::CannotAddNewPeriodicApp;
 use crate::data::Kernel;
 use crate::errors_mgt::error_handler;
-use crate::except::{return_from_exception, set_ticks_target};
+use crate::except::set_ticks_target;
 use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
 use cortex_m::peripheral::SCB;
 use cortex_m::peripheral::scb::SystemHandler;
