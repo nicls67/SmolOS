@@ -1,64 +1,76 @@
-use core::cell::Cell;
+use core::future::Future;
 use core::pin::Pin;
+use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use cortex_m::asm::wfi;
 
-/// A function that executes a given asynchronous task (future) to completion
-/// within a synchronous context. It blocks the thread on which it is called
-/// until the future is finished, returning the completed value of the future.
-///
-/// # Type Parameters
-/// - `F`: A type that implements the `Future` trait.
-///
-/// # Parameters
-/// - `fut`: The future to be executed to completion.
-///
-/// # Returns
-/// The output of the completed future (`F::Output`).
-///
-/// # Implementation Details
-/// This function:
-///
-/// 1. Utilizes a `Cell<bool>` named `woke` to indicate whether the future has
-///    been awoken (i.e., it needs to be polled or is ready to progress).
-///
-/// 2. Creates a custom `RawWaker` which forms the core of the `Waker` that drives
-///    the future. The `RawWaker` has the following behavior:
-///    - `clone`: Creates another identical `RawWaker`.
-///    - `wake` and `wake_by_ref`: Set the `woke` state to `true`, indicating the
-///      task should be polled.
-///    - `drop`:
-pub fn block_on<F: Future>(mut fut: F) -> F::Output {
-    let woke = Cell::new(true); // true pour un premier poll immédiat
+// Flag global pour signaler un réveil depuis n'importe quel contexte (IT inclus).
+static WOKE_FLAG: AtomicBool = AtomicBool::new(true);
 
-    fn raw_waker(woke: *const Cell<bool>) -> RawWaker {
-        unsafe fn clone(p: *const ()) -> RawWaker {
-            raw_waker(p as *const Cell<bool>)
-        }
-        unsafe fn wake(p: *const ()) {
-            let cell = &*(p as *const Cell<bool>);
-            cell.set(true);
-        }
-        unsafe fn wake_by_ref(p: *const ()) {
-            let cell = &*(p as *const Cell<bool>);
-            cell.set(true);
-        }
-        unsafe fn drop(_: *const ()) {}
-        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
-        RawWaker::new(woke as *const (), &VTABLE)
+// Garde simple pour éviter les appels réentrants à block_on (non supporté).
+static EXEC_IN_USE: AtomicBool = AtomicBool::new(false);
+
+fn raw_waker_from_flag(flag: &'static AtomicBool) -> RawWaker {
+    unsafe fn clone(p: *const ()) -> RawWaker {
+        let flag = &*(p as *const AtomicBool);
+        raw_waker_from_flag(flag)
+    }
+    unsafe fn wake(p: *const ()) {
+        let flag = &*(p as *const AtomicBool);
+        // Wake depuis IT/Thread: publication forte
+        flag.store(true, Ordering::SeqCst);
+    }
+    unsafe fn wake_by_ref(p: *const ()) {
+        let flag = &*(p as *const AtomicBool);
+        flag.store(true, Ordering::SeqCst);
+    }
+    unsafe fn drop(_: *const ()) {
+        // Rien à faire: flag 'static, pas de refcount
+    }
+    static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+    RawWaker::new(flag as *const _ as *const (), &VTABLE)
+}
+
+/// Exécute un Future jusqu’à complétion de manière synchrone.
+/// Non réentrant. Sécurisé pour des réveils depuis les interruptions.
+pub fn block_on<F: Future>(mut fut: F) -> F::Output {
+    // Interdire la réentrance
+    if EXEC_IN_USE
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        // Dans un kernel bare-metal, on préfère ne pas paniquer silencieusement.
+        // Selon ta politique, remplace par loop {} ou retourne via un Result.
+        panic!("block_on déjà en cours d'exécution");
     }
 
-    let waker = unsafe { Waker::from_raw(raw_waker(&woke as *const _)) };
+    // Marquer un premier poll
+    WOKE_FLAG.store(true, Ordering::SeqCst);
+
+    // Waker basé sur un flag 'static (évite les pointeurs pendus si un wake arrive tard)
+    let waker = unsafe { Waker::from_raw(raw_waker_from_flag(&WOKE_FLAG)) };
     let mut cx = Context::from_waker(&waker);
-    // Épingler la future
+
+    // Épingler le future
     let mut fut = unsafe { Pin::new_unchecked(&mut fut) };
 
-    loop {
-        if woke.replace(false) {
-            if let Poll::Ready(v) = fut.as_mut().poll(&mut cx) {
-                return v;
+    let output = loop {
+        // Acquire: observe les effets précédant le store du wake
+        if WOKE_FLAG.swap(false, Ordering::Acquire) {
+            match fut.as_mut().poll(&mut cx) {
+                Poll::Ready(v) => break v,
+                Poll::Pending => {
+                    // Rien: on repasse en sommeil
+                }
             }
         }
-        wfi(); // dormir jusqu'à la prochaine IRQ
-    }
+        // Attendre une IT qui fera wake() → WOKE_FLAG=true
+        // Remarque: s'il n'y a pas d'IT, ce WFI peut dormir indéfiniment.
+        // Adapter selon ta stratégie (time slice, timeout, etc.).
+        wfi();
+    };
+
+    // Relâcher la garde
+    EXEC_IN_USE.store(false, Ordering::SeqCst);
+    output
 }
