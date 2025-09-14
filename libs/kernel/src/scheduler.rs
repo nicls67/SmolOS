@@ -21,6 +21,7 @@ pub struct Scheduler {
     sched_period: Milliseconds,
     pub started: bool,
     current_task_id: Option<usize>,
+    current_task_has_error: bool,
 }
 
 impl Scheduler {
@@ -31,6 +32,7 @@ impl Scheduler {
             sched_period: period,
             started: false,
             current_task_id: None,
+            current_task_has_error: false,
         }
     }
 
@@ -72,22 +74,18 @@ impl Scheduler {
     }
 
     pub fn periodic_task(&mut self) {
-        let start_id;
-
-        // Find the first active task to run
-        if let Some(id) = self.current_task_id {
-            start_id = id + 1;
-        } else {
-            start_id = 0;
-        }
-
         // Run all tasks
-        for id in start_id..self.tasks.len() {
-            if self.cycle_counter % self.tasks[id].app_period == 0 && self.tasks[id].active {
+        for (id, task) in self.tasks.iter_mut().enumerate() {
+            if self.cycle_counter % task.app_period == 0 && task.active {
                 self.current_task_id = Some(id);
-                match (self.tasks[id].app)() {
+                self.current_task_has_error = false;
+                match (task.app)() {
                     Ok(..) => {}
-                    Err(e) => error_handler(&e),
+                    Err(e) => {
+                        if !self.current_task_has_error {
+                            error_handler(&e)
+                        }
+                    }
                 }
                 self.current_task_id = None;
             }
@@ -100,12 +98,7 @@ impl Scheduler {
         // Set the current task as inactive
         if let Some(id) = self.current_task_id {
             self.tasks[id].active = false;
+            self.current_task_has_error = true;
         }
-
-        // Program new exception handler
-        SCB::set_pendsv();
-
-        // Return from exception
-        return_from_exception();
     }
 }
