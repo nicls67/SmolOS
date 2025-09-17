@@ -178,6 +178,35 @@ impl ErrorsManager {
         Ok(())
     }
 
+    /// Handles errors within the kernel, performing appropriate actions based on the severity
+    /// of the error. This function is designed to ensure the system responds correctly to
+    /// different error levels by setting indicators, logging messages, or halting tasks.
+    ///
+    /// # Parameters
+    /// - `err`: A reference to a `KernelError` instance that encapsulates details about the error
+    ///   such as its severity and message.
+    ///
+    /// # Behavior
+    /// - **Fatal Errors (`KernelErrorLevel::Fatal`)**:
+    ///   - Turns on the error LED indicator. If this fails, it is ignored.
+    ///   - Causes the system to panic, displaying the error message, effectively halting the kernel.
+    ///
+    /// - **Critical Errors (`KernelErrorLevel::Critical`)**:
+    ///   - Turns on the error LED indicator. If this fails, it is ignored.
+    ///   - Logs the error message to the kernel's terminal output.
+    ///   - Aborts the currently running task within the scheduler.
+    ///
+    /// - **Errors (`KernelErrorLevel::Error`)**:
+    ///   - Logs the error message to the kernel's terminal output.
+    ///   - No further actions are taken.
+    ///
+    /// # Panics
+    /// - If the error severity is `KernelErrorLevel::Fatal`, the function will cause a panic with
+    ///   the error message.
+    ///
+    /// # Errors
+    /// - Any failure when operating on the error LED or writing logs to the terminal is silently
+    ///   ignored to ensure the handler does not propagate additional errors.
     pub fn error_handler(&mut self, err: &KernelError) {
         match err.severity() {
             KernelErrorLevel::Fatal => {
@@ -189,7 +218,7 @@ impl ErrorsManager {
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
                     .unwrap_or(());
-                Kernel::scheduler().abort_task()
+                Kernel::scheduler().abort_task_on_error()
             }
             KernelErrorLevel::Error => Kernel::terminal()
                 .write(&StrNewLineBoth(err.to_string().as_str()))
