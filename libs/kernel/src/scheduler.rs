@@ -68,23 +68,23 @@ pub enum AppCall {
     AppParam(AppParam, u32),
 }
 
-/// A struct representing a wrapper for an application, encapsulating necessary information about the application,
-/// its name, associated call, period, and status.
+/// `AppWrapper` is a structure that encapsulates metadata and runtime details for an application call.
+/// It provides information about the application and its lifecycle configuration.
 ///
 /// # Fields
 ///
-/// * `name` - A `String` with a maximum length of 32 characters, representing the name of the application.
-/// * `app` - An `AppCall` type, representing the associated application call or functionality.
-/// * `app_period` - A 32-bit unsigned integer specifying the application period or interval, often used to define
-///   the time or iteration cycles in which the application operates.
-/// * `active` - A boolean indicating whether the application is active (`true`) or inactive (`false`).
+/// * `name` - A fixed-size string (maximum 32 characters) representing the name of the application.
+/// * `app` - An `AppCall` object that represents the callable application functionality or instance.
+/// * `app_period` - A `u32` integer specifying the periodic execution interval of the application, in some time unit (e.g., seconds).
+/// * `ends_in` - An optional `u32` specifying the remaining time duration (in the same time unit as `app_period`)
+///   until the application is deactivated. If `None`, no expiration is set.
+/// * `active` - A boolean indicating whether the application is currently active (`true`) or inactive (`false`).
 ///
-/// This struct is useful for managing and encapsulating application-specific data
-/// in systems where various application elements need to be handled together efficiently.
 struct AppWrapper {
-    name: String<32>,
+    name: &'static str,
     app: AppCall,
     app_period: u32,
+    ends_in: Option<u32>,
     active: bool,
 }
 /// The `Scheduler` struct is responsible for managing and executing a collection
@@ -213,54 +213,46 @@ impl Scheduler {
         Kernel::terminal().write(&TerminalFormatting::StrNewLineBoth("Scheduler started !"))
     }
 
-    /// Adds a periodic application to the kernel.
+    /// Adds a periodic application to the kernel scheduler.
     ///
-    /// This function attempts to initialize and register a new application
-    /// that will execute periodically. The user needs to provide the application's
-    /// name, the periodic application object, its initializer, and the desired
-    /// execution period in milliseconds.
+    /// This function registers an application to be periodically executed by
+    /// the scheduler, according to the specified time period and optional
+    /// expiration time.
     ///
     /// # Parameters
-    /// - `name`: A string slice representing the name of the application.
-    /// - `app`: The actual application object that will be executed periodically.
-    /// - `init`: A function or closure that initializes the application before it is added.
-    /// - `period`: The execution period of the application, represented in milliseconds.
-    ///
-    /// # Returns
-    /// - `KernelResult<()>`: Returns `Ok(())` if the application is successfully added
-    ///   and scheduled. Otherwise, returns an appropriate error wrapped in `KernelError`.
-    ///
-    /// # Errors
-    /// - `KernelError::AppInitError`: If the `init` function fails during initialization.
-    /// - `KernelError::CannotAddNewPeriodicApp`: If the scheduler cannot register the application.
-    ///
-    /// # Behavior
-    /// 1. The function attempts to initialize the application by invoking the provided `init` function.
-    ///    If the initialization fails, it returns a `KernelError::AppInitError`.
-    /// 2. If initialization succeeds, the function registers the application in the scheduler by
-    ///    adding it to the internal `tasks` list. The registration associates the app name, application
-    ///    object, computed period in scheduler ticks (derived from the app's
+    /// - `name`: A string slice that represents the name of the application. It must
+    ///   be a valid string that can be parsed and stored as a `String`.
+    /// - `app`: The main application function to be executed periodically.
+    /// - `init`: An optional initialization function for the application. If provided,
+    ///   this will be called once to initialize the app. If the initialization fails,
+    ///   a `KernelError::AppInitError` is returned.
+    /// - `period`: The interval/duration (in milliseconds) at which the app will
+    ///   be executed periodically.
+    /// - `ends_in`: An optional duration (in milliseconds) that specifies when the
+    ///   periodic app should stop running. If `None` is provided, the app runs indefinitely
     pub fn add_periodic_app(
         &mut self,
-        name: &str,
+        name: &'static str,
         app: AppCall,
-        init: App,
+        init: Option<App>,
         period: Milliseconds,
+        ends_in: Option<Milliseconds>,
     ) -> KernelResult<()> {
-        let app_name = String::from(name.parse().unwrap());
-
         // Try to initialize the app
-        init().map_err(|_| KernelError::AppInitError(app_name.clone()))?;
+        if let Some(init_func) = init {
+            init_func().map_err(|_| KernelError::AppInitError(name))?;
+        }
 
         // Register app in the scheduler
         self.tasks
             .push(AppWrapper {
-                name: app_name.clone(),
+                name,
                 app,
                 app_period: period.to_u32() / self.sched_period.to_u32(),
                 active: true,
+                ends_in: ends_in.map(|e| e.to_u32() / period.to_u32()),
             })
-            .map_err(|_| CannotAddNewPeriodicApp(app_name))
+            .map_err(|_| CannotAddNewPeriodicApp(name))
     }
 
     /// Removes a periodic application task from the kernel's task list by its name.
@@ -303,7 +295,7 @@ impl Scheduler {
         let app_name: String<32> = String::from(name.parse().unwrap());
         for (index, task) in self.tasks.iter().enumerate() {
             if task.name == app_name {
-                self.tasks.remove(index);
+                self.tasks.swap_remove(index);
                 return Ok(());
             }
         }
@@ -338,6 +330,8 @@ impl Scheduler {
     /// - If a task is inactive (`task.active` is `false`), it will be skipped entirely.
     /// - Tasks with execution periods that do not align with the current `cycle_counter` are not executed in that cycle.
     pub fn periodic_task(&mut self) {
+        let mut tasks_to_remove: Vec<&'static str, 8> = Vec::new();
+
         // Run all tasks
         for (id, task) in self.tasks.iter_mut().enumerate() {
             if self.cycle_counter % task.app_period == 0 && task.active {
@@ -361,9 +355,19 @@ impl Scheduler {
                         }
                     },
                 }
-
                 self.current_task_id = None;
+                if task.ends_in.is_some() {
+                    task.ends_in = task.ends_in.map(|e| e - 1);
+                    if task.ends_in.unwrap() == 0 {
+                        tasks_to_remove.push(task.name).unwrap();
+                    }
+                }
             }
+        }
+
+        // Remove tasks that have ended
+        for task_name in tasks_to_remove {
+            self.remove_periodic_app(task_name).unwrap();
         }
 
         self.cycle_counter += 1;
@@ -397,5 +401,27 @@ impl Scheduler {
                 self.current_task_has_error = true;
             }
         }
+    }
+
+    /// Checks if an application with the given name exists within the stored tasks.
+    ///
+    /// # Parameters
+    /// - `name`: A string slice representing the name of the application to search for.
+    ///
+    /// # Returns
+    /// - `true`: If an application with the specified name exists.
+    /// - `false`: If no application with the specified name is found.
+    ///
+    /// # Panics
+    /// - This function will panic if the provided `name` cannot be parsed into a valid `String<32>`.
+    ///
+    pub fn app_exists(&self, name: &str) -> bool {
+        let app_name: String<32> = String::from(name.parse().unwrap());
+        for task in self.tasks.iter() {
+            if task.name == app_name {
+                return true;
+            }
+        }
+        false
     }
 }

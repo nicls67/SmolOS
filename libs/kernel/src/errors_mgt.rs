@@ -1,7 +1,11 @@
 use crate::TerminalFormatting::StrNewLineBoth;
 use crate::data::Kernel;
 use crate::ident::KERNEL_NAME;
-use crate::{KernelError, KernelErrorLevel, KernelResult, TerminalFormatting};
+use crate::scheduler::AppCall;
+use crate::{
+    KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalArgs, Syscall,
+    TerminalFormatting, syscall,
+};
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
@@ -93,6 +97,8 @@ pub struct ErrorsManager {
 }
 
 impl ErrorsManager {
+    const LED_BLINK_APP_NAME: &'static str = "ERR_LED_BLINK";
+
     /// Creates a new instance of `ErrorsManager`.
     ///
     /// # Returns
@@ -220,9 +226,31 @@ impl ErrorsManager {
                     .unwrap_or(());
                 Kernel::scheduler().abort_task_on_error()
             }
-            KernelErrorLevel::Error => Kernel::terminal()
-                .write(&StrNewLineBoth(err.to_string().as_str()))
-                .unwrap_or(()),
+            KernelErrorLevel::Error => {
+                if let Some(id) = self.err_led_id {
+                    if !Kernel::scheduler().app_exists(Self::LED_BLINK_APP_NAME) {
+                        syscall(Syscall::AddPeriodicTask(
+                            Self::LED_BLINK_APP_NAME,
+                            AppCall::AppParam(blink_err_led, id as u32),
+                            None,
+                            Milliseconds(100),
+                            Some(Milliseconds(1000)),
+                        ))
+                        .unwrap_or(());
+                    }
+                }
+                Kernel::terminal()
+                    .write(&StrNewLineBoth(err.to_string().as_str()))
+                    .unwrap_or(())
+            }
         }
     }
+}
+
+fn blink_err_led(id: u32) -> KernelResult<()> {
+    syscall(Syscall::Hal(SysCallHalArgs {
+        id: id as usize,
+        write_action: Some(InterfaceWriteActions::GpioWrite(GpioWriteActions::Toggle)),
+        read_action: None,
+    }))
 }

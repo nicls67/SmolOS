@@ -28,8 +28,8 @@ impl KernelErrorLevel {
 pub enum KernelError {
     HalError(HalErrorDef),
     TerminalError(KernelErrorLevel, &'static str, &'static str),
-    CannotAddNewPeriodicApp(String<32>),
-    AppInitError(String<32>),
+    CannotAddNewPeriodicApp(&'static str),
+    AppInitError(&'static str),
     WrongSyscallArgs(&'static str),
     AppNotFound(&'static str),
 }

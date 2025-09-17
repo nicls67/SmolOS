@@ -12,7 +12,13 @@ pub struct SysCallHalArgs<'a> {
 pub enum Syscall<'a> {
     Hal(SysCallHalArgs<'a>),
     HalGetId(&'static str, &'a mut usize),
-    AddPeriodicTask(&'static str, AppCall, App, Milliseconds),
+    AddPeriodicTask(
+        &'static str,
+        AppCall,
+        Option<App>,
+        Milliseconds,
+        Option<Milliseconds>,
+    ),
     RemovePeriodicTask(&'static str),
 }
 
@@ -46,8 +52,8 @@ pub fn syscall(syscall_type: Syscall) -> KernelResult<()> {
             }
             Err(e) => Err(KernelError::HalError(e)),
         },
-        Syscall::AddPeriodicTask(name, app, init, period) => {
-            Kernel::scheduler().add_periodic_app(name, app, init, period)
+        Syscall::AddPeriodicTask(name, app, init, period, ends_in) => {
+            Kernel::scheduler().add_periodic_app(name, app, init, period, ends_in)
         }
         Syscall::RemovePeriodicTask(name) => Kernel::scheduler().remove_periodic_app(name),
     };
