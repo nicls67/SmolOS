@@ -1,10 +1,11 @@
 use crate::TerminalFormatting::StrNewLineBoth;
 use crate::data::Kernel;
 use crate::ident::KERNEL_NAME;
-use crate::{KernelError, KernelErrorLevel};
+use crate::{KernelError, KernelErrorLevel, KernelResult, TerminalFormatting};
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
+use hal_interface::{GpioWriteActions, InterfaceWriteActions};
 
 /// The HardFault exception handler.
 ///
@@ -87,17 +88,85 @@ fn panic(info: &PanicInfo) -> ! {
     cortex_m::peripheral::SCB::sys_reset();
 }
 
-pub fn error_handler(err: &KernelError) {
-    match err.severity() {
-        KernelErrorLevel::Fatal => panic!("{}", err.to_string()),
-        KernelErrorLevel::Critical => {
-            Kernel::terminal()
-                .write(&StrNewLineBoth(err.to_string().as_str()))
-                .unwrap_or(());
-            Kernel::scheduler().abort_task()
+pub struct ErrorsManager {
+    err_led_id: Option<usize>,
+}
+
+impl ErrorsManager {
+    /// Creates a new instance of `ErrorsManager`.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `ErrorsManager`.
+    ///
+    pub fn new() -> ErrorsManager {
+        ErrorsManager { err_led_id: None }
+    }
+
+    pub fn init(&mut self) -> KernelResult<()> {
+        self.err_led_id = Some(
+            Kernel::hal()
+                .get_interface_id("ERR_LED")
+                .map_err(KernelError::HalError)?,
+        );
+
+        self.set_err_led(false)?;
+        Ok(())
+    }
+
+    /// Sets the state of the error LED.
+    ///
+    /// This function changes the state of the error LED to the specified value (`true` to set it on, `false` to turn it off).
+    /// It utilizes the hardware abstraction layer (HAL) to perform the operation on the hardware interface associated
+    /// with the error LED.
+    ///
+    /// # Parameters
+    /// - `state`: A boolean indicating the desired state of the error LED.
+    ///   - `true`: Turns the error LED on.
+    ///   - `false`: Turns the error LED off.
+    ///
+    /// # Returns
+    /// - `Ok(())` if the state was successfully set or if no error LED is configured (`self.err_led_id` is `None`).
+    /// - `Err(KernelError)` if there was an error interfacing with the hardware abstraction layer (HAL).
+    ///
+    /// # Errors
+    /// Returns an error of type `KernelError::HalError` if the HAL operation to change the LED state fails.
+    ///
+    /// # Safety
+    /// This function assumes that the hardware abstraction layer (HAL) is properly initialized.
+    /// Ensure that `self.err_led_id` is correctly configured to avoid any runtime issues.
+    fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
+        if let Some(id) = self.err_led_id {
+            Kernel::hal()
+                .interface_write(
+                    id,
+                    InterfaceWriteActions::GpioWrite(if state {
+                        GpioWriteActions::Set
+                    } else {
+                        GpioWriteActions::Clear
+                    }),
+                )
+                .map_err(KernelError::HalError)?;
         }
-        KernelErrorLevel::Error => Kernel::terminal()
-            .write(&StrNewLineBoth(err.to_string().as_str()))
-            .unwrap_or(()),
+        Ok(())
+    }
+
+    pub fn error_handler(&mut self, err: &KernelError) {
+        match err.severity() {
+            KernelErrorLevel::Fatal => {
+                self.set_err_led(true).unwrap_or(());
+                panic!("{}", err.to_string())
+            }
+            KernelErrorLevel::Critical => {
+                self.set_err_led(true).unwrap_or(());
+                Kernel::terminal()
+                    .write(&StrNewLineBoth(err.to_string().as_str()))
+                    .unwrap_or(());
+                Kernel::scheduler().abort_task()
+            }
+            KernelErrorLevel::Error => Kernel::terminal()
+                .write(&StrNewLineBoth(err.to_string().as_str()))
+                .unwrap_or(()),
+        }
     }
 }

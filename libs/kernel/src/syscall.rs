@@ -1,5 +1,4 @@
 use crate::data::Kernel;
-use crate::errors_mgt::error_handler;
 use crate::{KernelError, KernelResult};
 use hal_interface::{InterfaceReadActions, InterfaceWriteActions};
 
@@ -49,7 +48,7 @@ pub fn syscall(syscall_type: Syscall) -> KernelResult<()> {
     match result {
         Ok(..) => Ok(()),
         Err(err) => {
-            error_handler(&err);
+            Kernel::errors().error_handler(&err);
             Err(err)
         }
     }

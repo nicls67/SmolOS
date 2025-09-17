@@ -11,6 +11,7 @@ mod types;
 
 use crate::data::Kernel;
 pub use crate::data::KernelTimeData;
+use crate::errors_mgt::ErrorsManager;
 use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
 use crate::scheduler::{App, Scheduler};
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
@@ -73,8 +74,12 @@ pub fn boot(config: BootConfig) {
         config.kernel_time_data.clone(),
         Terminal::new(config.system_terminal_name, config.system_terminal_type),
         sched,
+        ErrorsManager::new(),
     );
 
+    ////////////////////////////
+    // Terminal start
+    ////////////////////////////
     let terminal = Kernel::terminal();
     terminal.set_kernel_state().unwrap();
     terminal.write(&TerminalFormatting::Clear).unwrap();
@@ -88,6 +93,11 @@ pub fn boot(config: BootConfig) {
                 .as_str(),
         ))
         .unwrap();
+
+    ////////////////////////////////////
+    // Errors Manager initialization
+    ////////////////////////////////////
+    Kernel::errors().init().unwrap();
 
     ////////////////////////////////////
     // Timers initialization

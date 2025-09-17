@@ -1,9 +1,7 @@
 use crate::KernelError::CannotAddNewPeriodicApp;
 use crate::data::Kernel;
-use crate::errors_mgt::error_handler;
 use crate::except::set_ticks_target;
 use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
-use cortex_m::peripheral::SCB;
 use cortex_m::peripheral::scb::SystemHandler;
 use heapless::{String, Vec};
 
@@ -83,7 +81,7 @@ impl Scheduler {
                     Ok(..) => {}
                     Err(e) => {
                         if !self.current_task_has_error {
-                            error_handler(&e)
+                            Kernel::errors().error_handler(&e);
                         }
                     }
                 }

@@ -1,3 +1,4 @@
+use crate::errors_mgt::ErrorsManager;
 use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
 use crate::{Mhz, Milliseconds};
@@ -10,6 +11,7 @@ pub static mut KERNEL_DATA: Kernel = Kernel {
     kernel_time_data: None,
     terminal: None,
     scheduler: None,
+    errors: None,
 };
 
 /// A data structure representing timing-related configuration for the system kernel.
@@ -38,59 +40,79 @@ pub struct KernelTimeData {
     pub systick_period: Milliseconds,
 }
 
-/// Represents the central structure of the operating system kernel, containing various components
-/// required for its operation.
+/// The `Kernel` struct represents the core of the embedded operating system,
+/// managing and coordinating various system components and functionalities.
 ///
-/// The `Kernel` struct encapsulates the core components of the system, utilizing optional fields
-/// for flexibility during initialization and configuration. Each field governs a critical aspect
-/// of kernel functionality, ranging from low-level peripherals to high-level scheduling.
+/// # Fields
 ///
-/// Fields:
-/// - `cortex_peripherals`: Optionally holds the Cortex-M microcontroller's peripherals,
-///   providing access to essential hardware features such as system timers, interrupts, and
-///   other on-chip components.
-/// - `hal`: Optionally stores the Hardware Abstraction Layer (HAL) implementation, offering
-///   a consistent interface to underlying hardware interactions and abstractions.
-/// - `kernel_time_data`: Optionally contains timing-related data and utilities crucial for
-///   measuring and managing system time, delays, or scheduling operations.
-/// - `terminal`: Optionally provides a text-based terminal interface for user interaction,
-///   logging, or debugging purposes.
-/// - `scheduler`: Optionally manages task scheduling and context switching, ensuring efficient
-///   execution and multitasking within the kernel.
+/// * `cortex_peripherals` - An optional field that contains core Cortex-M peripherals,
+///   such as NVIC, SysTick, and others, required for low-level system operations.
+///   This field is wrapped in an `Option` to allow deferred initialization or possible absence
+///   in certain configurations.
 ///
-/// The `Kernel` struct is designed to allow lazy initialization of its components, enabling
-/// modular development and customization of the kernel according to specific use cases or hardware
-/// configurations.
+/// * `hal` - An optional field for accessing the Hardware Abstraction Layer (HAL)
+///   to interact with the underlying hardware peripherals, such as GPIO, I2C, SPI, etc.
+///   Allows for hardware abstraction and easier portability between various microcontrollers.
+///
+/// * `kernel_time_data` - An optional field containing the timekeeping data required by the kernel
+///   for scheduling, delays, or other time-sensitive operations. Typically includes timing mechanisms
+///   like system ticks or RTC access.
+///
+/// * `terminal` - An optional field representing the user interface through a terminal,
+///   which may handle input and output operations for system communication or debugging purposes.
+///
+/// * `scheduler` - An optional field for the kernel's task scheduler, which is responsible for managing
+///   and orchestrating the execution of tasks or threads. Handles process prioritization and switching.
+///
+/// * `errors` - An optional field for the error manager, which tracks and manages system errors
+///   or exceptions. Provides mechanisms for error logging or recovery during runtime.
+///
+/// # Usage
+///
+/// The `Kernel` struct serves as a container for all critical system components. Each field
+/// is optional, allowing for greater flexibility in struct initialization and enabling configurations
+/// where certain components might not be present. For example, a minimal system might not require
+/// a terminal or a scheduler but still depends on HAL and timing functionalities.
+///
+/// Instances of `Kernel` are typically initialized during system startup and provide a central
+/// point of access for key functionalities and resources throughout the lifecycle of the system.
+/// Ensure proper initialization of required fields before usage to prevent runtime errors.
+///
 pub struct Kernel {
     cortex_peripherals: Option<Peripherals>,
     hal: Option<Hal>,
     kernel_time_data: Option<KernelTimeData>,
     terminal: Option<Terminal>,
     scheduler: Option<Scheduler>,
+    errors: Option<ErrorsManager>,
 }
 
 impl Kernel {
-    /// Initializes the kernel data structure with the provided components.
+    /// Initializes the global kernel data structure with the provided components.
     ///
-    /// This function sets up essential components of the kernel by assigning
-    /// values to the global `KERNEL_DATA` structure. It is used to configure
-    /// and prepare the kernel for operation. The function leverages unsafe
-    /// blocks to directly modify static data, which requires caution to ensure
-    /// proper synchronization and safety.
+    /// This function is responsible for setting up the core components of the kernel,
+    /// assigning each of them to the global `KERNEL_DATA` structure safely within an
+    /// `unsafe` block. This includes hardware abstraction layers, time management, terminal handling,
+    /// scheduler, and error management.
     ///
-    /// # Parameters
+    /// # Arguments
+    /// - `hal`: The hardware abstraction layer (HAL) object to manage platform-specific hardware.
+    /// - `kernel_time_data`: The time data object used for kernel time management.
+    /// - `terminal`: The terminal object to manage terminal input and output for the kernel.
+    /// - `scheduler`: The scheduler object to manage task scheduling in the kernel.
+    /// - `errors`: The error manager object to handle and track kernel errors.
     ///
-    /// - `hal`: The hardware abstraction layer (HAL) used to interface with the
-    ///   hardware of the system.
-    /// - `kernel_time_data`: Data related to the kernel's timekeeping mechanisms.
-    /// - `terminal`: The terminal interface used for input/output operations in
-    ///   the kernel environment.
-    /// - `scheduler`: The task
+    /// # Safety
+    /// This function operates within an `unsafe` block as it directly modifies the static, global `KERNEL_DATA` object.
+    /// The caller must ensure that `init_kernel_data` is only called once during the system initialization phase
+    /// to avoid any unintended behavior or double initialization.
+    ///
     pub fn init_kernel_data(
         hal: Hal,
         kernel_time_data: KernelTimeData,
         terminal: Terminal,
         scheduler: Scheduler,
+        errors: ErrorsManager,
     ) {
         unsafe {
             KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
@@ -98,6 +120,7 @@ impl Kernel {
             KERNEL_DATA.kernel_time_data = Some(kernel_time_data);
             KERNEL_DATA.terminal = Some(terminal);
             KERNEL_DATA.scheduler = Some(scheduler);
+            KERNEL_DATA.errors = Some(errors);
         }
     }
 
@@ -244,6 +267,39 @@ impl Kernel {
                 KERNEL_DATA.kernel_time_data.as_mut().unwrap()
             } else {
                 panic!("Time data not initialized");
+            }
+        }
+    }
+
+    /// Provides access to the global `ErrorsManager` instance.
+    ///
+    /// This function returns a static reference to the `ErrorsManager`. It ensures that the
+    /// global `ErrorsManager` instance is properly initialized before providing access to it.
+    /// If the `ErrorsManager` has not been initialized, the function will panic.
+    ///
+    /// # Safety
+    ///
+    /// This function uses unsafe code to dereference a potentially mutable static reference.
+    /// While the `#[allow(static_mut_refs)]` attribute suppresses the warning for mutable
+    /// references to a static variable, care must be taken to ensure this function is used
+    /// correctly to avoid undefined behavior.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the global `ErrorsManager` instance has not been
+    /// initialized. Ensure that the `ErrorsManager` is initialized before calling this function.
+    ///
+    /// # Returns
+    ///
+    /// A static reference to the `ErrorsManager` instance.
+    ///
+    #[allow(static_mut_refs)]
+    pub fn errors() -> &'static mut ErrorsManager {
+        unsafe {
+            if KERNEL_DATA.errors.is_some() {
+                KERNEL_DATA.errors.as_mut().unwrap()
+            } else {
+                panic!("Errors manager is not initialized");
             }
         }
     }
