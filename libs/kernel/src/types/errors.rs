@@ -1,5 +1,5 @@
 use crate::KernelError::{
-    AppInitError, CannotAddNewPeriodicApp, HalError, TerminalError, WrongSyscallArgs,
+    AppInitError, AppNotFound, CannotAddNewPeriodicApp, HalError, TerminalError, WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use hal_interface::{HalError as HalErrorDef, HalErrorLevel};
@@ -31,6 +31,7 @@ pub enum KernelError {
     CannotAddNewPeriodicApp(String<32>),
     AppInitError(String<32>),
     WrongSyscallArgs(&'static str),
+    AppNotFound(&'static str),
 }
 
 impl KernelError {
@@ -65,10 +66,19 @@ impl KernelError {
                 )
                 .unwrap();
             }
-            KernelError::WrongSyscallArgs(err) => {
+            WrongSyscallArgs(err) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(200; "Wrong syscall arguments : {}", err)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            AppNotFound(app_name) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(200; "Could not find app {} in scheduler", app_name)
                         .unwrap()
                         .as_str(),
                 )
@@ -78,28 +88,25 @@ impl KernelError {
         msg
     }
 
-    /// Returns the severity level of the current error.
+    /// Returns the severity level of the kernel error.
     ///
-    /// # Description
-    /// This method evaluates the specific type of error instance and determines
-    /// its corresponding severity level as a `KernelErrorLevel`. The severity is
-    /// classified into predefined levels (`Fatal`, `Critical`, `Error`), which
-    /// help in categorizing and handling errors appropriately.
+    /// This method evaluates the severity of the error
+    /// based on its specific type. The returned severity
+    /// is conveyed as a `KernelErrorLevel` enum, which can
+    /// represent `Fatal`, `Critical`, or `Error` levels.
     ///
     /// # Behavior
-    ///
-    /// - For `HalError`, it delegates the severity calculation to the `HalError`
-    ///   instance by mapping its `HalErrorLevel` (`Fatal`, `Critical`, `Error`) to
-    ///   the corresponding `KernelErrorLevel`.
-    /// - For `TerminalError`, the severity is directly returned as stored in the
-    ///   error's fields.
-    /// - For `CannotAddNewPeriodicApp`, the severity is always `Critical`.
-    /// - For `AppInitError`, the severity is always `Critical`.
-    /// - For `WrongSyscallArgs`, the severity is always `Error`.
-    ///
-    /// # Returns
-    /// A value of `KernelErrorLevel` indicating the error severity.
-    ///
+    /// - For `HalError`, the severity is determined based on
+    ///   the severity of the associated `HalErrorLevel`.
+    ///   - `HalErrorLevel::Fatal` maps to `KernelErrorLevel::Fatal`.
+    ///   - `HalErrorLevel::Critical` maps to `KernelErrorLevel::Critical`.
+    ///   - `HalErrorLevel::Error` maps to `KernelErrorLevel::Error`.
+    /// - For `TerminalError`, the severity level is directly extracted from the
+    ///   first tuple field.
+    /// - For `CannotAddNewPeriodicApp`, the severity is set to `Critical`.
+    /// - For `AppInitError`, the severity is set to `Critical`.
+    /// - For `WrongSyscallArgs`, the severity is set to `Error`.
+    /// - For `AppNotFound`, the severity is set to `Error`
     pub fn severity(&self) -> KernelErrorLevel {
         match self {
             HalError(err) => match err.severity() {
@@ -111,6 +118,7 @@ impl KernelError {
             CannotAddNewPeriodicApp(_) => Critical,
             AppInitError(_) => Critical,
             WrongSyscallArgs(_) => Error,
+            AppNotFound(_) => Error,
         }
     }
 }

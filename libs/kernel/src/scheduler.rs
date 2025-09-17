@@ -2,7 +2,8 @@ use crate::KernelError::CannotAddNewPeriodicApp;
 use crate::data::Kernel;
 use crate::except::set_ticks_target;
 use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
-use cortex_m::peripheral::scb::SystemHandler;
+use cortex_m::peripheral::SCB;
+use cortex_m::peripheral::scb::{Exception, SystemHandler, VectActive};
 use heapless::{String, Vec};
 
 /// Type alias `App` represents a function pointer type that returns a `KernelResult<()>`.
@@ -223,6 +224,53 @@ impl Scheduler {
             .map_err(|_| CannotAddNewPeriodicApp(app_name))
     }
 
+    /// Removes a periodic application task from the kernel's task list by its name.
+    ///
+    /// This function searches for a task with the specified name within the kernel's
+    /// `tasks` list. If a matching task is found, it is removed from the list. If no
+    /// task with the provided name is found, an error is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A static string slice that represents the name of the application task
+    ///   to be removed. The name should match the name of the application in the task list.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - If the task was successfully located and removed from the list.
+    /// * `Err(KernelError::AppNotFound)` - If no matching task is found in the tasks list.
+    ///
+    /// # Errors
+    ///
+    /// This function returns `KernelError::AppNotFound` if the specified task name
+    /// does not exist in the kernel's task list.
+    ///
+    /// # Notes
+    ///
+    /// * The `name` parameter must be a static string (i.e., `'static` lifetime).
+    /// * The `tasks` list is assumed to be a vector-like structure supporting `iter`
+    ///   and `remove` operations.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the conversion from `&str` to `String<32>` fails,
+    /// which should not occur under normal circumstances if the input is valid.
+    ///
+    /// # Related
+    ///
+    /// * `Kernel::add_task` - To add tasks to the kernel's task list.
+    /// * `KernelError` - Enum that defines possible kernel-related errors.
+    pub fn remove_periodic_app(&mut self, name: &'static str) -> KernelResult<()> {
+        let app_name: String<32> = String::from(name.parse().unwrap());
+        for (index, task) in self.tasks.iter().enumerate() {
+            if task.name == app_name {
+                self.tasks.remove(index);
+                return Ok(());
+            }
+        }
+        Err(KernelError::AppNotFound(name))
+    }
+
     /// Executes periodic tasks stored in the kernel's task list.
     ///
     /// This function iterates through all tasks and checks if each task's period
@@ -277,23 +325,33 @@ impl Scheduler {
         self.cycle_counter += 1;
     }
 
-    /// Aborts the currently active task by marking it as inactive and signaling that it encountered an error.
+    /// Aborts the current task when an error occurs during the PendSV exception.
+    ///
+    /// This function is designed to be executed during the PendSV exception,
+    /// which is typically used for context switching in embedded systems.
+    /// If the PendSV exception is active, the function will retrieve the ID
+    /// of the currently running task. It then marks the task as inactive and
+    /// sets a flag indicating that the task encountered an error, preventing
+    /// it from further execution.
     ///
     /// # Behavior
-    /// - If a task is currently active (indicated by `self.current_task_id` being `Some`):
-    ///   - The task's `active` status is set to `false`.
-    ///   - The `current_task_has_error` flag is set to `true` to indicate that an error occurred in the current task.
-    /// - If no task is active (`self.current_task_id` is `None`), this function does nothing.
+    /// - This function performs no action if the PendSV exception is not active.
+    /// - If the PendSV exception is active, the task with the ID stored in
+    ///   `self.current_task_id` is marked as inactive, and
+    ///   `self.current_task_has_error` is set to `true`.
+    /// - It assumes that `self.current_task_id` is `Some`, and the corresponding
+    ///   task exists in the `self.tasks` list.
     ///
     /// # Usage
-    /// Call this function to terminate the currently running task and flag it as having an error.
-    /// Ensure that proper task management logic accounts for the inactive and erroneous state.
-    ///
+    /// This function should be called during the PendSV exception handler to
+    /// handle tasks that encounter
     pub fn abort_task_on_error(&mut self) {
-        // Set the current task as inactive
-        if let Some(id) = self.current_task_id {
-            self.tasks[id].active = false;
-            self.current_task_has_error = true;
+        if SCB::vect_active() == VectActive::Exception(Exception::PendSV) {
+            // Set the current task as inactive
+            if let Some(id) = self.current_task_id {
+                self.tasks[id].active = false;
+                self.current_task_has_error = true;
+            }
         }
     }
 }

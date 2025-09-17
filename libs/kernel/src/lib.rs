@@ -138,10 +138,22 @@ pub fn start_scheduler() {
         .unwrap();
 }
 
-pub fn add_periodic_app(name: &str, app: App, init: App, period: Milliseconds) -> KernelResult<()> {
-    Kernel::scheduler().add_periodic_app(name, app, init, period)
-}
-
+/// Starts the kernel applications for the system.
+///
+/// This function initializes all kernel-level applications by invoking the
+/// `initialize_kernel_apps` method provided by the `kernel_apps` module.
+/// It ensures that the kernel apps are correctly set up and ready to use
+/// during the system's runtime.
+///
+/// # Panics
+///
+/// This function will panic if the initialization of kernel apps fails,
+/// as it propagates the error using `unwrap`. Ensure that proper setup and
+/// error handling are performed in `initialize_kernel_apps` to avoid runtime
+/// panics.
+///
+/// Make sure to call this function at the appropriate point during system
+/// initialization to correctly set up kernel applications.
 pub fn start_kernel_apps() {
     kernel_apps::initialize_kernel_apps().unwrap()
 }
