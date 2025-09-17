@@ -228,15 +228,25 @@ impl ErrorsManager {
             }
             KernelErrorLevel::Error => {
                 if let Some(id) = self.err_led_id {
-                    if !Kernel::scheduler().app_exists(Self::LED_BLINK_APP_NAME) {
+                    if Kernel::scheduler()
+                        .app_exists(Self::LED_BLINK_APP_NAME, self.err_led_id.map(|x| x as u32))
+                        .is_none()
+                    {
                         syscall(Syscall::AddPeriodicTask(
                             Self::LED_BLINK_APP_NAME,
                             AppCall::AppParam(blink_err_led, id as u32),
                             None,
                             Milliseconds(100),
-                            Some(Milliseconds(1000)),
+                            Some(Milliseconds(10000)),
                         ))
                         .unwrap_or(());
+                    } else {
+                        syscall(Syscall::NewTaskDuration(
+                            Self::LED_BLINK_APP_NAME,
+                            Some(id as u32),
+                            Milliseconds(10000),
+                        ))
+                        .unwrap_or(())
                     }
                 }
                 Kernel::terminal()

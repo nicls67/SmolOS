@@ -1,5 +1,6 @@
 use crate::KernelError::{
-    AppInitError, AppNotFound, CannotAddNewPeriodicApp, HalError, TerminalError, WrongSyscallArgs,
+    AppAlreadyExists, AppInitError, AppNotFound, CannotAddNewPeriodicApp, HalError, TerminalError,
+    WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use hal_interface::{HalError as HalErrorDef, HalErrorLevel};
@@ -32,6 +33,7 @@ pub enum KernelError {
     AppInitError(&'static str),
     WrongSyscallArgs(&'static str),
     AppNotFound(&'static str),
+    AppAlreadyExists(&'static str),
 }
 
 impl KernelError {
@@ -84,6 +86,15 @@ impl KernelError {
                 )
                 .unwrap();
             }
+            AppAlreadyExists(app_name) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(200; "App {} already exists in scheduler", app_name)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
         }
         msg
     }
@@ -107,6 +118,7 @@ impl KernelError {
     /// - For `AppInitError`, the severity is set to `Critical`.
     /// - For `WrongSyscallArgs`, the severity is set to `Error`.
     /// - For `AppNotFound`, the severity is set to `Error`
+    /// - For `AppAlreadyExists`, the severity is set to `Error`
     pub fn severity(&self) -> KernelErrorLevel {
         match self {
             HalError(err) => match err.severity() {
@@ -119,6 +131,7 @@ impl KernelError {
             AppInitError(_) => Critical,
             WrongSyscallArgs(_) => Error,
             AppNotFound(_) => Error,
+            AppAlreadyExists(_) => Error,
         }
     }
 }
