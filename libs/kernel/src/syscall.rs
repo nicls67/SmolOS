@@ -1,5 +1,5 @@
 use crate::data::Kernel;
-use crate::scheduler::App;
+use crate::scheduler::{App, AppCall};
 use crate::{KernelError, KernelResult, Milliseconds};
 use hal_interface::{InterfaceReadActions, InterfaceWriteActions};
 
@@ -12,7 +12,7 @@ pub struct SysCallHalArgs<'a> {
 pub enum Syscall<'a> {
     Hal(SysCallHalArgs<'a>),
     HalGetId(&'static str, &'a mut usize),
-    AddPeriodicTask(&'static str, App, App, Milliseconds),
+    AddPeriodicTask(&'static str, AppCall, App, Milliseconds),
     RemovePeriodicTask(&'static str),
 }
 

@@ -25,26 +25,65 @@ use heapless::{String, Vec};
 ///
 pub type App = fn() -> KernelResult<()>;
 
-/// A structure that wraps an application with additional metadata.
+/// A type alias for a function pointer that takes an unsigned 32-bit integer (`u32`)
+/// as an input parameter and returns a `KernelResult<()>`.
 ///
-/// The `AppWrapper` struct is used to encapsulate an application instance
-/// (`app`) along with its metadata, such as its name, operational period,
-/// and whether it is currently active or not.
+/// # Type Definition
+/// ```
+/// pub type AppParam = fn(u32) -> KernelResult<()>;
+/// ```
+///
+/// # Usage
+/// This type alias represents a callback or function interface that can be used within
+/// the kernel or application context. The function is expected to perform an operation
+/// based on the given `u32` parameter and return a `KernelResult<()>`.
+///
+/// The `KernelResult<()>` typically indicates whether the operation was
+/// successful or encountered an error, following the convention of `Result<T, E>`
+/// where `()` represents a unit type for successful results.
+///
+/// # Notes
+/// - The `KernelResult` and potential return types (`Ok` or `Err`) need to be
+///   appropriately defined in your context.
+/// - This alias helps standardize function signatures across different modules.
+pub type AppParam = fn(u32) -> KernelResult<()>;
+
+/// The `AppCall` enum represents different ways an application can be invoked,
+/// either without parameters or with a parameter and an associated value.
+///
+/// Variants:
+///  - `AppNoParam(App)`:
+///      Represents a call to an `App` without any additional parameters.
+///      - `App`: The application being called.
+///
+///  - `AppParam(AppParam, u32)`:
+///      Represents a call to an `App` with an associated parameter and a `u32` value.
+///      - `AppParam`: The parameter linked to the application call.
+///      - `u32`: An additional value associated with the parameter.
+///
+/// This enum provides a clear way to distinguish between calls with and without parameters,
+/// allowing for flexible handling within applications.
+pub enum AppCall {
+    AppNoParam(App),
+    AppParam(AppParam, u32),
+}
+
+/// A struct representing a wrapper for an application, encapsulating necessary information about the application,
+/// its name, associated call, period, and status.
 ///
 /// # Fields
 ///
-/// * `name` - A string containing the name of the application.
-///   The name has a maximum length of 32 characters.
-/// * `app` - The actual application instance encapsulated within the wrapper.
-/// * `app_period` - A 32-bit unsigned integer specifying the operational
-///   duration or period of the application. This might represent time or specific
-///   interval information, depending on the context of use.
-/// * `active` - A boolean flag indicating whether the application is currently active
-///   (`true`) or inactive (`false`).
+/// * `name` - A `String` with a maximum length of 32 characters, representing the name of the application.
+/// * `app` - An `AppCall` type, representing the associated application call or functionality.
+/// * `app_period` - A 32-bit unsigned integer specifying the application period or interval, often used to define
+///   the time or iteration cycles in which the application operates.
+/// * `active` - A boolean indicating whether the application is active (`true`) or inactive (`false`).
 ///
+/// This struct is useful for managing and encapsulating application-specific data
+/// in systems where various application elements need to be handled together efficiently.
 struct AppWrapper {
     name: String<32>,
-    app: App,
+    app: AppCall,
     app_period: u32,
     active: bool,
 }
@@ -204,7 +243,7 @@ impl Scheduler {
     pub fn add_periodic_app(
         &mut self,
         name: &str,
-        app: App,
+        app: AppCall,
         init: App,
         period: Milliseconds,
     ) -> KernelResult<()> {
@@ -271,53 +310,58 @@ impl Scheduler {
         Err(KernelError::AppNotFound(name))
     }
 
-    /// Executes periodic tasks stored in the kernel's task list.
+    /// Executes periodic tasks in the system based on their configured execution period.
     ///
-    /// This function iterates through all tasks and checks if each task's period
-    /// matches the current cycle count (`cycle_counter`). If the task's period matches
-    /// and the task is marked as active, the task's application function is executed.
-    /// Any errors encountered during the execution of a task are passed to the kernel's
-    /// error handler.
+    /// This function iterates through the list of tasks and checks each one to determine
+    /// if it should be executed during the current cycle. A task is executed when the following
+    /// conditions are met:
+    /// - The task is active (`task.active` is `true`).
+    /// - The system's `cycle_counter` modulo `task.app_period` equals `0` (indicating it's time to run the task).
     ///
-    /// ### Behavior:
-    /// - Each task has an associated period (`app_period`) and an active state (`active`).
-    /// - The function ensures that tasks are run in their scheduled cycles based on the
-    ///   period and the kernel's `cycle_counter`.
-    /// - The currently running task's ID and any errors are tracked using `current_task_id`
-    ///   and `current_task_has_error`.
-    /// - If the task function completes successfully, no additional action is taken.
-    /// - If the task function returns an error, the kernel's error handler processes it.
+    /// Each task can be either:
+    /// - A function without parameters (`AppCall::AppNoParam`), or
+    /// - A function with parameters (`AppCall::AppParam`).
     ///
-    /// ### Properties:
-    /// - `self.cycle_counter`: Tracks the number of cycles the kernel has executed. Increments
-    ///   after each call to this method.
-    /// - `self.current_task_id`: Temporarily stores the ID of the currently running task for
-    ///   tracking purposes.
-    /// - `self.current_task_has_error`: Tracks whether an error was encountered in the
-    ///   current task to avoid reporting the same error multiple times.
+    /// When a task is executed:
+    /// - If the task runs successfully, no additional action is taken.
+    /// - If the task returns an error, the system's error handler (`Kernel::errors().error_handler()`) is invoked
+    ///   to handle the error. Errors are only reported once per task invocation to avoid redundant handling.
     ///
-    /// ### Arguments:
-    /// This method takes mutable access to `self` since it alters the state of the kernel,
-    /// updating the cycle counter and tracking task execution state.
+    /// The function also updates:
+    /// - `current_task_id` to indicate which task is currently being executed, or `None` when no task is running.
+    /// - `current_task_has_error` to track whether a task has encountered an error.
     ///
-    /// ### Notes:
-    /// - Tasks that are inactive (`task.active == false`) are skipped.
-    /// - Task execution state is encapsulated using `current_task_id` to allow better
-    ///   debugging or logging if necessary.
+    /// After all tasks are evaluated, the function increments the `cycle_counter` by 1 to advance to the next cycle.
+    ///
+    /// # Notes
+    ///
+    /// - If a task is inactive (`task.active` is `false`), it will be skipped entirely.
+    /// - Tasks with execution periods that do not align with the current `cycle_counter` are not executed in that cycle.
     pub fn periodic_task(&mut self) {
         // Run all tasks
         for (id, task) in self.tasks.iter_mut().enumerate() {
             if self.cycle_counter % task.app_period == 0 && task.active {
                 self.current_task_id = Some(id);
                 self.current_task_has_error = false;
-                match (task.app)() {
-                    Ok(..) => {}
-                    Err(e) => {
-                        if !self.current_task_has_error {
-                            Kernel::errors().error_handler(&e);
+                match task.app {
+                    AppCall::AppNoParam(app) => match app() {
+                        Ok(..) => {}
+                        Err(e) => {
+                            if !self.current_task_has_error {
+                                Kernel::errors().error_handler(&e);
+                            }
                         }
-                    }
+                    },
+                    AppCall::AppParam(app, param) => match app(param) {
+                        Ok(..) => {}
+                        Err(e) => {
+                            if !self.current_task_has_error {
+                                Kernel::errors().error_handler(&e);
+                            }
+                        }
+                    },
                 }
+
                 self.current_task_id = None;
             }
         }
