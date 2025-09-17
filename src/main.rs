@@ -31,6 +31,7 @@ fn main() -> ! {
         hal,
         system_terminal_name: "SERIAL_MAIN",
         system_terminal_type: TerminalType::Usart,
+        err_led_name: Some("ERR_LED"),
     });
 
     kernel::start_kernel_apps();

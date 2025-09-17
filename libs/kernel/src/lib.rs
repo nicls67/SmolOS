@@ -27,6 +27,7 @@ pub struct BootConfig {
     pub hal: Hal,
     pub system_terminal_name: &'static str,
     pub system_terminal_type: TerminalType,
+    pub err_led_name: Option<&'static str>,
 }
 
 /**
@@ -97,7 +98,7 @@ pub fn boot(config: BootConfig) {
     ////////////////////////////////////
     // Errors Manager initialization
     ////////////////////////////////////
-    Kernel::errors().init().unwrap();
+    Kernel::errors().init(config.err_led_name).unwrap();
 
     ////////////////////////////////////
     // Timers initialization

@@ -103,12 +103,39 @@ impl ErrorsManager {
         ErrorsManager { err_led_id: None }
     }
 
-    pub fn init(&mut self) -> KernelResult<()> {
-        self.err_led_id = Some(
-            Kernel::hal()
-                .get_interface_id("ERR_LED")
-                .map_err(KernelError::HalError)?,
-        );
+    /// Initializes the kernel or module instance with an optional error LED identifier.
+    ///
+    /// # Parameters
+    /// - `err_led_name`: An `Option` containing a static string slice representing the name of the error LED.
+    ///   - If `Some(name)` is provided, the function will attempt to link the error LED by fetching its interface ID
+    ///     from the HAL (Hardware Abstraction Layer).
+    ///   - If `None` is passed, the optional `err_led_id` remains unset.
+    ///
+    /// # Behavior
+    /// - If an error LED name is provided, this method:
+    ///   1. Resolves the LED's interface ID via the HAL interface.
+    ///   2. Assigns the retrieved ID to `err_led_id`.
+    /// - Once the optional error LED identifier is processed, the function ensures the error LED is turned off by
+    ///   calling `set_err_led(false)`.
+    ///
+    /// # Returns
+    /// - Returns `Ok(())` if the initialization succeeds.
+    /// - Returns a `KernelError` if fetching the HAL interface ID or setting the error LED fails.
+    ///
+    /// # Errors
+    /// This function may return the following errors wrapped in a `KernelError`:
+    /// - `KernelError::HalError`: If the interface ID retrieval for `err_led_name` fails or if the HAL interaction
+    ///   encounters an error.
+    /// - Any other errors caused by `set_err_led`.
+    ///
+    pub fn init(&mut self, err_led_name: Option<&'static str>) -> KernelResult<()> {
+        if let Some(name) = err_led_name {
+            self.err_led_id = Some(
+                Kernel::hal()
+                    .get_interface_id(name)
+                    .map_err(KernelError::HalError)?,
+            );
+        }
 
         self.set_err_led(false)?;
         Ok(())
@@ -117,7 +144,7 @@ impl ErrorsManager {
     /// Sets the state of the error LED.
     ///
     /// This function changes the state of the error LED to the specified value (`true` to set it on, `false` to turn it off).
-    /// It utilizes the hardware abstraction layer (HAL) to perform the operation on the hardware interface associated
+    /// It uses the hardware abstraction layer (HAL) to perform the operation on the hardware interface associated
     /// with the error LED.
     ///
     /// # Parameters
