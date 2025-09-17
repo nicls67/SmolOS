@@ -34,15 +34,11 @@ fn raw_waker_from_flag(flag: &'static AtomicBool) -> RawWaker {
 /// Exécute un Future jusqu’à complétion de manière synchrone.
 /// Non réentrant. Sécurisé pour des réveils depuis les interruptions.
 pub fn block_on<F: Future>(mut fut: F) -> F::Output {
-    // Interdire la réentrance
-    if EXEC_IN_USE
+    // Wait until the previous execution is done
+    while EXEC_IN_USE
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
-    {
-        // Dans un kernel bare-metal, on préfère ne pas paniquer silencieusement.
-        // Selon ta politique, remplace par loop {} ou retourne via un Result.
-        panic!("block_on déjà en cours d'exécution");
-    }
+    {}
 
     // Marquer un premier poll
     WOKE_FLAG.store(true, Ordering::SeqCst);
