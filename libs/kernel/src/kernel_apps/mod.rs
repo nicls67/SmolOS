@@ -4,7 +4,6 @@ use crate::syscall;
 use crate::{KernelResult, Syscall};
 
 mod led_blink;
-mod term_test;
 
 pub fn initialize_kernel_apps() -> KernelResult<()> {
     syscall(Syscall::AddPeriodicTask(
@@ -15,12 +14,5 @@ pub fn initialize_kernel_apps() -> KernelResult<()> {
         None,
     ))?;
 
-    syscall(Syscall::AddPeriodicTask(
-        term_test::TERM_TEST_NAME,
-        AppCall::AppNoParam(term_test::term_test, None),
-        Some(term_test::init_term_test),
-        term_test::TERM_TEST_PERIOD,
-        None,
-    ))?;
     Ok(())
 }
