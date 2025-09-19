@@ -3,8 +3,7 @@ use crate::data::Kernel;
 use crate::ident::KERNEL_NAME;
 use crate::scheduler::AppCall;
 use crate::{
-    KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalArgs, Syscall,
-    TerminalFormatting, syscall,
+    KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall,
 };
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
@@ -168,7 +167,7 @@ impl ErrorsManager {
     /// # Safety
     /// This function assumes that the hardware abstraction layer (HAL) is properly initialized.
     /// Ensure that `self.err_led_id` is correctly configured to avoid any runtime issues.
-    fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
+    pub(in crate::errors_mgt) fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
         if let Some(id) = self.err_led_id {
             Kernel::hal()
                 .interface_write(
@@ -234,7 +233,7 @@ impl ErrorsManager {
                     {
                         syscall(Syscall::AddPeriodicTask(
                             Self::LED_BLINK_APP_NAME,
-                            AppCall::AppParam(blink_err_led, id as u32),
+                            AppCall::AppParam(blink_err_led, id as u32, Some(reset_err_led)),
                             None,
                             Milliseconds(100),
                             Some(Milliseconds(10000)),
@@ -257,10 +256,42 @@ impl ErrorsManager {
     }
 }
 
+/// Toggles the state of an error LED specified by its unique identifier.
+///
+/// This function utilizes a system call to execute a GPIO (General Purpose Input/Output) toggle action
+/// for the hardware associated with the given LED identifier. It is typically used to signal errors
+/// or debug information by blinking the LED.
+///
+/// # Arguments
+///
+/// * `id` - A unique 32-bit unsigned integer identifying the specific error LED to toggle.
+///
+/// # Returns
+///
+/// * `KernelResult<()>` - Returns `Ok(())` on successful execution of the GPIO toggling action.
+///   Returns an appropriate error in the `KernelResult` if the system call fails or the action
+///   cannot be completed.
+///
 fn blink_err_led(id: u32) -> KernelResult<()> {
     syscall(Syscall::Hal(SysCallHalArgs {
         id: id as usize,
         write_action: Some(InterfaceWriteActions::GpioWrite(GpioWriteActions::Toggle)),
         read_action: None,
     }))
+}
+
+/// Resets the error LED indicator.
+///
+/// This function turns off the error LED indicator by setting its
+/// state to `false` through the kernel's error handling subsystem.
+///
+/// # Returns
+/// * `KernelResult<()>` - Returns a result indicating success if the error LED
+/// was successfully reset, or an error if the operation failed.
+///
+/// # Errors
+/// This function may return an error if there is an issue with accessing or modifying
+/// the internal kernel state.
+fn reset_err_led() -> KernelResult<()> {
+    Kernel::errors().set_err_led(false)
 }

@@ -4,7 +4,7 @@ use crate::except::set_ticks_target;
 use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
 use cortex_m::peripheral::SCB;
 use cortex_m::peripheral::scb::{Exception, SystemHandler, VectActive};
-use heapless::{String, Vec};
+use heapless::Vec;
 
 /// Type alias `App` represents a function pointer type that returns a `KernelResult<()>`.
 ///
@@ -48,24 +48,28 @@ pub type App = fn() -> KernelResult<()>;
 /// - This alias helps standardize function signatures across different modules.
 pub type AppParam = fn(u32) -> KernelResult<()>;
 
-/// The `AppCall` enum represents different ways an application can be invoked,
-/// either without parameters or with a parameter and an associated value.
+/// Represents different types of application calls within a system.
 ///
-/// Variants:
-///  - `AppNoParam(App)`:
-///      Represents a call to an `App` without any additional parameters.
-///      - `App`: The application being called.
+/// This enum encapsulates various variants of calls to an app, with or without parameters.
 ///
-///  - `AppParam(AppParam, u32)`:
-///      Represents a call to an `App` with an associated parameter and a `u32` value.
-///      - `AppParam`: The parameter linked to the application call.
-///      - `u32`: An additional value associated with the parameter.
+/// # Variants
 ///
-/// This enum provides a clear way to distinguish between calls with and without parameters,
-/// allowing for flexible handling within applications.
+/// - `AppNoParam`:
+///   - Represents a call to an app that does not require any parameters.
+///   - Fields:
+///     - `App`: The primary application to be called.
+///     - `Option<App>`: An optional secondary application reference.
+///
+/// - `AppParam`:
+///   - Represents a call to an app that requires parameters.
+///   - Fields:
+///     - `AppParam`: The parameter structure associated with the application call.
+///     - `u32`: A numeric identifier or parameter for the call.
+///     - `Option<App>`: An optional secondary application reference.
+///
 pub enum AppCall {
-    AppNoParam(App),
-    AppParam(AppParam, u32),
+    AppNoParam(App, Option<App>),
+    AppParam(AppParam, u32, Option<App>),
 }
 
 /// `AppWrapper` is a structure that encapsulates metadata and runtime details for an application call.
@@ -257,10 +261,12 @@ impl Scheduler {
         ends_in: Option<Milliseconds>,
     ) -> KernelResult<()> {
         // Check if the app already exists
-        if let Some(_) = match app {
-            AppCall::AppNoParam(_) => self.app_exists(name, None),
-            AppCall::AppParam(_, p) => self.app_exists(name, Some(p)),
-        } {
+        if (match app {
+            AppCall::AppNoParam(_, _) => self.app_exists(name, None),
+            AppCall::AppParam(_, p, _) => self.app_exists(name, Some(p)),
+        })
+        .is_some()
+        {
             return Err(KernelError::AppAlreadyExists(name));
         }
 
@@ -320,67 +326,69 @@ impl Scheduler {
         }
     }
 
-    /// Executes periodic tasks based on their defined execution intervals and manages task lifecycle.
+    /// Executes and manages periodic tasks within the system.
     ///
-    /// This function iterates through all registered tasks, executing those that are due,
-    /// and handles their termination if their lifetime (`ends_in`) is completed. The task's
-    /// execution is determined by the current cycle count and the task's application period.
-    /// Errors encountered during task execution are handled via the error handler system.
+    /// This function iterates through all registered tasks and performs the following:
     ///
-    /// # Functionality
-    /// - Evaluates and executes tasks whose periodicity matches the current cycle count.
-    /// - Handles tasks with or without parameters depending on the type of `AppCall`.
-    /// - Tracks and manages errors occurring in task execution, ensuring appropriate error handling.
-    /// - Terminates tasks when their predefined duration (`ends_in`) has elapsed.
-    /// - Removes completed tasks and increments the cycle count.
+    /// 1. **Task Execution**:
+    ///    - Executes tasks whose cycle timing (`app_period`) matches the current `cycle_counter`.
+    ///    - Supports tasks with or without parameters (`AppNoParam` or `AppParam`).
+    ///    - Handles errors during task execution using the system's error handler, making sure not to invoke
+    ///      the error handler multiple times for the same task run.
     ///
-    /// # Task Execution
-    /// Each task is represented by an `AppCall`, which can either:
-    /// - `AppNoParam`: A function with no parameters.
-    /// - `AppParam`: A function with associated parameters.
+    /// 2. **Task Lifetime Management**:
+    ///    - Checks if a task is configured to terminate (`ends_in`).
+    ///    - If a task's lifetime expires:
+    ///      - It is added to the removal queue (`tasks_to_remove`).
+    ///      - Executes any final associated closure (`closure`) for tasks with parameters, if present.
     ///
-    /// The task is executed periodically based on the `app_period` and only if it is marked as `active`.
-    /// Upon execution:
-    /// - If the task executes successfully, it continues its lifecycle.
-    /// - If an error occurs, it is passed to the system's error handler.
+    /// 3. **Task Removal**:
+    ///    - Removes tasks from the system based on the removal queue.
+    ///    - Utilizes `remove_periodic_app` to safely remove tasks that have ended.
     ///
-    /// # Task Termination
-    /// If a task has a defined `ends_in` value:
-    /// - The value decrements after each execution.
-    /// - Once the value reaches 0, the task is added to a removal list to be cleaned up at the end
-    ///   of the cycle.
+    /// 4. **Cycle Counter Update**:
+    ///    - Increments the `cycle_counter` to track the progression of periodic task executions.
     ///
-    /// # Error Handling
-    /// Task execution errors are detected, and if the task has not already logged an error in
-    /// the current execution cycle, they are passed to the system-wide error handler.
+    /// ### Example Workflow:
+    /// - A task is checked for execution based on the current cycle.
+    /// - If it matches timing criteria and is active, it is executed.
+    /// - If the task has a defined lifetime (`ends_in`), its countdown is reduced until it expires.
+    /// - Expired tasks are then removed from the system.
     ///
-    /// # Parameters
-    /// - `self` (`&mut Self`): A mutable reference to the structure containing the periodic task system.
+    /// ### Key Implementation Details:
+    /// - **Task Execution Modes**:
+    ///   - `AppNoParam`: Tasks without parameters are executed directly.
+    ///   - `AppParam`: Tasks with parameters are executed with the provided parameter and can optionally trigger a closure.
+    /// - **Error Handling**:
+    ///   - Uses `Kernel::errors().error_handler(&e)` to handle runtime errors encountered during task execution.
     ///
-    /// # Behavior
-    /// 1. Iterates over the task list and executes eligible tasks based on their periodicity and state.
-    /// 2. Manages task error detection and invokes the system's error handler when necessary.
-    /// 3. Checks tasks with defined lifetimes and schedules their removal when their time expires.
-    /// 4. Incrementally updates the cycle counter for the task scheduler.
+    /// ### Panics:
+    /// - Panics if the removal of terminated tasks (`tasks_to_remove`) fails unexpectedly, as the `unwrap` method is used during this process.
     ///
-    /// # Removes Tasks
-    /// Tasks that are completed (based on their `ends_in` value reaching 0) are removed from
-    /// the system using the `remove_periodic_app` method.
+    /// ### Fields Used:
+    /// - `self.tasks`: A mutable list of registered tasks.
+    /// - `self.cycle_counter`: Tracks the current execution cycle.
+    /// - `self.current_task_id`: Temporarily stores the ID of the currently executing task.
+    /// - `self.current_task_has_error`: Flags if a task encountered errors during execution.
     ///
-    /// # Panics
-    /// The function assumes the task removal and addition to the `tasks_to_remove` vector will not
-    /// exceed the maximum capacity of 8 elements; if this assumption is violated, it will panic.
+    /// ### Assumptions:
+    /// - The task system uses `AppCall` enum to classify tasks (`AppNoParam`, `AppParam`).
+    /// - Each task has an associated name, period, active status, and optional termination (`ends_in`).
     ///
+    /// ### Dependencies:
+    /// - `Kernel::errors()` for accessing the global error handler.
+    /// - `remove_periodic_app` for cleaning up terminated tasks.
     pub fn periodic_task(&mut self) {
         let mut tasks_to_remove: Vec<(&'static str, Option<u32>), 8> = Vec::new();
 
         // Run all tasks
         for (id, task) in self.tasks.iter_mut().enumerate() {
             if self.cycle_counter % task.app_period == 0 && task.active {
+                // Execute the task
                 self.current_task_id = Some(id);
                 self.current_task_has_error = false;
                 match task.app {
-                    AppCall::AppNoParam(app) => match app() {
+                    AppCall::AppNoParam(app, _) => match app() {
                         Ok(..) => {}
                         Err(e) => {
                             if !self.current_task_has_error {
@@ -388,7 +396,7 @@ impl Scheduler {
                             }
                         }
                     },
-                    AppCall::AppParam(app, param) => match app(param) {
+                    AppCall::AppParam(app, param, _) => match app(param) {
                         Ok(..) => {}
                         Err(e) => {
                             if !self.current_task_has_error {
@@ -397,16 +405,35 @@ impl Scheduler {
                         }
                     },
                 }
+                self.current_task_has_error = false;
                 self.current_task_id = None;
+
+                // Check if the task has ended
                 if task.ends_in.is_some() {
                     task.ends_in = task.ends_in.map(|e| e - 1);
                     if task.ends_in.unwrap() == 0 {
+                        let closure_to_apply;
+
                         match task.app {
-                            AppCall::AppNoParam(_) => {
-                                tasks_to_remove.push((task.name, None)).unwrap()
+                            AppCall::AppNoParam(_, closure) => {
+                                tasks_to_remove.push((task.name, None)).unwrap();
+                                closure_to_apply = closure;
                             }
-                            AppCall::AppParam(_, p) => {
-                                tasks_to_remove.push((task.name, Some(p))).unwrap()
+                            AppCall::AppParam(_, p, closure) => {
+                                tasks_to_remove.push((task.name, Some(p))).unwrap();
+                                closure_to_apply = closure;
+                            }
+                        }
+
+                        // Apply closure
+                        if let Some(c) = closure_to_apply {
+                            match c() {
+                                Ok(..) => {}
+                                Err(e) => {
+                                    if !self.current_task_has_error {
+                                        Kernel::errors().error_handler(&e);
+                                    }
+                                }
                             }
                         }
                     }
@@ -419,6 +446,7 @@ impl Scheduler {
             self.remove_periodic_app(task_name, param).unwrap();
         }
 
+        // Increment cycle counter
         self.cycle_counter += 1;
     }
 
@@ -480,7 +508,7 @@ impl Scheduler {
     pub fn app_exists(&self, name: &str, param: Option<u32>) -> Option<usize> {
         for (index, task) in self.tasks.iter().enumerate() {
             if task.name == name {
-                if let AppCall::AppParam(_, app_param) = task.app {
+                if let AppCall::AppParam(_, app_param, _) = task.app {
                     if let Some(p) = param {
                         if p == app_param {
                             return Some(index);
@@ -496,6 +524,35 @@ impl Scheduler {
         None
     }
 
+    /// Updates the duration for a task specified by its name and optional parameter.
+    ///
+    /// This function modifies the `ends_in` field of a task, recalculating its
+    /// value based on the provided duration (`time`), the scheduler period, and
+    /// the task's application period. If the specified task is not found, an error
+    /// is returned.
+    ///
+    /// # Parameters
+    /// - `name`: A static string slice representing the name of the task to update.
+    /// - `param`: An optional 32-bit unsigned integer parameter to further identify
+    ///   the task. This can differentiate between tasks with the same name.
+    /// - `time`: A `Milliseconds` instance representing the new duration for the
+    ///   task, usually measured in milliseconds.
+    ///
+    /// # Returns
+    /// - `Ok(())`: If the task's duration was successfully updated.
+    /// - `Err(KernelError::AppNotFound)`: If no task matching the specified `name`
+    ///   and `param` is found.
+    ///
+    /// # Panics
+    /// This function does not explicitly panic under normal conditions. However,
+    /// unexpected panics could arise from underlying operations or misconfigured
+    /// scheduler values.
+    ///
+    /// # Note
+    /// The `ends_in` value is derived by dividing the given `time` by both the
+    /// scheduler's period and the task's application period. Ensure that both
+    /// `self.sched_period` and the specified task's `app_period` are non-zero to
+    /// prevent division-related errors.
     pub fn set_new_task_duration(
         &mut self,
         name: &'static str,
