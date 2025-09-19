@@ -8,11 +8,11 @@ use heapless::{String, format};
 
 pub type KernelResult<T> = Result<T, KernelError>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub enum KernelErrorLevel {
-    Fatal,
-    Critical,
     Error,
+    Critical,
+    Fatal,
 }
 
 impl KernelErrorLevel {

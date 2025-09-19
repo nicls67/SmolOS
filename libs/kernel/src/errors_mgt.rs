@@ -1,3 +1,4 @@
+use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use crate::TerminalFormatting::StrNewLineBoth;
 use crate::data::Kernel;
 use crate::ident::KERNEL_NAME;
@@ -91,8 +92,27 @@ fn panic(info: &PanicInfo) -> ! {
     cortex_m::peripheral::SCB::sys_reset();
 }
 
+/// A struct that manages error states and associated components within a system.
+///
+/// The `ErrorsManager` struct is used to track and handle error states, including
+/// associating an error level and a corresponding LED identifier (if applicable)
+/// to signal the error condition.
+///
+/// # Fields
+///
+/// * `err_led_id` - An optional identifier for an LED that can be used to
+///   visually indicate the presence of an error. If set to `None`, no LED
+///   is associated with the error condition.
+///
+/// * `has_error` - An optional error level of type `KernelErrorLevel` that
+///   represents the current error state. If set to `None`, it indicates that
+///   no error is currently present.
+///
+/// This struct can be extended or used in combination with other components
+/// to build robust error handling mechanisms in a kernel or embedded system context.
 pub struct ErrorsManager {
     err_led_id: Option<usize>,
+    has_error: Option<KernelErrorLevel>,
 }
 
 impl ErrorsManager {
@@ -105,7 +125,10 @@ impl ErrorsManager {
     /// A new instance of `ErrorsManager`.
     ///
     pub fn new() -> ErrorsManager {
-        ErrorsManager { err_led_id: None }
+        ErrorsManager {
+            err_led_id: None,
+            has_error: None,
+        }
     }
 
     /// Initializes the kernel or module instance with an optional error LED identifier.
@@ -167,7 +190,7 @@ impl ErrorsManager {
     /// # Safety
     /// This function assumes that the hardware abstraction layer (HAL) is properly initialized.
     /// Ensure that `self.err_led_id` is correctly configured to avoid any runtime issues.
-    pub(in crate::errors_mgt) fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
+    fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
         if let Some(id) = self.err_led_id {
             Kernel::hal()
                 .interface_write(
@@ -214,18 +237,26 @@ impl ErrorsManager {
     ///   ignored to ensure the handler does not propagate additional errors.
     pub fn error_handler(&mut self, err: &KernelError) {
         match err.severity() {
-            KernelErrorLevel::Fatal => {
+            Fatal => {
                 self.set_err_led(true).unwrap_or(());
+                self.has_error = Some(Fatal);
                 panic!("{}", err.to_string())
             }
-            KernelErrorLevel::Critical => {
+            Critical => {
                 self.set_err_led(true).unwrap_or(());
+                if self.has_error != Some(Fatal) {
+                    self.has_error = Some(Critical);
+                }
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
                     .unwrap_or(());
                 Kernel::scheduler().abort_task_on_error()
             }
-            KernelErrorLevel::Error => {
+            Error => {
+                if self.has_error != Some(Fatal) && self.has_error != Some(Critical) {
+                    self.has_error = Some(Error);
+                }
+
                 if let Some(id) = self.err_led_id {
                     if Kernel::scheduler()
                         .app_exists(Self::LED_BLINK_APP_NAME, self.err_led_id.map(|x| x as u32))
@@ -248,10 +279,49 @@ impl ErrorsManager {
                         .unwrap_or(())
                     }
                 }
+
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
                     .unwrap_or(())
             }
+        }
+    }
+
+    /// Resets the error indicator LED based on the current error state.
+    ///
+    /// # Visibility
+    /// This function is visible only within the `errors_mgt` module and its submodules.
+    ///
+    /// # Behavior
+    /// - If the system is in an error state:
+    ///   - For a regular `Error` level, the error LED is turned off.
+    ///   - For `Critical` or `Fatal` error levels, the error LED is turned on.
+    /// - If there is no error (`has_error` is `None`), the error LED is turned off.
+    ///
+    /// # Returns
+    /// - `KernelResult<()>`: Indicates success or failure of the operation.
+    ///
+    /// # Errors
+    /// This function can return a `KernelResult` error in case the error LED cannot be modified.
+    ///
+    /// # Requirements
+    /// - `self.has_error` must be properly initialized before calling this function.
+    /// - Error levels (`Error`, `Critical`, `Fatal`) must correspond to valid states handled accordingly.
+    ///
+    /// # Notes
+    /// - The implementation assumes `set_err_led` is a function that changes the state of the error LED.
+    /// - The absence of an error (`None` in `has_error`) is treated as no error and turns the LED off.
+    ///
+    /// # See Also
+    /// - [`set_err_led`](../path/to/set_err_led)
+    pub(in crate::errors_mgt) fn reset_err_led(&mut self) -> KernelResult<()> {
+        if let Some(err_lvl) = self.has_error {
+            match err_lvl {
+                Error => self.set_err_led(false),
+                Critical | Fatal => self.set_err_led(true),
+            }
+        } else {
+            self.set_err_led(false)
         }
     }
 }
@@ -282,16 +352,18 @@ fn blink_err_led(id: u32) -> KernelResult<()> {
 
 /// Resets the error LED indicator.
 ///
-/// This function turns off the error LED indicator by setting its
-/// state to `false` through the kernel's error handling subsystem.
+/// This function calls the kernel's error handling system to reset the state
+/// of the error LED. It ensures that the error LED no longer indicates a fault
+/// state once any errors have been addressed or cleared.
 ///
 /// # Returns
-/// * `KernelResult<()>` - Returns a result indicating success if the error LED
-/// was successfully reset, or an error if the operation failed.
+/// * `KernelResult<()>` - On success, it returns an empty Ok value.
+/// If an error occurs during the reset process, it returns a kernel-specific error
+/// wrapped in `KernelResult`.
 ///
-/// # Errors
-/// This function may return an error if there is an issue with accessing or modifying
-/// the internal kernel state.
+/// # Notes
+/// * This function relies on the kernel's error handling system. Ensure that
+///   the kernel is properly initialized before invoking this function.
 fn reset_err_led() -> KernelResult<()> {
-    Kernel::errors().set_err_led(false)
+    Kernel::errors().reset_err_led()
 }
