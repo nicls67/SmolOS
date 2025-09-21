@@ -1,8 +1,6 @@
 use crate::data::Kernel;
-use core::sync::atomic::{AtomicU32, Ordering, compiler_fence, fence};
-use cortex_m::asm::{dsb, isb};
+use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m::peripheral::SCB;
-use cortex_m::peripheral::scb::VectActive::Exception;
 use cortex_m_rt::exception;
 
 static SCHED_TICKS_COUNTER: AtomicU32 = AtomicU32::new(0);
