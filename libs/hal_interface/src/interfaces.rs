@@ -2,16 +2,12 @@ use crate::HalError::{
     IncompatibleAction, InterfaceInitError, InterfaceNotFound, ReadOnlyInterface,
     WriteOnlyInterface, WrongInterfaceId,
 };
-use crate::HalErrorLevel::{Critical, Error, Fatal};
 use crate::{HalResult, InterfaceReadActions, InterfaceWriteActions};
-use embassy_stm32::gpio::Output;
-use embassy_stm32::mode::Async;
-use embassy_stm32::usart::Uart;
 use heapless::Vec;
 
 pub enum InterfaceType {
-    GpioOutput(Output<'static>),
-    Uart(Uart<'static, Async>),
+    GpioOutput,
+    Uart,
 }
 
 pub struct Interface {
@@ -108,16 +104,16 @@ impl InterfaceVect {
         let interface = self.vect.get_mut(id).ok_or(WrongInterfaceId(id))?;
 
         match &mut interface.interface {
-            InterfaceType::GpioOutput(pin) => {
+            InterfaceType::GpioOutput => {
                 if let InterfaceWriteActions::GpioWrite(action) = action {
-                    action.action(pin)
+                    action.action()
                 } else {
                     Err(IncompatibleAction(action.name(), interface.name))
                 }
             }
-            InterfaceType::Uart(uart) => {
+            InterfaceType::Uart => {
                 if let InterfaceWriteActions::UartWrite(action) = action {
-                    action.action(uart)
+                    action.action()
                 } else {
                     Err(IncompatibleAction(action.name(), interface.name))
                 }
@@ -129,15 +125,17 @@ impl InterfaceVect {
     pub fn interface_read(&mut self, id: usize, action: InterfaceReadActions) -> HalResult<()> {
         let interface = self.vect.get_mut(id).ok_or(WrongInterfaceId(id))?;
 
-        match &mut interface.interface {
-            InterfaceType::Uart(uart) => {
-                if let InterfaceReadActions::UartRead(mut action) = action {
-                    action.action(uart)
-                } else {
-                    Err(IncompatibleAction(action.name(), interface.name))
-                }
-            }
-            _ => Err(WriteOnlyInterface(interface.name)),
-        }
+        // match &mut interface.interface {
+        //     InterfaceType::Uart(uart) => {
+        //         if let InterfaceReadActions::UartRead(mut action) = action {
+        //             action.action(uart)
+        //         } else {
+        //             Err(IncompatibleAction(action.name(), interface.name))
+        //         }
+        //     }
+        //     _ => Err(WriteOnlyInterface(interface.name)),
+        // }
+
+        Ok(())
     }
 }

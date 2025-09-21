@@ -8,13 +8,8 @@ pub use interface_actions::*;
 pub use interfaces::{Interface, InterfaceType};
 
 use crate::HalError::{HalAlreadyLocked, HalNotLocked};
-use crate::HalErrorLevel::{Critical, Error, Fatal};
 use crate::interfaces::InterfaceVect;
-use embassy_stm32::rcc::{
-    AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource, Sysclk,
-};
-use embassy_stm32::time::Hertz;
-use embassy_stm32::{Config, Peripherals};
+
 pub use errors::*;
 
 pub enum CoreClkConfig {
@@ -34,6 +29,10 @@ impl Default for Hal {
     fn default() -> Self {
         Self::new()
     }
+}
+
+unsafe extern "C" {
+    fn init();
 }
 
 impl Hal {
@@ -75,34 +74,12 @@ impl Hal {
     /// before calling this function. The configuration assumes that external components connected
     /// to the microcontroller (e.g., an external clock source) are correctly set up to achieve stable
     /// operation.
-    pub fn init(hal_config: HalConfig) -> (Peripherals, u32) {
+    pub fn init(hal_config: HalConfig) -> u32 {
         // Initialize HAL
-        let mut config = Config::default();
-        let mut core_freq = 16_000_000;
-
-        if let CoreClkConfig::Max = hal_config.core_clk_config {
-            config.rcc.hsi = true;
-            config.rcc.hse = Some(Hse {
-                freq: Hertz(25_000_000),
-                mode: HseMode::Oscillator,
-            });
-            config.rcc.sys = Sysclk::PLL1_P;
-            config.rcc.pll_src = PllSource::HSE;
-            config.rcc.pll = Some(Pll {
-                prediv: PllPreDiv::DIV25,
-                mul: PllMul::MUL432,
-                divp: Some(PllPDiv::DIV2),
-                divq: None,
-                divr: None,
-            });
-            config.rcc.ahb_pre = AHBPrescaler::DIV1;
-            config.rcc.apb1_pre = APBPrescaler::DIV4;
-            config.rcc.apb2_pre = APBPrescaler::DIV2;
-
-            core_freq = 216_000_000;
+        unsafe {
+            init();
         }
-
-        (embassy_stm32::init(config), core_freq)
+        216_000_000
     }
 
     /// Creates a new instance of the structure.

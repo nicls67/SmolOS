@@ -11,13 +11,13 @@ use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds, TerminalType};
 #[entry]
 fn main() -> ! {
     // HAL initialization
-    let (peripherals, core_freq) = Hal::init(HalConfig {
+    let core_freq = Hal::init(HalConfig {
         core_clk_config: CoreClkConfig::Max,
     });
     let mut hal = Hal::new();
 
     // Add interfaces
-    init_interfaces(&mut hal, peripherals);
+    init_interfaces(&mut hal);
     // Lock HAL
     hal.lock().unwrap();
 

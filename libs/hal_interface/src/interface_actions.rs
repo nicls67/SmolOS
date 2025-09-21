@@ -5,9 +5,6 @@ use crate::UartReadActions::Read;
 use crate::UartWriteActions::{SendChar, SendString};
 use crate::async_block::block_on;
 use crate::{HalError, HalResult};
-use embassy_stm32::gpio::Output;
-use embassy_stm32::mode::Async;
-use embassy_stm32::usart::Uart;
 
 pub enum InterfaceWriteActions<'a> {
     GpioWrite(GpioWriteActions),
@@ -29,19 +26,25 @@ pub enum GpioWriteActions {
     Toggle,
 }
 
+unsafe extern "C" {
+    fn toggle_pin();
+}
+
 impl GpioWriteActions {
-    pub fn action(&self, pin: &mut Output) -> HalResult<()> {
+    pub fn action(&self) -> HalResult<()> {
         match self {
             GpioWriteActions::Set => {
-                pin.set_high();
+                //pin.set_high();
                 Ok(())
             }
             GpioWriteActions::Clear => {
-                pin.set_low();
+                //pin.set_low();
                 Ok(())
             }
             GpioWriteActions::Toggle => {
-                pin.toggle();
+                unsafe {
+                    toggle_pin();
+                }
                 Ok(())
             }
         }
@@ -53,15 +56,25 @@ pub enum UartWriteActions<'a> {
     SendString(&'a str),
 }
 
+unsafe extern "C" {
+    fn usart_write(data: *const u8, len: u16);
+}
+
 impl UartWriteActions<'_> {
-    pub fn action(&self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
+    pub fn action(&self) -> HalResult<()> {
         match self {
             SendChar(c) => {
                 let data_arr = [*c];
-                block_on(uart.write(&data_arr)).map_err(|_| HalError::WriteError(Error, "UART"))
+                unsafe {
+                    usart_write(&data_arr as *const u8, 1);
+                }
+                Ok(())
+                //block_on(uart.write(&data_arr)).map_err(|_| HalError::WriteError(Error, "UART"))
             }
-            SendString(str) => block_on(uart.write(str.as_bytes()))
-                .map_err(|_| HalError::WriteError(Error, "UART")),
+            SendString(str) => unsafe {
+                usart_write(str.as_bytes().as_ptr(), str.len() as u16);
+                Ok(())
+            },
         }
     }
 }
@@ -83,11 +96,11 @@ pub enum UartReadActions<'a> {
 }
 
 impl UartReadActions<'_> {
-    pub fn action(&mut self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
-        match self {
-            Read(buffer) => {
-                block_on(uart.read(buffer)).map_err(|_| HalError::ReadError(Error, "UART"))
-            }
-        }
-    }
+    // pub fn action(&mut self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
+    //     match self {
+    //         Read(buffer) => {
+    //             block_on(uart.read(buffer)).map_err(|_| HalError::ReadError(Error, "UART"))
+    //         }
+    //     }
+    // }
 }
