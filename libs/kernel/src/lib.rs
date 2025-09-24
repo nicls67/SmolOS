@@ -13,7 +13,7 @@ use crate::data::Kernel;
 pub use crate::data::KernelTimeData;
 use crate::errors_mgt::ErrorsManager;
 use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
-use crate::scheduler::{App, Scheduler};
+use crate::scheduler::Scheduler;
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 use cortex_m::peripheral::syst::SystClkSource;
 use hal_interface::Hal;

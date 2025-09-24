@@ -1,31 +1,20 @@
 #![no_std]
 #![no_main]
 
-mod interface_init;
-
-use crate::interface_init::init_interfaces;
 use cortex_m_rt::entry;
-use hal_interface::{CoreClkConfig, Hal, HalConfig};
+use hal_interface::Hal;
 use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds, TerminalType};
 
 #[entry]
 fn main() -> ! {
-    // HAL initialization
-    let core_freq = Hal::init(HalConfig {
-        core_clk_config: CoreClkConfig::Max,
-    });
-    let mut hal = Hal::new();
-
-    // Add interfaces
-    init_interfaces(&mut hal);
-    // Lock HAL
-    hal.lock().unwrap();
+    // Initialize HAL
+    let hal = Hal::new();
 
     // Start kernel
     kernel::boot(BootConfig {
         sched_period: Milliseconds(50),
         kernel_time_data: KernelTimeData {
-            core_frequency: Mhz(core_freq),
+            core_frequency: Mhz(hal.get_core_clk()),
             systick_period: Milliseconds(1),
         },
         hal,

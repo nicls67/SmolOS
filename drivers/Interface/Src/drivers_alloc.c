@@ -1,7 +1,7 @@
 /**
   *******************************************************************
-  * @file               : lib_interface
-  * @date               : Created on 22/09/2025
+  * @file               : drivers_alloc
+  * @date               : Created on 24/09/2025
   * @author             : Nicolas SIMON
   *******************************************************************
   * @brief 
@@ -12,7 +12,7 @@
 /********************/
 /* Private includes */
 /********************/
-#include "gpio.h"
+#include "../Inc/drivers_alloc.h"
 #include "usart.h"
 
 /*******************/
@@ -26,6 +26,20 @@
 /*********************/
 /* Private constants */
 /*********************/
+const GPIO_ALLOC GPIO_PJ5 = {
+    .gpio = GPIOJ,
+    .pin = GPIO_PIN_5
+};
+const GPIO_ALLOC GPIO_PJ13 = {
+    .gpio = GPIOJ,
+    .pin = GPIO_PIN_13
+};
+
+const DRIVER_ALLOC DRIVERS_ALLOC[] = {
+    {(uint8_t *) "SERIAL_MAIN", USART, INOUT, (void *) &huart1, 0},
+    {(uint8_t *) "ERR_LED", GPIO, OUT, (void *) &GPIO_PJ13, 1},
+    {(uint8_t *) "ACT_LED", GPIO, OUT, (void *) &GPIO_PJ5, 2}
+};
 
 /******************/
 /* Private macros */
@@ -39,25 +53,6 @@
 /* Private functions */
 /*********************/
 
-
 /********************/
 /* Public functions */
 /********************/
-void init()
-{
-    //HAL_Init();
-    SystemClock_Config();
-    PeriphCommonClock_Config();
-    MX_GPIO_Init();
-    MX_USART1_UART_Init();
-}
-
-void toggle_pin()
-{
-    HAL_GPIO_TogglePin(GPIOJ, GPIO_PIN_5);
-}
-
-void usart_write(const uint8_t* str, uint16_t len)
-{
-    HAL_UART_Transmit(&huart1, str, len, HAL_MAX_DELAY);
-}

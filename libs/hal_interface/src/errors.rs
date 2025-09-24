@@ -1,9 +1,10 @@
 //! This module defines the `HalError` and `HalErrorLevel` enumerations and their associated
 //! functionality. It provides a structured way to represent hardware abstraction layer (HAL)
 //! related errors with different severity levels and format
+
 use crate::HalError::{
-    HalAlreadyLocked, HalNotLocked, IncompatibleAction, InterfaceInitError, InterfaceNotFound,
-    ReadError, ReadOnlyInterface, WriteError, WriteOnlyInterface, WrongInterfaceId,
+    IncompatibleAction, InterfaceNotFound, ReadError, ReadOnlyInterface, UnknownError, WriteError,
+    WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::HalErrorLevel::{Critical, Error, Fatal};
 use heapless::{String, format};
@@ -51,18 +52,15 @@ impl HalErrorLevel {
     /// be used for logging or display purposes.
     pub fn as_str(&self) -> &str {
         match self {
-            HalErrorLevel::Fatal => "HAL Fatal error : ",
-            HalErrorLevel::Critical => "HAL Critical error : ",
-            HalErrorLevel::Error => "HAL Error : ",
+            Fatal => "HAL Fatal error : ",
+            Critical => "HAL Critical error : ",
+            Error => "HAL Error : ",
         }
     }
 }
 
 #[derive(Debug)]
 pub enum HalError {
-    HalAlreadyLocked,
-    HalNotLocked,
-    InterfaceInitError(&'static str),
     InterfaceNotFound(&'static str),
     WrongInterfaceId(usize),
     ReadOnlyInterface(&'static str),
@@ -70,6 +68,7 @@ pub enum HalError {
     IncompatibleAction(&'static str, &'static str),
     WriteError(HalErrorLevel, &'static str),
     ReadError(HalErrorLevel, &'static str),
+    UnknownError,
 }
 
 impl HalError {
@@ -83,10 +82,6 @@ impl HalError {
     /// A `String` with the descriptive message for the current object state or error.
     ///
     /// # Variants Handling
-    /// - **HalAlreadyLocked**: Produces a message indicating that the hardware abstraction layer (HAL) is already locked.
-    /// - **HalNotLocked**: Produces a message indicating that the HAL is not locked.
-    /// - **InterfaceInitError(err)**: Produces a message describing an initialization error with an interface,
-    ///   incorporating the specific error `err`.
     /// - **InterfaceNotFound(name)**: Produces a message indicating that an interface with the given `name` is not found.
     /// - **WrongInterfaceId(id)**: Produces a message indicating that the provided interface ID `id` does not exist.
     /// - **ReadOnlyInterface(name)**: Produces a message indicating that the interface named `name` is read-only.
@@ -97,6 +92,7 @@ impl HalError {
     ///   interface `ift`.
     /// - **ReadError(lvl, ift)**: Produces a message indicating an error during a read operation on the specified
     ///   interface `ift`.
+    /// - **UnknownError**: Produces a generic message indicating an unknown error occurred.
     ///
     /// # Behavior
     /// - Uses `self.severity().as_str()` to prefix the severity level to the message.
@@ -113,19 +109,6 @@ impl HalError {
     pub fn to_string(&self) -> String<256> {
         let mut msg = String::new();
         match self {
-            HalAlreadyLocked => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str("HAL already locked").unwrap();
-            }
-            HalNotLocked => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str("HAL not locked").unwrap();
-            }
-            InterfaceInitError(err) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str("Interface initialization error : ").unwrap();
-                msg.push_str(err).unwrap_or(());
-            }
             InterfaceNotFound(name) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
@@ -189,6 +172,11 @@ impl HalError {
                 )
                 .unwrap();
             }
+            UnknownError => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(format!(256; "Unknown HAL error").unwrap().as_str())
+                    .unwrap();
+            }
         }
         msg
     }
@@ -199,9 +187,6 @@ impl HalError {
     /// `HalErrorLevel`, which represents how critical the error is. The mapping for
     /// each specific error variant to its respective severity level is defined as follows:
     ///
-    /// - `HalAlreadyLocked`: Returns `Error`
-    /// - `HalNotLocked`: Returns `Error`
-    /// - `InterfaceInitError(_)`: Returns `Fatal`
     /// - `InterfaceNotFound(_)`: Returns `Critical`
     /// - `WrongInterfaceId(_)`: Returns `Critical`
     /// - `ReadOnlyInterface(_)`: Returns `Error`
@@ -209,6 +194,7 @@ impl HalError {
     /// - `IncompatibleAction(_, _)`: Returns `Error`
     /// - `WriteError(lvl, _)`: Returns the level specified in `lvl`
     /// - `ReadError(lvl, _)`: Returns the level specified in `lvl`
+    /// - `UnknownError`: Returns `Error`
     ///
     /// # Returns
     ///
@@ -216,9 +202,6 @@ impl HalError {
     ///
     pub fn severity(&self) -> HalErrorLevel {
         match self {
-            HalAlreadyLocked => Error,
-            HalNotLocked => Error,
-            InterfaceInitError(_) => Fatal,
             InterfaceNotFound(_) => Critical,
             WrongInterfaceId(_) => Critical,
             ReadOnlyInterface(_) => Error,
@@ -226,6 +209,7 @@ impl HalError {
             IncompatibleAction(_, _) => Error,
             WriteError(lvl, _) => *lvl,
             ReadError(lvl, _) => *lvl,
+            UnknownError => Error,
         }
     }
 }

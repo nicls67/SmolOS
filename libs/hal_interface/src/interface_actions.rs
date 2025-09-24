@@ -1,106 +1,46 @@
-use crate::HalErrorLevel::Error;
-use crate::InterfaceReadActions::UartRead;
-use crate::InterfaceWriteActions::{GpioWrite, UartWrite};
-use crate::UartReadActions::Read;
+use crate::InterfaceActions::{GpioWrite, UartWrite};
 use crate::UartWriteActions::{SendChar, SendString};
-use crate::async_block::block_on;
-use crate::{HalError, HalResult};
+use crate::bindings::{HalInterfaceResult, usart_write};
 
-pub enum InterfaceWriteActions<'a> {
-    GpioWrite(GpioWriteActions),
+#[derive(Debug, Clone, Copy)]
+pub enum InterfaceActions<'a> {
+    GpioWrite(GpioWriteAction),
     UartWrite(UartWriteActions<'a>),
 }
 
-impl InterfaceWriteActions<'_> {
+impl InterfaceActions<'_> {
     pub fn name(&self) -> &'static str {
         match self {
             GpioWrite(_) => "GPIO Write",
-            UartWrite(_) => "Uart Write",
+            UartWrite(_) => "UART Write",
         }
     }
 }
 
-pub enum GpioWriteActions {
-    Set,
-    Clear,
-    Toggle,
-}
-
-unsafe extern "C" {
-    fn toggle_pin();
-}
-
-impl GpioWriteActions {
-    pub fn action(&self) -> HalResult<()> {
-        match self {
-            GpioWriteActions::Set => {
-                //pin.set_high();
-                Ok(())
-            }
-            GpioWriteActions::Clear => {
-                //pin.set_low();
-                Ok(())
-            }
-            GpioWriteActions::Toggle => {
-                unsafe {
-                    toggle_pin();
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
+#[derive(Debug, Clone, Copy)]
 pub enum UartWriteActions<'a> {
     SendChar(u8),
     SendString(&'a str),
 }
 
-unsafe extern "C" {
-    fn usart_write(data: *const u8, len: u16);
-}
-
 impl UartWriteActions<'_> {
-    pub fn action(&self) -> HalResult<()> {
+    pub fn action(&self, id: u8) -> HalInterfaceResult {
         match self {
             SendChar(c) => {
                 let data_arr = [*c];
-                unsafe {
-                    usart_write(&data_arr as *const u8, 1);
-                }
-                Ok(())
-                //block_on(uart.write(&data_arr)).map_err(|_| HalError::WriteError(Error, "UART"))
+                unsafe { usart_write(id, &data_arr as *const u8, 1) }
             }
             SendString(str) => unsafe {
-                usart_write(str.as_bytes().as_ptr(), str.len() as u16);
-                Ok(())
+                usart_write(id, str.as_bytes().as_ptr(), str.len() as u16)
             },
         }
     }
 }
 
-pub enum InterfaceReadActions<'a> {
-    UartRead(UartReadActions<'a>),
-}
-
-impl InterfaceReadActions<'_> {
-    pub fn name(&self) -> &'static str {
-        match self {
-            UartRead(_) => "UART Read",
-        }
-    }
-}
-
-pub enum UartReadActions<'a> {
-    Read(&'a mut [u8]),
-}
-
-impl UartReadActions<'_> {
-    // pub fn action(&mut self, uart: &mut Uart<'static, Async>) -> HalResult<()> {
-    //     match self {
-    //         Read(buffer) => {
-    //             block_on(uart.read(buffer)).map_err(|_| HalError::ReadError(Error, "UART"))
-    //         }
-    //     }
-    // }
+#[repr(u8)]
+#[derive(Debug, Clone, Copy)]
+pub enum GpioWriteAction {
+    Set = 0,
+    Clear = 1,
+    Toggle = 2,
 }
