@@ -36,7 +36,8 @@ add_library(${CMAKE_PROJECT_NAME} STATIC
         Interface/Src/lib_interface.c
         Interface/Src/drivers_alloc.c
         Interface/Inc/lib_interface.h
-        Interface/Inc/drivers_alloc.h)
+        Interface/Inc/drivers_alloc.h
+        Interface/Inc/drivers_types.h)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
