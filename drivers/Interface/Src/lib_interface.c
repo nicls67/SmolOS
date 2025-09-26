@@ -58,6 +58,9 @@ bool str_compare(const uint8_t *str1, const uint8_t *str2)
     return true;
 }
 
+extern void SystemClock_Config();
+
+extern void PeriphCommonClock_Config();
 
 /********************/
 /* Public functions */
