@@ -1,7 +1,7 @@
 use crate::{KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall};
 use core::sync::atomic::{AtomicUsize, Ordering};
-use hal_interface::GpioWriteActions::Toggle;
-use hal_interface::InterfaceWriteActions;
+use hal_interface::GpioWriteAction::Toggle;
+use hal_interface::InterfaceActions;
 
 static LED_ID: AtomicUsize = AtomicUsize::new(0);
 const LED_NAME: &str = "ACT_LED";
@@ -11,8 +11,7 @@ pub const LED_BLINK_PERIOD: Milliseconds = Milliseconds(1000);
 pub fn led_blink() -> KernelResult<()> {
     syscall(Syscall::Hal(SysCallHalArgs {
         id: LED_ID.load(Ordering::Relaxed),
-        write_action: Some(InterfaceWriteActions::GpioWrite(Toggle)),
-        read_action: None,
+        action: InterfaceActions::GpioWrite(Toggle),
     }))
 }
 

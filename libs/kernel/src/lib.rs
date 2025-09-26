@@ -13,7 +13,7 @@ use crate::data::Kernel;
 pub use crate::data::KernelTimeData;
 use crate::errors_mgt::ErrorsManager;
 use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
-use crate::scheduler::{App, Scheduler};
+use crate::scheduler::Scheduler;
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 use cortex_m::peripheral::syst::SystClkSource;
 use hal_interface::Hal;
@@ -94,6 +94,13 @@ pub fn boot(config: BootConfig) {
                 .as_str(),
         ))
         .unwrap();
+    terminal
+        .write(&TerminalFormatting::StrNewLineAfter(
+            format!(30; "Core frequency is {} MHz", Kernel::time_data().core_frequency.to_u32() / 1_000_000)
+                .unwrap()
+                .as_str(),
+        ))
+        .unwrap();
 
     ////////////////////////////////////
     // Errors Manager initialization
@@ -117,7 +124,7 @@ pub fn boot(config: BootConfig) {
 
     //Boot completed
     terminal
-        .write(&TerminalFormatting::StrNewLineAfter("Kernel ready !"))
+        .write(&TerminalFormatting::StrNewLineBoth("Kernel ready !"))
         .unwrap();
 }
 

@@ -14,8 +14,42 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 
 fn main() {
+    // Generate drivers allocation file
+    println!("cargo:rerun-if-changed=drivers_conf.yaml");
+    let gen_status = Command::new("python")
+        .arg("tools/gen_drivers_alloc.py")
+        .arg("drivers_conf.yaml")
+        .output()
+        .expect("Failed to execute Python script");
+
+    if !gen_status.status.success() {
+        panic!(
+            "Drivers allocation generation failed: {}",
+            String::from_utf8_lossy(&gen_status.stderr)
+        );
+    }
+
+    // Build drivers lib
+    println!("cargo:rerun-if-changed=drivers/Interface/Src/drivers_alloc.c");
+    let build_status = Command::new("cmake")
+        .current_dir("drivers")
+        .arg("--build")
+        .arg("--target")
+        .arg("drivers")
+        .arg("--preset")
+        .arg("Debug")
+        .output()
+        .expect("Failed to build drivers");
+    if !build_status.status.success() {
+        panic!(
+            "Drivers library build failed: {}",
+            String::from_utf8_lossy(&gen_status.stderr)
+        );
+    }
+
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -40,4 +74,7 @@ fn main() {
 
     // Set the linker script to the one provided by cortex-m-rt.
     println!("cargo:rustc-link-arg=-Tlink.x");
+
+    println!("cargo:rustc-link-search=native=drivers/build/Debug");
+    println!("cargo:rustc-link-lib=static=drivers");
 }

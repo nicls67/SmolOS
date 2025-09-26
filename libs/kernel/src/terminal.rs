@@ -1,6 +1,6 @@
 use crate::data::Kernel;
 use crate::{KernelError, KernelResult};
-use hal_interface::{InterfaceWriteActions, UartWriteActions};
+use hal_interface::{InterfaceActions, UartWriteActions};
 use heapless::String;
 
 /// Represents different kinds of terminal text formatting or operations.
@@ -158,9 +158,9 @@ impl Terminal {
     fn write_char(&self, data: char) -> KernelResult<()> {
         match self.terminal {
             TerminalType::Usart => Kernel::hal()
-                .interface_write(
+                .interface_action(
                     self.interface_id.unwrap(),
-                    InterfaceWriteActions::UartWrite(UartWriteActions::SendChar(data as u8)),
+                    InterfaceActions::UartWrite(UartWriteActions::SendChar(data as u8)),
                 )
                 .map_err(KernelError::HalError),
         }
@@ -169,9 +169,9 @@ impl Terminal {
     fn write_str(&self, data: &str) -> KernelResult<()> {
         match self.terminal {
             TerminalType::Usart => Kernel::hal()
-                .interface_write(
+                .interface_action(
                     self.interface_id.unwrap(),
-                    InterfaceWriteActions::UartWrite(UartWriteActions::SendString(data)),
+                    InterfaceActions::UartWrite(UartWriteActions::SendString(data)),
                 )
                 .map_err(KernelError::HalError),
         }

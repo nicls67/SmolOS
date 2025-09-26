@@ -8,7 +8,6 @@ edition = "2024"
 cortex-m-rt = { version = "0.7.0" }
 kernel = { path = "libs/kernel" }
 hal_interface = { path = "libs/hal_interface" }
-embassy-stm32 = { version = "0.4.0", features = ["stm32f769ni", "single-bank"] }
 
 [[bin]]
 name = "SmolOS"

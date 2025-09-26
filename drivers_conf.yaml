@@ -1,0 +1,30 @@
+target_file:
+  name: drivers_alloc
+  directory: drivers/Interface
+
+includes_c:
+  - "../Inc/drivers_alloc.h"
+  - "usart.h"
+
+includes_h:
+  - "drivers_types.h"
+
+drivers:
+  - name: SERIAL_MAIN
+    type: USART
+    direction: INOUT
+    peripheral: USART1
+
+  - name: ACT_LED
+    type: GPIO
+    direction: OUT
+    peripheral:
+      port: J
+      pin: 5
+
+  - name: ERR_LED
+    type: GPIO
+    direction: OUT
+    peripheral:
+      port: J
+      pin: 13
