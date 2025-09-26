@@ -14,8 +14,24 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 
 fn main() {
+    // Build drivers lib
+    let build_status = Command::new("cmake")
+        .current_dir("drivers")
+        .arg("--build")
+        .arg("--target")
+        .arg("drivers")
+        .arg("--preset")
+        .arg("Debug")
+        .output()
+        .expect("Failed to build drivers");
+    println!(
+        "cargo:warning=Drivers lib build status: {}",
+        String::from_utf8_lossy(&build_status.stdout)
+    );
+
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
