@@ -17,7 +17,23 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
+    // Generate drivers allocation file
+    println!("cargo:rerun-if-changed=drivers_conf.yaml");
+    let gen_status = Command::new("python")
+        .arg("tools/gen_drivers_alloc.py")
+        .arg("drivers_conf.yaml")
+        .output()
+        .expect("Failed to execute Python script");
+
+    if !gen_status.status.success() {
+        panic!(
+            "Drivers allocation generation failed: {}",
+            String::from_utf8_lossy(&gen_status.stderr)
+        );
+    }
+
     // Build drivers lib
+    println!("cargo:rerun-if-changed=drivers/Interface/Src/drivers_alloc.c");
     let build_status = Command::new("cmake")
         .current_dir("drivers")
         .arg("--build")
@@ -27,10 +43,12 @@ fn main() {
         .arg("Debug")
         .output()
         .expect("Failed to build drivers");
-    println!(
-        "cargo:warning=Drivers lib build status: {}",
-        String::from_utf8_lossy(&build_status.stdout)
-    );
+    if !build_status.status.success() {
+        panic!(
+            "Drivers library build failed: {}",
+            String::from_utf8_lossy(&gen_status.stderr)
+        );
+    }
 
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
