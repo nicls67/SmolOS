@@ -104,6 +104,9 @@ impl Hal {
             InterfaceActions::UartWrite(act) => {
                 act.action(id as u8).to_result(Some(id), None, Some(action))
             }
+            InterfaceActions::Lcd(act) => {
+                act.action(id as u8).to_result(Some(id), None, Some(action))
+            }
         }
     }
 

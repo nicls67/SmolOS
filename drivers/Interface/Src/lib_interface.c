@@ -19,6 +19,9 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
+#include "fmc.h"
+#include "stm32f769i_discovery_lcd.h"
+
 
 /*******************/
 /* Private typedef */
@@ -62,6 +65,26 @@ extern void SystemClock_Config();
 
 extern void PeriphCommonClock_Config();
 
+HAL_INTERFACE_RESULT lcd_id_check(const uint8_t id)
+{
+    if (id >= DRIVERS_ALLOC_SIZE)
+    {
+        return ERR_WRONG_INTERFACE_ID;
+    }
+
+    if (DRIVERS_ALLOC[id].drv_direction == IN)
+    {
+        return ERR_READ_ONLY_INTERFACE;
+    }
+
+    if (DRIVERS_ALLOC[id].drv_type != LCD)
+    {
+        return ERR_INCOMPATIBLE_ACTION;
+    }
+
+    return OK;
+}
+
 /********************/
 /* Public functions */
 /********************/
@@ -73,6 +96,12 @@ void hal_init()
     PeriphCommonClock_Config();
     MX_GPIO_Init();
     MX_USART1_UART_Init();
+    MX_FMC_Init();
+
+    // LCD Init
+    BSP_LCD_Init();
+    BSP_LCD_LayerDefaultInit(1, 0xC0000000);
+    BSP_LCD_DisplayOff();
 }
 
 HAL_INTERFACE_RESULT get_interface_id(const uint8_t *name, uint8_t *id)
@@ -166,4 +195,52 @@ HAL_INTERFACE_RESULT usart_write(const uint8_t id, const uint8_t *str, const uin
 uint32_t get_core_clk()
 {
     return HAL_RCC_GetSysClockFreq();
+}
+
+HAL_INTERFACE_RESULT lcd_enable(const uint8_t id, const bool enable)
+{
+    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
+    if (result != OK)
+    {
+        return result;
+    }
+
+    if (enable)
+    {
+        BSP_LCD_DisplayOn();
+    }
+    else
+    {
+        BSP_LCD_DisplayOff();
+    }
+    return OK;
+}
+
+HAL_INTERFACE_RESULT lcd_clear(const uint8_t id, const uint8_t layer, const uint32_t color)
+{
+    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
+    if (result != OK)
+    {
+        return result;
+    }
+
+    BSP_LCD_SelectLayer(layer);
+    BSP_LCD_Clear(color);
+
+    return OK;
+}
+
+HAL_INTERFACE_RESULT lcd_draw_pixel(const uint8_t id, const uint8_t layer, const uint16_t x, const uint16_t y,
+                                    const uint32_t color)
+{
+    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
+    if (result != OK)
+    {
+        return result;
+    }
+
+    BSP_LCD_SelectLayer(layer);
+    BSP_LCD_DrawPixel(x, y, color);
+
+    return OK;
 }

@@ -15,6 +15,8 @@
 /************/
 /* Includes */
 /************/
+#include <stdbool.h>
+
 #include "stm32f769xx.h"
 
 /********************/
@@ -43,6 +45,7 @@ typedef enum
     CLEAR_PIN = 1,
     TOGGLE_PIN = 2
 } GPIO_WRITE_ACTION;
+
 
 /**********************/
 /* Exported constants */
@@ -168,5 +171,81 @@ HAL_INTERFACE_RESULT usart_write(uint8_t id, const uint8_t *str, uint16_t len);
  * @return The frequency of the core system clock in hertz (Hz).
  */
 uint32_t get_core_clk();
+
+/**
+ * @brief Enables or disables the LCD identified by the given ID.
+ *
+ * This function manages the display state of an LCD peripheral, turning it
+ * on or off based on the enable parameter. It verifies the validity of the
+ * specified interface ID and ensures it corresponds to a valid and compatible
+ * LCD-type interface.
+ *
+ * If the ID is valid, the function interacts with the hardware to modify the
+ * state of the LCD by calling BSP_LCD_DisplayOn or BSP_LCD_DisplayOff, depending
+ * on the value of the enable parameter.
+ *
+ * The following conditions are checked before performing the operation:
+ * - The ID must be within the range of allocated driver entries.
+ * - The specified interface must not be read-only.
+ * - The specified interface must be of type LCD.
+ *
+ * @param id The ID of the LCD interface to be enabled or disabled.
+ * @param enable A boolean flag where true enables the display, and false disables it.
+ *
+ * @return HAL_INTERFACE_RESULT
+ *         - OK: If the operation was successful.
+ *         - ERR_WRONG_INTERFACE_ID: If the ID is outside the allowable range.
+ *         - ERR_READ_ONLY_INTERFACE: If the specified interface is read-only.
+ *         - ERR_INCOMPATIBLE_ACTION: If the specified interface is not of LCD type.
+ */
+HAL_INTERFACE_RESULT lcd_enable(uint8_t id, bool enable);
+
+/**
+ * @brief Clears the specified LCD layer with the given color.
+ *
+ * This function selects the specified LCD layer and fills it with the specified color.
+ * Before performing the operation, it checks the validity of the LCD interface ID.
+ *
+ * The function performs the following steps:
+ * - Validates the LCD interface ID using lcd_id_check.
+ * - Selects the specified layer using BSP_LCD_SelectLayer.
+ * - Clears the selected layer with the provided color using BSP_LCD_Clear.
+ *
+ * @param id The interface ID corresponding to the target LCD. Must be within
+ *           the valid range of interface IDs and associated with an LCD interface.
+ * @param layer The layer index to select for clearing.
+ * @param color The color value to fill the selected layer.
+ * @return HAL_INTERFACE_RESULT Returns one of the following results:
+ *         - OK on success.
+ *         - ERR_WRONG_INTERFACE_ID if the specified interface ID is invalid.
+ *         - ERR_READ_ONLY_INTERFACE if the interface ID corresponds to a read-only interface.
+ *         - ERR_INCOMPATIBLE_ACTION if the specified interface is not an LCD type.
+ */
+HAL_INTERFACE_RESULT lcd_clear(uint8_t id, uint8_t layer, uint32_t color);
+
+/**
+ * @brief Draws a pixel on the specified LCD layer at the given coordinates
+ *        with the specified color.
+ *
+ * This function checks the validity of the LCD interface using the given
+ * interface ID, selects the appropriate layer, and draws a pixel at the
+ * specified X and Y coordinates using the provided color. Errors may be
+ * returned if the interface ID does not refer to a compatible writable LCD
+ * interface or if the ID does not exist.
+ *
+ * @param id The interface ID for the LCD driver to be used. Must refer to
+ *           a valid writable LCD interface.
+ * @param layer The LCD layer to which the pixel is drawn. Must be a valid
+ *              layer value supported by the hardware.
+ * @param x The X-coordinate of the pixel to be drawn.
+ * @param y The Y-coordinate of the pixel to be drawn.
+ * @param color The RGB color value of the pixel to be drawn.
+ *
+ * @return HAL_INTERFACE_RESULT Returns OK if the pixel is drawn successfully.
+ *         Returns an error code (e.g., ERR_WRONG_INTERFACE_ID,
+ *         ERR_INCOMPATIBLE_ACTION, ERR_READ_ONLY_INTERFACE) if the interface ID
+ *         is invalid or the action is disallowed.
+ */
+HAL_INTERFACE_RESULT lcd_draw_pixel(uint8_t id, uint8_t layer, uint16_t x, uint16_t y, uint32_t color);
 
 #endif //LIB_INTERFACE_H

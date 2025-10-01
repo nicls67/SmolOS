@@ -1,7 +1,7 @@
 use crate::HalError::{
     IncompatibleAction, InterfaceNotFound, ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
 };
-use crate::{GpioWriteAction, HalResult, InterfaceActions};
+use crate::{GpioWriteAction, HalResult, InterfaceActions, LcdLayer};
 
 #[repr(u8)]
 pub enum HalInterfaceResult {
@@ -86,6 +86,18 @@ unsafe extern "C" {
     pub fn usart_write(id: u8, str: *const u8, len: u16) -> HalInterfaceResult;
 
     pub fn get_core_clk() -> u32;
+
+    pub fn lcd_enable(id: u8, enable: bool) -> HalInterfaceResult;
+
+    pub fn lcd_clear(id: u8, layer: LcdLayer, color: u32) -> HalInterfaceResult;
+
+    pub fn lcd_draw_pixel(
+        id: u8,
+        layer: LcdLayer,
+        x: u16,
+        y: u16,
+        color: u32,
+    ) -> HalInterfaceResult;
 }
 
 /**
