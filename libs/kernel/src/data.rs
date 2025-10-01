@@ -115,7 +115,6 @@ impl Kernel {
         errors: ErrorsManager,
     ) {
         unsafe {
-            KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
             KERNEL_DATA.hal = Some(hal);
             KERNEL_DATA.kernel_time_data = Some(kernel_time_data);
             KERNEL_DATA.terminal = Some(terminal);
@@ -302,5 +301,31 @@ impl Kernel {
                 panic!("Errors manager is not initialized");
             }
         }
+    }
+}
+
+/// Initializes the Cortex-M peripherals used by the kernel.
+///
+/// This function is responsible for initializing the peripherals of the Cortex-M microcontroller
+/// that the kernel depends on. It accesses the global `KERNEL_DATA` structure and assigns the
+/// retrieved peripherals object to the `cortex_peripherals` field.
+///
+/// # Safety
+///
+/// This function performs an unsafe operation to directly modify the global `KERNEL_DATA` structure.
+/// It assumes exclusive access to this data structure and relies on the safe initialization of
+/// `KERNEL_DATA` and the presence of Cortex-M peripherals.
+///
+/// Calling this function multiple times without proper synchronization or in an invalid state
+/// may result in undefined behavior.
+///
+/// # Panics
+///
+/// This function will panic if it fails to retrieve the Cortex-M peripherals via `Peripherals::take()`,
+/// which occurs if the peripherals have already been taken elsewhere in the program.
+///
+pub fn cortex_init() {
+    unsafe {
+        KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
     }
 }

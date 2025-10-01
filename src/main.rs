@@ -7,6 +7,12 @@ use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds, TerminalType};
 
 #[entry]
 fn main() -> ! {
+    // Initialize Cortex-M core
+    kernel::cortex_init();
+
+    // Start systick
+    kernel::init_systick(None);
+
     // Initialize HAL
     let hal = Hal::new();
 
