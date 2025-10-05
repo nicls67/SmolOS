@@ -25,6 +25,7 @@ impl DisplayErrorLevel {
 #[derive(Debug)]
 pub enum DisplayError {
     HalError(HalErrorDef),
+    DisplayDriverNotInitialized,
     UnknownError,
 }
 
@@ -33,7 +34,14 @@ impl DisplayError {
         let mut msg = String::new();
         match self {
             HalError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
-            DisplayError::UnknownError => msg.push_str("Unknown error").unwrap(),
+            DisplayError::DisplayDriverNotInitialized => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str("Display driver not initialized").unwrap()
+            }
+            DisplayError::UnknownError => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str("Unknown error").unwrap()
+            }
         }
         msg
     }
@@ -45,6 +53,7 @@ impl DisplayError {
                 HalErrorLevel::Critical => Critical,
                 HalErrorLevel::Error => Error,
             },
+            DisplayError::DisplayDriverNotInitialized => Error,
             DisplayError::UnknownError => Error,
         }
     }
