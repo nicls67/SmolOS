@@ -6,3 +6,4 @@
 /drivers/build/
 /drivers/startup_stm32f769xx.s
 /drivers/STM32F769XX_FLASH.ld
+/libs/display/target/
