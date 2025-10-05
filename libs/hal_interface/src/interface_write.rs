@@ -1,21 +1,21 @@
-use crate::InterfaceActions::{GpioWrite, Lcd, UartWrite};
+use crate::InterfaceWriteActions::{GpioWrite, Lcd, UartWrite};
 use crate::LcdActions::{Clear, DrawPixel, Enable};
 use crate::UartWriteActions::{SendChar, SendString};
 use crate::bindings::{HalInterfaceResult, lcd_clear, lcd_draw_pixel, lcd_enable, usart_write};
 
 #[derive(Debug, Clone, Copy)]
-pub enum InterfaceActions<'a> {
+pub enum InterfaceWriteActions<'a> {
     GpioWrite(GpioWriteAction),
     UartWrite(UartWriteActions<'a>),
     Lcd(LcdActions),
 }
 
-impl InterfaceActions<'_> {
-    pub fn name(&self) -> &'static str {
+impl InterfaceWriteActions<'_> {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
             GpioWrite(_) => "GPIO Write",
             UartWrite(_) => "UART Write",
-            Lcd(_) => "LCD",
+            Lcd(_) => "LCD Write",
         }
     }
 }
@@ -27,7 +27,7 @@ pub enum UartWriteActions<'a> {
 }
 
 impl UartWriteActions<'_> {
-    pub fn action(&self, id: u8) -> HalInterfaceResult {
+    pub(crate) fn action(&self, id: u8) -> HalInterfaceResult {
         match self {
             SendChar(c) => {
                 let data_arr = [*c];
@@ -95,7 +95,7 @@ pub enum LcdActions {
 }
 
 impl LcdActions {
-    pub fn action(&self, id: u8) -> HalInterfaceResult {
+    pub(crate) fn action(&self, id: u8) -> HalInterfaceResult {
         match self {
             Enable(enable) => unsafe { lcd_enable(id, *enable) },
             Clear(layer, color) => unsafe { lcd_clear(id, *layer, color.as_u32()) },

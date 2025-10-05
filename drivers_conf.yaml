@@ -31,5 +31,5 @@ drivers:
 
   - name: LCD
     type: LCD
-    direction: OUT
+    direction: INOUT
     peripheral: None

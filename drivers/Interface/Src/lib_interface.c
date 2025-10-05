@@ -72,11 +72,6 @@ HAL_INTERFACE_RESULT lcd_id_check(const uint8_t id)
         return ERR_WRONG_INTERFACE_ID;
     }
 
-    if (DRIVERS_ALLOC[id].drv_direction == IN)
-    {
-        return ERR_READ_ONLY_INTERFACE;
-    }
-
     if (DRIVERS_ALLOC[id].drv_type != LCD)
     {
         return ERR_INCOMPATIBLE_ACTION;
@@ -100,7 +95,7 @@ void hal_init()
 
     // LCD Init
     BSP_LCD_Init();
-    BSP_LCD_LayerDefaultInit(1, 0xC0000000);
+    BSP_LCD_LayerDefaultInit(1, LCD_FB_START_ADDRESS);
     BSP_LCD_DisplayOff();
 }
 
@@ -241,6 +236,20 @@ HAL_INTERFACE_RESULT lcd_draw_pixel(const uint8_t id, const uint8_t layer, const
 
     BSP_LCD_SelectLayer(layer);
     BSP_LCD_DrawPixel(x, y, color);
+
+    return OK;
+}
+
+HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t *x, uint16_t *y)
+{
+    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
+    if (result != OK)
+    {
+        return result;
+    }
+
+    *x = (uint16_t) BSP_LCD_GetXSize();
+    *y = (uint16_t) BSP_LCD_GetYSize();
 
     return OK;
 }

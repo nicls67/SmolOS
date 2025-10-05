@@ -1,8 +1,9 @@
 use crate::KernelError::{
-    AppAlreadyExists, AppInitError, AppNotFound, CannotAddNewPeriodicApp, HalError, TerminalError,
-    WrongSyscallArgs,
+    AppAlreadyExists, AppInitError, AppNotFound, CannotAddNewPeriodicApp, DisplayError, HalError,
+    TerminalError, WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
+use display::{DisplayError as DisplayErrorDef, DisplayErrorLevel};
 use hal_interface::{HalError as HalErrorDef, HalErrorLevel};
 use heapless::{String, format};
 
@@ -28,6 +29,7 @@ impl KernelErrorLevel {
 #[derive(Debug)]
 pub enum KernelError {
     HalError(HalErrorDef),
+    DisplayError(DisplayErrorDef),
     TerminalError(KernelErrorLevel, &'static str, &'static str),
     CannotAddNewPeriodicApp(&'static str),
     AppInitError(&'static str),
@@ -41,6 +43,7 @@ impl KernelError {
         let mut msg = String::new();
         match self {
             HalError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
+            DisplayError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
             TerminalError(_, name, err) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
@@ -106,25 +109,17 @@ impl KernelError {
     /// is conveyed as a `KernelErrorLevel` enum, which can
     /// represent `Fatal`, `Critical`, or `Error` levels.
     ///
-    /// # Behavior
-    /// - For `HalError`, the severity is determined based on
-    ///   the severity of the associated `HalErrorLevel`.
-    ///   - `HalErrorLevel::Fatal` maps to `KernelErrorLevel::Fatal`.
-    ///   - `HalErrorLevel::Critical` maps to `KernelErrorLevel::Critical`.
-    ///   - `HalErrorLevel::Error` maps to `KernelErrorLevel::Error`.
-    /// - For `TerminalError`, the severity level is directly extracted from the
-    ///   first tuple field.
-    /// - For `CannotAddNewPeriodicApp`, the severity is set to `Critical`.
-    /// - For `AppInitError`, the severity is set to `Critical`.
-    /// - For `WrongSyscallArgs`, the severity is set to `Error`.
-    /// - For `AppNotFound`, the severity is set to `Error`
-    /// - For `AppAlreadyExists`, the severity is set to `Error`
     pub fn severity(&self) -> KernelErrorLevel {
         match self {
             HalError(err) => match err.severity() {
                 HalErrorLevel::Fatal => Fatal,
                 HalErrorLevel::Critical => Critical,
                 HalErrorLevel::Error => Error,
+            },
+            DisplayError(err) => match err.severity() {
+                DisplayErrorLevel::Fatal => Fatal,
+                DisplayErrorLevel::Critical => Critical,
+                DisplayErrorLevel::Error => Error,
             },
             TerminalError(lvl, _, _) => *lvl,
             CannotAddNewPeriodicApp(_) => Critical,

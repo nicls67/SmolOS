@@ -16,6 +16,7 @@ use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
 use crate::scheduler::Scheduler;
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 pub use data::cortex_init;
+use display::{Colors, Display};
 use hal_interface::Hal;
 use heapless::format;
 pub use syscall::*;
@@ -29,6 +30,7 @@ pub struct BootConfig {
     pub system_terminal_name: &'static str,
     pub system_terminal_type: TerminalType,
     pub err_led_name: Option<&'static str>,
+    pub display_name: Option<&'static str>,
 }
 
 /// Boot the kernel with the provided configuration.
@@ -60,11 +62,15 @@ pub fn boot(config: BootConfig) {
     let sched = Scheduler::new(config.sched_period);
     Kernel::init_kernel_data(
         config.hal,
+        Display::new(),
         config.kernel_time_data.clone(),
         Terminal::new(config.system_terminal_name, config.system_terminal_type),
         sched,
         ErrorsManager::new(),
     );
+    Kernel::display()
+        .init(config.display_name.unwrap(), Kernel::hal(), Colors::Black)
+        .unwrap();
 
     ////////////////////////////
     // Terminal start

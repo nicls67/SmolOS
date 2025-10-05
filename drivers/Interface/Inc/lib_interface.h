@@ -17,6 +17,7 @@
 /************/
 #include <stdbool.h>
 
+#include "drivers_types.h"
 #include "stm32f769xx.h"
 
 /********************/
@@ -247,5 +248,25 @@ HAL_INTERFACE_RESULT lcd_clear(uint8_t id, uint8_t layer, uint32_t color);
  *         is invalid or the action is disallowed.
  */
 HAL_INTERFACE_RESULT lcd_draw_pixel(uint8_t id, uint8_t layer, uint16_t x, uint16_t y, uint32_t color);
+
+/**
+ * @brief Retrieves the size (width and height) of the specified LCD panel.
+ *
+ * This function checks the validity of the given LCD interface ID and ensures
+ * it is configured for proper use as an output-type LCD device. If the interface
+ * is valid, it retrieves the screen dimensions (width and height) in pixels.
+ *
+ * @param id The ID of the LCD interface to query. Must be within the valid range
+ *           and correspond to an output-type LCD interface.
+ * @param size Pointer to a PIXEL_COORD structure where the LCD dimensions will
+ *             be stored. The `x` member will store the width, and the `y` member
+ *             will store the height of the LCD.
+ * @return A HAL_INTERFACE_RESULT indicating the result of the operation:
+ *         - OK: The operation was successful, and the size has been retrieved.
+ *         - ERR_WRONG_INTERFACE_ID: The provided ID is out of range.
+ *         - ERR_READ_ONLY_INTERFACE: The interface is read-only and cannot be queried.
+ *         - ERR_INCOMPATIBLE_ACTION: The ID does not correspond to an LCD device.
+ */
+HAL_INTERFACE_RESULT get_lcd_size(uint8_t id, uint16_t *x, uint16_t *y);
 
 #endif //LIB_INTERFACE_H

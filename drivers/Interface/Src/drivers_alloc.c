@@ -38,7 +38,7 @@ const DRIVER_ALLOC DRIVERS_ALLOC[] = {
     { (uint8_t*)"SERIAL_MAIN", USART, INOUT, (void*) &huart1, 0 },
     { (uint8_t*)"ACT_LED", GPIO, OUT, (void*) &GPIO_PJ5, 1 },
     { (uint8_t*)"ERR_LED", GPIO, OUT, (void*) &GPIO_PJ13, 2 },
-    { (uint8_t*)"LCD", LCD, OUT, (void*) 0, 3 },
+    { (uint8_t*)"LCD", LCD, INOUT, (void*) 0, 3 },
 };
 
 /******************/

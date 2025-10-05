@@ -1,11 +1,11 @@
 use crate::data::Kernel;
 use crate::scheduler::{App, AppCall};
 use crate::{KernelError, KernelResult, Milliseconds};
-use hal_interface::InterfaceActions;
+use hal_interface::InterfaceWriteActions;
 
 pub struct SysCallHalArgs<'a> {
     pub id: usize,
-    pub action: InterfaceActions<'a>,
+    pub action: InterfaceWriteActions<'a>,
 }
 
 pub enum Syscall<'a> {
@@ -84,7 +84,7 @@ pub enum Syscall<'a> {
 pub fn syscall(syscall_type: Syscall) -> KernelResult<()> {
     let result = match syscall_type {
         Syscall::Hal(args) => Kernel::hal()
-            .interface_action(args.id, args.action)
+            .interface_write(args.id, args.action)
             .map_err(KernelError::HalError),
         Syscall::HalGetId(name, id) => match Kernel::hal().get_interface_id(name) {
             Ok(hal_id) => {

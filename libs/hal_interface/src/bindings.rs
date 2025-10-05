@@ -1,7 +1,8 @@
 use crate::HalError::{
     IncompatibleAction, InterfaceNotFound, ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
 };
-use crate::{GpioWriteAction, HalResult, InterfaceActions, LcdLayer};
+use crate::interface_read::InterfaceReadAction;
+use crate::{GpioWriteAction, HalResult, InterfaceWriteActions, LcdLayer};
 
 #[repr(u8)]
 pub enum HalInterfaceResult {
@@ -54,7 +55,8 @@ impl HalInterfaceResult {
         &self,
         id: Option<usize>,
         name: Option<&'static str>,
-        action: Option<InterfaceActions>,
+        action_write: Option<InterfaceWriteActions>,
+        action_read: Option<InterfaceReadAction>,
     ) -> HalResult<()> {
         match self {
             HalInterfaceResult::OK => Ok(()),
@@ -67,7 +69,15 @@ impl HalInterfaceResult {
                 Err(WriteOnlyInterface(interface_name(id.unwrap())?))
             }
             HalInterfaceResult::ErrIncompatibleAction => Err(IncompatibleAction(
-                action.unwrap().name(),
+                {
+                    if let Some(action) = action_write {
+                        action.name()
+                    } else if let Some(action) = action_read {
+                        action.name()
+                    } else {
+                        "Unknown"
+                    }
+                },
                 interface_name(id.unwrap())?,
             )),
         }
@@ -98,6 +108,8 @@ unsafe extern "C" {
         y: u16,
         color: u32,
     ) -> HalInterfaceResult;
+
+    pub fn get_lcd_size(id: u8, x: *mut u16, y: *mut u16) -> HalInterfaceResult;
 }
 
 /**
