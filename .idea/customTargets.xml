@@ -11,5 +11,15 @@
         </clean>
       </configuration>
     </target>
+    <target id="b04ec195-2747-4668-98ce-1f75859d421a" name="Cargo Release" defaultType="TOOL">
+      <configuration id="bc78ae04-9316-4ac2-a17a-5be91f49944f" name="Cargo Release" toolchainName="Rust Embedded STM32F7">
+        <build type="TOOL">
+          <tool actionId="Tool_External Tools_BuildRelease" />
+        </build>
+        <clean type="TOOL">
+          <tool actionId="Tool_External Tools_Clean" />
+        </clean>
+      </configuration>
+    </target>
   </component>
 </project>

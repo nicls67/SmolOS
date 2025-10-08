@@ -114,21 +114,6 @@ impl Display {
                 )),
             )
             .map_err(DisplayError::HalError)?;
-        self.switch_frame_buffer()?;
-
-        // Clean the buffer and then switch to the other buffer
-        self.hal
-            .as_mut()
-            .unwrap()
-            .interface_write(
-                self.hal_id.unwrap(),
-                InterfaceWriteActions::Lcd(LcdActions::Clear(
-                    LcdLayer::FOREGROUND,
-                    background_color.to_argb(),
-                )),
-            )
-            .map_err(DisplayError::HalError)?;
-        self.switch_frame_buffer()?;
 
         self.initialized = true;
 
@@ -230,7 +215,7 @@ impl Display {
         let char_size = font_size.get_char_size();
         let mut current_x = x;
         let color_argb = color.to_argb().as_u32();
-        let mut fb_write_address = self.frame_buffer.as_mut().unwrap().address_active()
+        let mut fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
             + 4 * (y as u32 * self.size.unwrap().0 as u32 + x as u32);
 
         for char_to_display in string.as_bytes() {
@@ -254,11 +239,9 @@ impl Display {
             // Compute next char position
             current_x += char_size.0 as u16;
             // Increment frame buffer address
-            fb_write_address = self.frame_buffer.as_mut().unwrap().address_active()
+            fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
                 + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
         }
-
-        self.switch_frame_buffer()?;
 
         Ok(())
     }
