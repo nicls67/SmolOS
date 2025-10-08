@@ -1,7 +1,9 @@
 use crate::InterfaceWriteActions::{GpioWrite, Lcd, UartWrite};
-use crate::LcdActions::{Clear, DrawPixel, Enable};
+use crate::LcdActions::{Clear, DrawPixel, Enable, SetFbAddress};
 use crate::UartWriteActions::{SendChar, SendString};
-use crate::bindings::{HalInterfaceResult, lcd_clear, lcd_draw_pixel, lcd_enable, usart_write};
+use crate::bindings::{
+    HalInterfaceResult, lcd_clear, lcd_draw_pixel, lcd_enable, set_fb_address, usart_write,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceWriteActions<'a> {
@@ -92,6 +94,7 @@ pub enum LcdActions {
     Enable(bool),
     Clear(LcdLayer, PixelColorARGB),
     DrawPixel(LcdLayer, LcdPixel),
+    SetFbAddress(LcdLayer, u32),
 }
 
 impl LcdActions {
@@ -102,6 +105,7 @@ impl LcdActions {
             DrawPixel(layer, pixel) => unsafe {
                 lcd_draw_pixel(id, *layer, pixel.x, pixel.y, pixel.color.as_u32())
             },
+            SetFbAddress(layer, fb_address) => unsafe { set_fb_address(id, *layer, *fb_address) },
         }
     }
 }

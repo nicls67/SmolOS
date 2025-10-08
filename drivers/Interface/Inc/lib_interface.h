@@ -269,4 +269,45 @@ HAL_INTERFACE_RESULT lcd_draw_pixel(uint8_t id, uint8_t layer, uint16_t x, uint1
  */
 HAL_INTERFACE_RESULT get_lcd_size(uint8_t id, uint16_t *x, uint16_t *y);
 
+/**
+ * @brief Retrieves the frame buffer address for a specific LCD interface and layer.
+ *
+ * This function checks the validity of the provided LCD interface ID and layer,
+ * and if valid, retrieves the starting address of the frame buffer corresponding
+ * to the specified layer. It ensures the interface ID corresponds to an LCD interface
+ * and that the provided parameters are compatible.
+ *
+ * @param id The ID of the LCD interface to check.
+ * @param layer The layer number for which the frame buffer address is requested.
+ * @param addr Pointer to a variable where the frame buffer address will be stored.
+ *
+ * @return Returns a result of type HAL_INTERFACE_RESULT indicating the outcome:
+ *         - OK: The operation was successful, and the frame buffer address is available.
+ *         - ERR_WRONG_INTERFACE_ID: The specified ID is outside the valid range.
+ *         - ERR_INCOMPATIBLE_ACTION: The interface ID does not correspond to an LCD.
+ */
+HAL_INTERFACE_RESULT get_fb_address(uint8_t id, uint8_t layer, uint32_t *addr);
+
+/**
+ * @brief Sets the frame buffer address for a specific LCD layer.
+ *
+ * This function sets the address of the frame buffer for the specified
+ * LCD layer. It first validates the LCD ID to ensure it is within the
+ * range of allocated drivers and that the driver is of type LCD. If the
+ * validation fails, it returns an appropriate error code. Otherwise, it
+ * updates the specified layer's address.
+ *
+ * @param id The identifier of the LCD driver to modify.
+ * @param layer The layer index for which the frame buffer address is to be set.
+ * @param addr The new frame buffer address to be assigned.
+ *
+ * @return An instance of HAL_INTERFACE_RESULT indicating the result of
+ *         the operation. Possible return values are:
+ *         - OK: The operation was successful.
+ *         - ERR_WRONG_INTERFACE_ID: The provided ID is invalid.
+ *         - ERR_INCOMPATIBLE_ACTION: The driver ID does not correspond
+ *           to an LCD interface.
+ */
+HAL_INTERFACE_RESULT set_fb_address(uint8_t id, uint8_t layer, uint32_t addr);
+
 #endif //LIB_INTERFACE_H

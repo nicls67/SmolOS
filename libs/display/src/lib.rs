@@ -2,22 +2,24 @@
 mod colors;
 mod errors;
 mod fonts;
+mod frame_buffer;
 
 pub use errors::{DisplayError, DisplayErrorLevel, DisplayResult};
 pub use fonts::FontSize;
 use hal_interface::{
-    Hal, InterfaceReadAction, InterfaceWriteActions, LcdActions, LcdLayer, LcdPixel, LcdReadAction,
+    Hal, InterfaceReadAction, InterfaceWriteActions, LcdActions, LcdLayer, LcdReadAction,
 };
 
+use crate::frame_buffer::FrameBuffer;
 pub use colors::Colors;
 use hal_interface::InterfaceReadResult::LcdRead;
-use hal_interface::LcdRead::{FbAddress, LcdSize};
+use hal_interface::LcdRead::LcdSize;
 
 pub struct Display {
     hal_id: Option<usize>,
     hal: Option<&'static mut Hal>,
     size: Option<(u16, u16)>,
-    fb_address: Option<u32>,
+    frame_buffer: Option<FrameBuffer>,
     initialized: bool,
 }
 
@@ -31,20 +33,21 @@ impl Display {
     /// Creates a new instance of the struct with default values.
     ///
     /// # Returns
-    ///
-    /// A new instance of the struct with the following default fields:
+    /// A new instance of the struct with the following default settings:
     /// - `hal_id`: `None`
     /// - `hal`: `None`
     /// - `size`: `None`
-    /// - `fb_address`: `None`
+    /// - `frame_buffer`: `None`
     /// - `initialized`: `false`
     ///
+    /// This function is typically used as a default constructor for initializing
+    /// the struct with no pre-set values.
     pub fn new() -> Self {
         Self {
             hal_id: None,
             hal: None,
             size: None,
-            fb_address: None,
+            frame_buffer: None,
             initialized: false,
         }
     }
@@ -109,20 +112,30 @@ impl Display {
             _ => None,
         };
 
-        // Get framebuffer address
-        self.fb_address = match hal
-            .interface_read(
-                self.hal_id.unwrap(),
-                InterfaceReadAction::LcdRead(LcdReadAction::FbAddress(LcdLayer::FOREGROUND)),
-            )
-            .map_err(DisplayError::HalError)?
-        {
-            LcdRead(FbAddress(fb_address)) => Some(fb_address),
-            _ => None,
-        };
-
+        // Store HAL reference
         self.hal = Some(hal);
+
+        // Initialize the frame buffer
+        self.frame_buffer = Some(FrameBuffer::new());
+        self.switch_frame_buffer()?;
+
         self.initialized = true;
+
+        Ok(())
+    }
+
+    fn switch_frame_buffer(&mut self) -> DisplayResult<()> {
+        let fb_addr = self.frame_buffer.as_mut().unwrap().switch();
+
+        self.hal
+            .as_mut()
+            .unwrap()
+            .interface_write(
+                self.hal_id.unwrap(),
+                InterfaceWriteActions::Lcd(LcdActions::SetFbAddress(LcdLayer::FOREGROUND, fb_addr)),
+            )
+            .map_err(DisplayError::HalError)?;
+
         Ok(())
     }
 
@@ -143,8 +156,8 @@ impl Display {
         let char_size = font_size.get_char_size();
         let mut current_x = x;
         let color_argb = color.to_argb().as_u32();
-        let mut fb_write_address =
-            self.fb_address.unwrap() + 4 * (y * self.size.unwrap().0 + x) as u32;
+        let mut fb_write_address = self.frame_buffer.as_mut().unwrap().address_active()
+            + 4 * (y as u32 * self.size.unwrap().0 as u32 + x as u32);
 
         for char_to_display in string.as_bytes() {
             // Display chat at the current position
@@ -167,9 +180,11 @@ impl Display {
             // Compute next char position
             current_x += char_size.0 as u16;
             // Increment frame buffer address
-            fb_write_address =
-                self.fb_address.unwrap() + 4 * (y * self.size.unwrap().0 + current_x) as u32;
+            fb_write_address = self.frame_buffer.as_mut().unwrap().address_active()
+                + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
         }
+
+        self.switch_frame_buffer()?;
 
         Ok(())
     }

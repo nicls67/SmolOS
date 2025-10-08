@@ -273,3 +273,15 @@ HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint3
 
     return OK;
 }
+
+HAL_INTERFACE_RESULT set_fb_address(const uint8_t id, const uint8_t layer, const uint32_t addr)
+{
+    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
+    if (result != OK)
+    {
+        return result;
+    }
+
+    BSP_LCD_SetLayerAddress(layer, addr);
+    return OK;
+}
