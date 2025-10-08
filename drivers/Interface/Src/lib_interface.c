@@ -253,3 +253,23 @@ HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t *x, uint16_t *y)
 
     return OK;
 }
+
+HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint32_t *addr)
+{
+    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
+    if (result != OK)
+    {
+        return result;
+    }
+
+    switch (layer)
+    {
+        case 1:
+            *addr = LCD_FB_START_ADDRESS;
+            break;
+        default:
+            break;
+    }
+
+    return OK;
+}

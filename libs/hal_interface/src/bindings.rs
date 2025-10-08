@@ -111,6 +111,8 @@ unsafe extern "C" {
     ) -> HalInterfaceResult;
 
     pub fn get_lcd_size(id: u8, x: *mut u16, y: *mut u16) -> HalInterfaceResult;
+
+    pub fn get_fb_address(id: u8, layer: LcdLayer, fb_address: *mut u32) -> HalInterfaceResult;
 }
 
 /**

@@ -1,4 +1,5 @@
-use crate::bindings::{HalInterfaceResult, get_lcd_size};
+use crate::LcdLayer;
+use crate::bindings::{HalInterfaceResult, get_fb_address, get_lcd_size};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceReadAction {
@@ -20,10 +21,12 @@ pub enum InterfaceReadResult {
 #[derive(Debug, Clone, Copy)]
 pub enum LcdReadAction {
     LcdSize,
+    FbAddress(LcdLayer),
 }
 
 pub enum LcdRead {
     LcdSize(u16, u16),
+    FbAddress(u32),
 }
 
 impl LcdReadAction {
@@ -35,6 +38,11 @@ impl LcdReadAction {
                 let mut y: u16 = 0;
                 result = unsafe { get_lcd_size(id as u8, &mut x, &mut y) };
                 *read_result = LcdRead::LcdSize(x, y);
+            }
+            LcdReadAction::FbAddress(layer) => {
+                let mut fb_address: u32 = 0;
+                result = unsafe { get_fb_address(id as u8, *layer, &mut fb_address) };
+                *read_result = LcdRead::FbAddress(fb_address);
             }
         }
         result

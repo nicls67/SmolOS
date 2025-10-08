@@ -11,12 +11,13 @@ use hal_interface::{
 
 pub use colors::Colors;
 use hal_interface::InterfaceReadResult::LcdRead;
-use hal_interface::LcdRead::LcdSize;
+use hal_interface::LcdRead::{FbAddress, LcdSize};
 
 pub struct Display {
     hal_id: Option<usize>,
     hal: Option<&'static mut Hal>,
     size: Option<(u16, u16)>,
+    fb_address: Option<u32>,
     initialized: bool,
 }
 
@@ -30,10 +31,12 @@ impl Display {
     /// Creates a new instance of the struct with default values.
     ///
     /// # Returns
-    /// A new instance of the struct with the following default field values:
+    ///
+    /// A new instance of the struct with the following default fields:
     /// - `hal_id`: `None`
     /// - `hal`: `None`
     /// - `size`: `None`
+    /// - `fb_address`: `None`
     /// - `initialized`: `false`
     ///
     pub fn new() -> Self {
@@ -41,6 +44,7 @@ impl Display {
             hal_id: None,
             hal: None,
             size: None,
+            fb_address: None,
             initialized: false,
         }
     }
@@ -102,6 +106,19 @@ impl Display {
             .map_err(DisplayError::HalError)?
         {
             LcdRead(LcdSize(x, y)) => Some((x, y)),
+            _ => None,
+        };
+
+        // Get framebuffer address
+        self.fb_address = match hal
+            .interface_read(
+                self.hal_id.unwrap(),
+                InterfaceReadAction::LcdRead(LcdReadAction::FbAddress(LcdLayer::FOREGROUND)),
+            )
+            .map_err(DisplayError::HalError)?
+        {
+            LcdRead(FbAddress(fb_address)) => Some(fb_address),
+            _ => None,
         };
 
         self.hal = Some(hal);
@@ -125,28 +142,21 @@ impl Display {
         // Initialize variables
         let char_size = font_size.get_char_size();
         let mut current_x = x;
-        let color_argb = color.to_argb();
+        let color_argb = color.to_argb().as_u32();
 
         for char_to_display in string.as_bytes() {
             // Display chat at the current position
             for line in 0..char_size.1 {
                 for col in 0..char_size.0 {
                     if font_size.is_pixel_set(*char_to_display, col, line) {
-                        self.hal
-                            .as_mut()
-                            .unwrap()
-                            .interface_write(
-                                self.hal_id.unwrap(),
-                                InterfaceWriteActions::Lcd(LcdActions::DrawPixel(
-                                    LcdLayer::FOREGROUND,
-                                    LcdPixel {
-                                        x: current_x + col as u16,
-                                        y: y + line as u16,
-                                        color: color_argb,
-                                    },
-                                )),
-                            )
-                            .map_err(DisplayError::HalError)?;
+                        let write_address = (self.fb_address.unwrap()
+                            + 4 * ((y + line as u16) * self.size.unwrap().0
+                                + current_x
+                                + col as u16) as u32)
+                            as *mut u32;
+                        unsafe {
+                            *write_address = color_argb;
+                        }
                     }
                 }
             }
