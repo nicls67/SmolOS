@@ -52,25 +52,20 @@ impl Display {
         }
     }
 
-    /// Initializes the display driver by setting up communication with the LCD hardware, enabling it,
-    /// clearing the display with a specified background color, and retrieving the screen dimensions.
+    /// Initializes the display by setting up its interface, enabling the LCD, clearing it with
+    /// a specified background color, retrieving its size, and preparing the frame buffer for rendering.
     ///
     /// # Parameters
-    /// - `lcd_name`: A string slice that specifies the name or ID of the LCD interface.
-    /// - `hal`: A mutable reference to the hardware abstraction layer (`Hal`) used for communicating
-    ///   with the display interface.
-    /// - `background_color`: A `Colors` enum specifying the color to fill the background of the LCD
-    ///   after initialization.
+    /// - `lcd_name`: A `&'static str` representing the name/identifier of the LCD display to be initialized.
+    /// - `hal`: A mutable reference to the `Hal` interface, which provides methods to communicate with the hardware layer.
+    /// - `background_color`: A `Colors` enumeration value that specifies the background color to clear the display with.
     ///
     /// # Returns
-    /// - `Ok(())` if the initialization is successful.
-    /// - `Err(DisplayError)` if there is an issue with any of the HAL operations, such as retrieving
-    ///   the LCD interface ID, enabling the display, clearing it, or reading the screen size.
+    /// - `DisplayResult<()>`: Returns `Ok(())` if the initialization process completes successfully, or an error
+    ///   wrapped in `DisplayResult` if any step in the initialization fails.
     ///
-    /// # Behavior
-    /// - Retrieves the interface ID associated with the specified `lcd_name` from the provided HAL instance.
-    /// - Enables the LCD display.
-    /// - Clears the foreground layer of the display with
+    /// # Errors
+    /// - Returns a `DisplayError::HalError` if any interaction with the HAL
     pub fn init(
         &mut self,
         lcd_name: &'static str,
@@ -124,7 +119,34 @@ impl Display {
         Ok(())
     }
 
-    fn switch_frame_buffer(&mut self) -> DisplayResult<()> {
+    /// Switches the current frame buffer and updates the display hardware with the new frame buffer address.
+    ///
+    /// This function switches the current frame buffer to a new one by calling the `switch`
+    /// method on the existing frame buffer. Once the new frame buffer address is determined,
+    /// it communicates with the hardware abstraction layer (HAL) to inform the display hardware
+    /// of the new frame buffer address for the foreground layer.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the frame buffer switch and hardware update were successful.
+    /// If an error occurs during a HAL interface write operation, it returns a `DisplayError::HalError`.
+    ///
+    /// # Errors
+    ///
+    /// This function may return a `DisplayError::HalError` if there is an issue writing
+    /// to the HAL interface.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if:
+    /// - The `frame_buffer` field is `None`. This indicates that the frame buffer has not been properly
+    /// initialized.
+    /// - The `hal` field is `None`. This indicates that the hardware abstraction layer is not initialized.
+    /// - The `hal_id` field is `None`. This indicates the HAL identifier is missing.
+    ///
+    /// In this example, the function switches the current frame buffer and updates the associated
+    /// hardware accordingly.
+    pub fn switch_frame_buffer(&mut self) -> DisplayResult<()> {
         let fb_addr = self.frame_buffer.as_mut().unwrap().switch();
 
         self.hal
@@ -139,6 +161,42 @@ impl Display {
         Ok(())
     }
 
+    /// Draws a string on the display at the specified position, with a given color and font size.
+    ///
+    /// # Parameters
+    /// - `string`: A reference to the string (`&str`) to be displayed on the screen.
+    /// - `x`: The x-coordinate (horizontal position) on the display where the string will start.
+    /// - `y`: The y-coordinate (vertical position) on the display where the string will start.
+    /// - `color`: A `Colors` object that represents the color in which the text will be displayed.
+    /// - `font_size`: A `FontSize` object that determines the size/dimensions of each character.
+    ///
+    /// # Errors
+    /// Returns an error of type `DisplayError::DisplayDriverNotInitialized` if the display driver
+    /// has not been initialized before calling this method. Ensure the display is properly initialized
+    /// by the time this function is invoked.
+    ///
+    /// # Behavior
+    /// - The function iterates through each character in the input string and draws it sequentially
+    ///   at the appropriate position on the display, based on the given coordinates and font size.
+    /// - For each character, the method computes the pixel positions, checks the font map to determine
+    ///   which pixels are set, and updates the frame buffer with the corresponding color for the active
+    ///   pixels.
+    ///
+    /// # Notes
+    /// - The function assumes a linear frame buffer addressing scheme.
+    /// - The position of each drawn character advances horizontally by the character width, as defined
+    ///   by the given `FontSize`.
+    /// - Frame buffer addressing takes into account the display width and the dimensions of the font
+    ///   characters to ensure proper placement of the string.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the string was drawn successfully on the display. Otherwise, it returns
+    /// a `DisplayError` if an error occurred, such as the display being uninitialized.
+    ///
+    /// # Performance
+    /// This function involves pixel-level operations for every character in the string. For large
+    /// strings or high-resolution fonts, the time to render may increase significantly. Consider
+    /// optimizing the frame buffer access if drawing speed is critical.
     pub fn draw_string(
         &mut self,
         string: &str,
@@ -183,8 +241,6 @@ impl Display {
             fb_write_address = self.frame_buffer.as_mut().unwrap().address_active()
                 + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
         }
-
-        self.switch_frame_buffer()?;
 
         Ok(())
     }
