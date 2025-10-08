@@ -21,6 +21,7 @@ pub struct Display {
     size: Option<(u16, u16)>,
     frame_buffer: Option<FrameBuffer>,
     initialized: bool,
+    cursor_pos: (u16, u16),
 }
 
 impl Default for Display {
@@ -30,18 +31,15 @@ impl Default for Display {
 }
 
 impl Display {
-    /// Creates a new instance of the struct with default values.
+    /// Initializes and returns a new instance of the struct.
+    ///
+    /// # Description
+    /// This function is a constructor for creating a new instance of the struct.
+    /// It initializes all fields with their default values.
     ///
     /// # Returns
-    /// A new instance of the struct with the following default settings:
-    /// - `hal_id`: `None`
-    /// - `hal`: `None`
-    /// - `size`: `None`
-    /// - `frame_buffer`: `None`
-    /// - `initialized`: `false`
+    /// A new instance of the struct with all fields set to their default values.
     ///
-    /// This function is typically used as a default constructor for initializing
-    /// the struct with no pre-set values.
     pub fn new() -> Self {
         Self {
             hal_id: None,
@@ -49,6 +47,7 @@ impl Display {
             size: None,
             frame_buffer: None,
             initialized: false,
+            cursor_pos: (0, 0),
         }
     }
 
@@ -85,16 +84,6 @@ impl Display {
         )
         .map_err(DisplayError::HalError)?;
 
-        // Clear display
-        hal.interface_write(
-            self.hal_id.unwrap(),
-            InterfaceWriteActions::Lcd(LcdActions::Clear(
-                LcdLayer::FOREGROUND,
-                background_color.to_argb(),
-            )),
-        )
-        .map_err(DisplayError::HalError)?;
-
         // Get screen size
         self.size = match hal
             .interface_read(
@@ -112,6 +101,33 @@ impl Display {
 
         // Initialize the frame buffer
         self.frame_buffer = Some(FrameBuffer::new());
+
+        // Clean the buffer and then switch to the other buffer
+        self.hal
+            .as_mut()
+            .unwrap()
+            .interface_write(
+                self.hal_id.unwrap(),
+                InterfaceWriteActions::Lcd(LcdActions::Clear(
+                    LcdLayer::FOREGROUND,
+                    background_color.to_argb(),
+                )),
+            )
+            .map_err(DisplayError::HalError)?;
+        self.switch_frame_buffer()?;
+
+        // Clean the buffer and then switch to the other buffer
+        self.hal
+            .as_mut()
+            .unwrap()
+            .interface_write(
+                self.hal_id.unwrap(),
+                InterfaceWriteActions::Lcd(LcdActions::Clear(
+                    LcdLayer::FOREGROUND,
+                    background_color.to_argb(),
+                )),
+            )
+            .map_err(DisplayError::HalError)?;
         self.switch_frame_buffer()?;
 
         self.initialized = true;
@@ -241,6 +257,8 @@ impl Display {
             fb_write_address = self.frame_buffer.as_mut().unwrap().address_active()
                 + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
         }
+
+        self.switch_frame_buffer()?;
 
         Ok(())
     }
