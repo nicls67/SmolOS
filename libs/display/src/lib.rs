@@ -125,7 +125,6 @@ impl Display {
         // Initialize variables
         let char_size = font_size.get_char_size();
         let mut current_x = x;
-        let mut current_y = y;
         let color_argb = color.to_argb();
 
         for char_to_display in string.as_bytes() {
@@ -142,7 +141,7 @@ impl Display {
                                     LcdLayer::FOREGROUND,
                                     LcdPixel {
                                         x: current_x + col as u16,
-                                        y: current_y + line as u16,
+                                        y: y + line as u16,
                                         color: color_argb,
                                     },
                                 )),
