@@ -16,6 +16,7 @@ use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
 use crate::scheduler::Scheduler;
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 pub use data::cortex_init;
+use display::FontSize::Font24;
 use display::{Colors, Display, FontSize};
 use hal_interface::Hal;
 use heapless::format;
@@ -75,8 +76,17 @@ pub fn boot(config: BootConfig) {
     Kernel::display()
         .init(config.display_name.unwrap(), Kernel::hal(), Colors::Black)
         .unwrap();
+    Kernel::display().set_font(Font24);
     Kernel::display()
-        .draw_string("Coucou !!", 0, 0, Colors::White, FontSize::Font24)
+        .draw_string_at_cursor("Booting...\n", Colors::White)
+        .unwrap();
+    Kernel::display()
+        .draw_string_at_cursor(
+            format!(30; "{} version {}", KERNEL_NAME, KERNEL_VERSION)
+                .unwrap()
+                .as_str(),
+            Colors::White,
+        )
         .unwrap();
 
     ////////////////////////////

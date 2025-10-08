@@ -7230,6 +7230,7 @@ const FONT_ASCII_24: [u32; 2280] = [
     0x00000000, //
 ];
 
+#[derive(Copy, Clone)]
 pub enum FontSize {
     Font12,
     Font16,

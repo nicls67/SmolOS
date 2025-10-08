@@ -10,6 +10,7 @@ use hal_interface::{
     Hal, InterfaceReadAction, InterfaceWriteActions, LcdActions, LcdLayer, LcdReadAction,
 };
 
+use crate::FontSize::Font16;
 use crate::frame_buffer::FrameBuffer;
 pub use colors::Colors;
 use hal_interface::InterfaceReadResult::LcdRead;
@@ -22,6 +23,7 @@ pub struct Display {
     frame_buffer: Option<FrameBuffer>,
     initialized: bool,
     cursor_pos: (u16, u16),
+    font: FontSize,
 }
 
 impl Default for Display {
@@ -48,6 +50,7 @@ impl Display {
             frame_buffer: None,
             initialized: false,
             cursor_pos: (0, 0),
+            font: Font16,
         }
     }
 
@@ -162,14 +165,13 @@ impl Display {
         Ok(())
     }
 
-    /// Draws a string on the display at the specified position, with a given color and font size.
+    /// Draws a string on the display at the specified position, with a given color.
     ///
     /// # Parameters
     /// - `string`: A reference to the string (`&str`) to be displayed on the screen.
     /// - `x`: The x-coordinate (horizontal position) on the display where the string will start.
     /// - `y`: The y-coordinate (vertical position) on the display where the string will start.
     /// - `color`: A `Colors` object that represents the color in which the text will be displayed.
-    /// - `font_size`: A `FontSize` object that determines the size/dimensions of each character.
     ///
     /// # Errors
     /// Returns an error of type `DisplayError::DisplayDriverNotInitialized` if the display driver
@@ -178,7 +180,7 @@ impl Display {
     ///
     /// # Behavior
     /// - The function iterates through each character in the input string and draws it sequentially
-    ///   at the appropriate position on the display, based on the given coordinates and font size.
+    ///   at the appropriate position on the display, based on the given coordinates.
     /// - For each character, the method computes the pixel positions, checks the font map to determine
     ///   which pixels are set, and updates the frame buffer with the corresponding color for the active
     ///   pixels.
@@ -186,7 +188,7 @@ impl Display {
     /// # Notes
     /// - The function assumes a linear frame buffer addressing scheme.
     /// - The position of each drawn character advances horizontally by the character width, as defined
-    ///   by the given `FontSize`.
+    ///   by the selected font size.
     /// - Frame buffer addressing takes into account the display width and the dimensions of the font
     ///   characters to ensure proper placement of the string.
     ///
@@ -204,7 +206,6 @@ impl Display {
         x: u16,
         y: u16,
         color: Colors,
-        font_size: FontSize,
     ) -> DisplayResult<()> {
         // Returns error if not initialized
         if !self.initialized {
@@ -212,37 +213,90 @@ impl Display {
         }
 
         // Initialize variables
-        let char_size = font_size.get_char_size();
+        let char_size = self.font.get_char_size();
         let mut current_x = x;
         let color_argb = color.to_argb().as_u32();
         let mut fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
             + 4 * (y as u32 * self.size.unwrap().0 as u32 + x as u32);
 
         for char_to_display in string.as_bytes() {
-            // Display chat at the current position
-            for line in 0..char_size.1 {
-                for col in 0..char_size.0 {
-                    if font_size.is_pixel_set(*char_to_display, col, line) {
-                        unsafe {
-                            *(fb_write_address as *mut u32) = color_argb;
+            // Check for new line
+            if *char_to_display == b'\n' {
+                self.set_cursor_at_new_line();
+            } else {
+                // Display chat at the current position
+                for line in 0..char_size.1 {
+                    for col in 0..char_size.0 {
+                        if self.font.is_pixel_set(*char_to_display, col, line) {
+                            unsafe {
+                                *(fb_write_address as *mut u32) = color_argb;
+                            }
                         }
+
+                        // Increment frame buffer address
+                        fb_write_address += 4;
                     }
 
                     // Increment frame buffer address
-                    fb_write_address += 4;
+                    fb_write_address += self.size.unwrap().0 as u32 * 4 - char_size.0 as u32 * 4;
                 }
 
+                // Compute next char position
+                current_x += char_size.0 as u16;
                 // Increment frame buffer address
-                fb_write_address += self.size.unwrap().0 as u32 * 4 - char_size.0 as u32 * 4;
+                fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
+                    + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
             }
-
-            // Compute next char position
-            current_x += char_size.0 as u16;
-            // Increment frame buffer address
-            fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
-                + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
         }
 
         Ok(())
+    }
+
+    /// Draws a string at the current cursor position on the display, with the specified color and font size.
+    ///
+    /// # Parameters
+    /// - `string`: A string slice (`&str`) containing the text to be drawn.
+    /// - `color`: A `Colors` enum value specifying the color of the text.
+    ///
+    /// # Behavior
+    /// - The method internally calls `draw_string` to render the provided string at the current cursor position (`cursor_pos`).
+    /// - After successfully rendering the string, the horizontal cursor position (`cursor_pos.0`) is updated based on the character size of the provided font and the length of the string.
+    ///
+    /// # Return Value
+    /// - Returns a `DisplayResult<()>`, which is `Ok(())` if the operation succeeds, or an error variant if the operation fails.
+    ///
+    /// # Errors
+    /// - If the `draw_string` method fails, this method will propagate the error.
+    ///
+    /// # Notes
+    /// - This method does not handle line wrapping. If the updated cursor position exceeds the display boundary, rendering issues may occur.
+    /// - Ensure to set the initial `cursor_pos` before calling this method, or the behavior might be unexpected.
+    pub fn draw_string_at_cursor(&mut self, string: &str, color: Colors) -> DisplayResult<()> {
+        let y_pos = self.cursor_pos.1;
+
+        self.draw_string(string, self.cursor_pos.0, self.cursor_pos.1, color)?;
+
+        // Update the cursor position only if no line feed was found
+        if self.cursor_pos.1 == y_pos {
+            self.cursor_pos.0 += self.font.get_char_size().0 as u16 * string.len() as u16;
+        }
+        Ok(())
+    }
+
+    /// Sets the font size for the current object.
+    ///
+    /// # Parameters
+    /// - `font`: The new font size to be set. This should be a value of type `FontSize`.
+    ///
+    /// # Remarks
+    /// This function updates the `font` property of the object to the specified value.
+    /// The new font size will replace any previously set value.
+    pub fn set_font(&mut self, font: FontSize) {
+        self.font = font;
+    }
+
+    pub fn set_cursor_at_new_line(&mut self) {
+        self.cursor_pos.0 = 0;
+        self.cursor_pos.1 += self.font.get_char_size().1 as u16;
     }
 }
