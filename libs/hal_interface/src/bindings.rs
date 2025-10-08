@@ -5,6 +5,7 @@ use crate::interface_read::InterfaceReadAction;
 use crate::{GpioWriteAction, HalResult, InterfaceWriteActions, LcdLayer};
 
 #[repr(u8)]
+#[allow(dead_code)]
 pub enum HalInterfaceResult {
     OK = 0,
     ErrInterfaceNotFound = 1,

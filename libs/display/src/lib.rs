@@ -109,39 +109,51 @@ impl Display {
         Ok(())
     }
 
-    pub fn draw_char(
+    pub fn draw_string(
         &mut self,
-        ascii_char: u8,
+        string: &str,
         x: u16,
         y: u16,
         color: Colors,
         font_size: FontSize,
     ) -> DisplayResult<()> {
+        // Returns error if not initialized
         if !self.initialized {
             return Err(DisplayError::DisplayDriverNotInitialized);
         }
 
+        // Initialize variables
         let char_size = font_size.get_char_size();
-        for line in 0..char_size.1 {
-            for col in 0..char_size.0 {
-                if font_size.is_pixel_set(ascii_char, col, line) {
-                    self.hal
-                        .as_mut()
-                        .unwrap()
-                        .interface_write(
-                            self.hal_id.unwrap(),
-                            InterfaceWriteActions::Lcd(LcdActions::DrawPixel(
-                                LcdLayer::FOREGROUND,
-                                LcdPixel {
-                                    x: x + col as u16,
-                                    y: y + line as u16,
-                                    color: color.to_argb(),
-                                },
-                            )),
-                        )
-                        .map_err(DisplayError::HalError)?;
+        let mut current_x = x;
+        let mut current_y = y;
+        let color_argb = color.to_argb();
+
+        for char_to_display in string.as_bytes() {
+            // Display chat at the current position
+            for line in 0..char_size.1 {
+                for col in 0..char_size.0 {
+                    if font_size.is_pixel_set(*char_to_display, col, line) {
+                        self.hal
+                            .as_mut()
+                            .unwrap()
+                            .interface_write(
+                                self.hal_id.unwrap(),
+                                InterfaceWriteActions::Lcd(LcdActions::DrawPixel(
+                                    LcdLayer::FOREGROUND,
+                                    LcdPixel {
+                                        x: current_x + col as u16,
+                                        y: current_y + line as u16,
+                                        color: color_argb,
+                                    },
+                                )),
+                            )
+                            .map_err(DisplayError::HalError)?;
+                    }
                 }
             }
+
+            // Compute next chat position
+            current_x += char_size.0 as u16;
         }
 
         Ok(())
