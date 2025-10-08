@@ -143,26 +143,32 @@ impl Display {
         let char_size = font_size.get_char_size();
         let mut current_x = x;
         let color_argb = color.to_argb().as_u32();
+        let mut fb_write_address =
+            self.fb_address.unwrap() + 4 * (y * self.size.unwrap().0 + x) as u32;
 
         for char_to_display in string.as_bytes() {
             // Display chat at the current position
             for line in 0..char_size.1 {
                 for col in 0..char_size.0 {
                     if font_size.is_pixel_set(*char_to_display, col, line) {
-                        let write_address = (self.fb_address.unwrap()
-                            + 4 * ((y + line as u16) * self.size.unwrap().0
-                                + current_x
-                                + col as u16) as u32)
-                            as *mut u32;
                         unsafe {
-                            *write_address = color_argb;
+                            *(fb_write_address as *mut u32) = color_argb;
                         }
                     }
+
+                    // Increment frame buffer address
+                    fb_write_address += 4;
                 }
+
+                // Increment frame buffer address
+                fb_write_address += self.size.unwrap().0 as u32 * 4 - char_size.0 as u32 * 4;
             }
 
-            // Compute next chat position
+            // Compute next char position
             current_x += char_size.0 as u16;
+            // Increment frame buffer address
+            fb_write_address =
+                self.fb_address.unwrap() + 4 * (y * self.size.unwrap().0 + current_x) as u32;
         }
 
         Ok(())
