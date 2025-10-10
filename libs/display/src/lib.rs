@@ -425,7 +425,7 @@ impl Display {
 
         // Update the cursor position only if no line feed was found
         if !self.line_feed_executed {
-            self.cursor_pos.0 += self.font.get_char_size().0 as u16 * string.len() as u16;
+            self.move_cursor()?;
         } else {
             self.line_feed_executed = false;
         }
@@ -473,10 +473,24 @@ impl Display {
 
         // Update the cursor position only if no line feed was found
         if !self.line_feed_executed {
-            self.cursor_pos.0 += self.font.get_char_size().0 as u16;
+            self.move_cursor()?;
         } else {
             self.line_feed_executed = false;
         }
+        Ok(())
+    }
+
+    fn move_cursor(&mut self) -> DisplayResult<()> {
+        let mut next_cursor_pos = self.cursor_pos;
+        next_cursor_pos.0 += self.font.get_char_size().0 as u16;
+        if next_cursor_pos.0 > self.size.unwrap().0 - self.font.get_char_size().0 as u16 {
+            next_cursor_pos.0 = 0;
+            next_cursor_pos.1 += self.font.get_char_size().1 as u16;
+            if next_cursor_pos.1 > self.size.unwrap().1 - self.font.get_char_size().1 as u16 {
+                return Err(DisplayError::OutOfScreenBounds);
+            }
+        }
+        self.cursor_pos = next_cursor_pos;
         Ok(())
     }
 
