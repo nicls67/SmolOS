@@ -282,6 +282,7 @@ impl ErrorsManager {
                     }
                 }
 
+                Kernel::terminal().clear_terminal().unwrap();
                 Kernel::terminal().set_color(Colors::Red);
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))

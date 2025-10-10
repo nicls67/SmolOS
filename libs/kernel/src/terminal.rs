@@ -294,10 +294,7 @@ impl Terminal {
                     )
                     .map_err(KernelError::HalError)?,
                 TerminalType::Display => KernelData::display()
-                    .draw_string_at_cursor(
-                        str::from_utf8(&[data as u8]).unwrap(),
-                        Some(self.current_color),
-                    )
+                    .draw_char_at_cursor(data as u8, Some(self.current_color))
                     .map_err(KernelError::DisplayError)?,
             }
         }
@@ -392,7 +389,7 @@ impl Terminal {
     /// This function relies on the `KernelData::hal()` and `KernelData::display()` implementations
     /// to interact with hardware-specific interfaces. Ensure these components are properly initialized
     /// and accessible before invoking this method.
-    fn clear_terminal(&self) -> KernelResult<()> {
+    pub fn clear_terminal(&self) -> KernelResult<()> {
         for (i, terminal) in self.terminals.iter().enumerate() {
             match terminal {
                 TerminalType::Usart(_) => KernelData::hal()

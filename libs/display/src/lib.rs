@@ -26,6 +26,7 @@ pub struct Display {
     font: FontSize,
     color: Colors,
     line_feed_executed: bool,
+    line_return_executed: bool,
 }
 
 impl Default for Display {
@@ -55,6 +56,7 @@ impl Display {
             font: Font16,
             color: Colors::White,
             line_feed_executed: false,
+            line_return_executed: false,
         }
     }
 
@@ -372,9 +374,12 @@ impl Display {
     ) -> DisplayResult<()> {
         // Check for new line
         if char_to_display == b'\n' {
-            self.set_cursor_at_new_line();
+            self.set_cursor_line_feed()?;
             self.line_feed_executed = true;
-        } else if char_to_display != b'\r' {
+        } else if char_to_display == b'\r' {
+            self.set_cursor_return();
+            self.line_return_executed = true;
+        } else {
             // Display chat at the current position
             for line in 0..char_size.1 {
                 for col in 0..char_size.0 {
@@ -424,10 +429,11 @@ impl Display {
         self.draw_string(string, self.cursor_pos.0, self.cursor_pos.1, color)?;
 
         // Update the cursor position only if no line feed was found
-        if !self.line_feed_executed {
+        if !self.line_feed_executed && !self.line_return_executed {
             self.move_cursor()?;
         } else {
             self.line_feed_executed = false;
+            self.line_return_executed = false;
         }
         Ok(())
     }
@@ -472,14 +478,31 @@ impl Display {
         self.draw_char(char_to_display, self.cursor_pos.0, self.cursor_pos.1, color)?;
 
         // Update the cursor position only if no line feed was found
-        if !self.line_feed_executed {
+        if !self.line_feed_executed && !self.line_return_executed {
             self.move_cursor()?;
         } else {
             self.line_feed_executed = false;
+            self.line_return_executed = false;
         }
         Ok(())
     }
 
+    /// Moves the cursor position to the next location, handling line wrapping and screen bounds.
+    ///
+    /// The method increments the cursor's horizontal position by the width of a single character.
+    /// If the cursor reaches the end of the line, it wraps to the beginning of the next line and
+    /// increments the vertical position by the height of a character. If the cursor moves beyond
+    /// the vertical bounds of the screen, it returns an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(DisplayError::OutOfScreenBounds)` if moving the cursor vertically
+    /// would exceed the screen's height.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the cursor successfully moves to the new position.
+    ///
     fn move_cursor(&mut self) -> DisplayResult<()> {
         let mut next_cursor_pos = self.cursor_pos;
         next_cursor_pos.0 += self.font.get_char_size().0 as u16;
@@ -507,17 +530,42 @@ impl Display {
         Ok(())
     }
 
-    /// Moves the cursor to the beginning of a new line.
+    /// Moves the cursor position down by one line, taking into account the character height of the font.
     ///
-    /// This method resets the horizontal position of the cursor (`self.cursor_pos.0`)
-    /// to `0` and increments the vertical position (`self.cursor_pos.1`) by the height
-    /// of a character. The character height is determined by the `get_char_size` method
-    /// of the `font` attribute.
+    /// # Behavior
+    /// - The `cursor_pos.1` (the vertical position) is incremented by the height of a single character, as defined by the font's character size.
+    /// - If the new vertical position exceeds the display's height limit, an error is returned.
     ///
-    /// After calling this method, the cursor will be positioned at the start of the next line.
-    pub fn set_cursor_at_new_line(&mut self) {
-        self.cursor_pos.0 = 0;
+    /// # Returns
+    /// - `Ok(())` if the cursor was successfully moved to the next line within screen bounds.
+    /// - `Err(DisplayError::OutOfScreenBounds)` if the operation would move the cursor beyond the bottom boundary of the screen.
+    ///
+    /// # Errors
+    /// - Returns `DisplayError::OutOfScreenBounds` if the cursor is moved beyond the screen's vertical size.
+    ///
+    /// # Notes
+    /// - The display size is expected to be set (via `self.size.unwrap()`), and the result relies on the font's character size.
+    /// - Cursor movement assumes that the font, display size, and cursor position are valid and properly managed.
+    ///
+    pub fn set_cursor_line_feed(&mut self) -> DisplayResult<()> {
         self.cursor_pos.1 += self.font.get_char_size().1 as u16;
+        if self.cursor_pos.1 > self.size.unwrap().1 - self.font.get_char_size().1 as u16 {
+            Err(DisplayError::OutOfScreenBounds)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Sets the cursor to the starting position of the current line.
+    ///
+    /// This function resets the horizontal position of the cursor (`cursor_pos.0`) to 0,
+    /// effectively moving the cursor to the beginning of the current line.
+    ///
+    /// # Note
+    /// This function does not modify the vertical position (`cursor_pos.1`) of the cursor,
+    /// nor does it affect any other part of the cursor state.
+    pub fn set_cursor_return(&mut self) {
+        self.cursor_pos.0 = 0;
     }
 
     /// Sets the cursor position on the display.
