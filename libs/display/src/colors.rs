@@ -1,5 +1,6 @@
 use hal_interface::PixelColorARGB;
 
+#[derive(Copy, Clone)]
 pub enum Colors {
     Black,
     White,

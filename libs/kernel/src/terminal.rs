@@ -1,7 +1,9 @@
-use crate::data::Kernel;
+use crate::data::Kernel as KernelData;
+use crate::terminal::TerminalState::Kernel;
 use crate::{KernelError, KernelResult};
+use display::Colors;
 use hal_interface::{InterfaceWriteActions, UartWriteActions};
-use heapless::String;
+use heapless::{String, Vec};
 
 /// Represents different kinds of terminal text formatting or operations.
 ///
@@ -43,8 +45,10 @@ pub enum TerminalFormatting<'a> {
     Clear,
 }
 
+#[derive(Copy, Clone)]
 pub enum TerminalType {
-    Usart,
+    Usart(&'static str),
+    Display,
 }
 
 /// Represents the state of a terminal.
@@ -71,26 +75,28 @@ enum EscapeSeqState {
     ThirdRcv,
 }
 
+const MAX_TERMINALS: usize = 8;
+
 pub struct Terminal {
-    pub name: &'static str,
-    interface_id: Option<usize>,
-    terminal: TerminalType,
+    interface_id: Vec<usize, MAX_TERMINALS>,
+    terminals: Vec<TerminalType, MAX_TERMINALS>,
     line_buffer: String<256>,
     state: TerminalState,
     escape_seq: EscapeSeqState,
     cursor_pos: usize,
+    current_color: Colors,
 }
 
 impl Terminal {
-    pub fn new(name: &'static str, term: TerminalType) -> Terminal {
+    pub fn new(terminals: Vec<TerminalType, 8>) -> Terminal {
         Terminal {
-            name,
-            interface_id: None,
-            terminal: term,
+            interface_id: Vec::from_slice(&[0; MAX_TERMINALS]).unwrap(),
+            terminals,
             line_buffer: String::new(),
             state: TerminalState::Stopped,
             escape_seq: EscapeSeqState::NotInEcsSeq,
             cursor_pos: 0,
+            current_color: display::Colors::White,
         }
     }
 
@@ -113,15 +119,34 @@ impl Terminal {
     }
 
     pub fn set_kernel_state(&mut self) -> KernelResult<()> {
-        self.interface_id = Some(
-            Kernel::hal()
-                .get_interface_id(self.name)
-                .map_err(KernelError::HalError)?,
-        );
-        if self.state != TerminalState::Kernel {
-            self.state = TerminalState::Kernel
+        // Retrieve interface id for all terminals
+        for (i, terminal) in self.terminals.iter().enumerate() {
+            if let TerminalType::Usart(name) = terminal {
+                self.interface_id[i] = KernelData::hal()
+                    .get_interface_id(name)
+                    .map_err(KernelError::HalError)?;
+            }
+        }
+
+        // Set state to kernel
+        if self.state != Kernel {
+            self.state = Kernel
         }
         Ok(())
+    }
+
+    /// Sets the current color of the object.
+    ///
+    /// # Arguments
+    ///
+    /// * `color` - A value of a type `display::Colors` that specifies the color
+    ///   to set for the object.
+    ///
+    /// This method updates the `current_color` property of the object
+    /// to the specified `color`.
+    #[inline(always)]
+    pub fn set_color(&mut self, color: display::Colors) {
+        self.current_color = color;
     }
 
     #[inline(always)]
@@ -131,7 +156,7 @@ impl Terminal {
     }
 
     pub fn write(&self, format: &TerminalFormatting) -> KernelResult<()> {
-        if self.state == TerminalState::Kernel {
+        if self.state == Kernel {
             match format {
                 TerminalFormatting::StrNoFormatting(text) => self.write_str(text)?,
                 TerminalFormatting::StrNewLineAfter(text) => {
@@ -156,29 +181,61 @@ impl Terminal {
     }
 
     fn write_char(&self, data: char) -> KernelResult<()> {
-        match self.terminal {
-            TerminalType::Usart => Kernel::hal()
-                .interface_write(
-                    self.interface_id.unwrap(),
-                    InterfaceWriteActions::UartWrite(UartWriteActions::SendChar(data as u8)),
-                )
-                .map_err(KernelError::HalError),
+        for (i, terminal) in self.terminals.iter().enumerate() {
+            match terminal {
+                TerminalType::Usart(_) => KernelData::hal()
+                    .interface_write(
+                        self.interface_id[i],
+                        InterfaceWriteActions::UartWrite(UartWriteActions::SendChar(data as u8)),
+                    )
+                    .map_err(KernelError::HalError)?,
+                TerminalType::Display => KernelData::display()
+                    .draw_string_at_cursor(
+                        str::from_utf8(&[data as u8]).unwrap(),
+                        self.current_color,
+                    )
+                    .map_err(KernelError::DisplayError)?,
+            }
         }
+
+        Ok(())
     }
 
     fn write_str(&self, data: &str) -> KernelResult<()> {
-        match self.terminal {
-            TerminalType::Usart => Kernel::hal()
-                .interface_write(
-                    self.interface_id.unwrap(),
-                    InterfaceWriteActions::UartWrite(UartWriteActions::SendString(data)),
-                )
-                .map_err(KernelError::HalError),
+        for (i, terminal) in self.terminals.iter().enumerate() {
+            match terminal {
+                TerminalType::Usart(_) => KernelData::hal()
+                    .interface_write(
+                        self.interface_id[i],
+                        InterfaceWriteActions::UartWrite(UartWriteActions::SendString(data)),
+                    )
+                    .map_err(KernelError::HalError)?,
+                TerminalType::Display => KernelData::display()
+                    .draw_string_at_cursor(data, self.current_color)
+                    .map_err(KernelError::DisplayError)?,
+            }
         }
+
+        Ok(())
     }
 
-    #[inline(always)]
     fn clear_terminal(&self) -> KernelResult<()> {
-        self.write_str("\x1B[2J\x1B[H")
+        for (i, terminal) in self.terminals.iter().enumerate() {
+            match terminal {
+                TerminalType::Usart(_) => KernelData::hal()
+                    .interface_write(
+                        self.interface_id[i],
+                        InterfaceWriteActions::UartWrite(UartWriteActions::SendString(
+                            "\x1B[2J\x1B[H",
+                        )),
+                    )
+                    .map_err(KernelError::HalError)?,
+                TerminalType::Display => KernelData::display()
+                    .clear(Colors::Black)
+                    .map_err(KernelError::DisplayError)?,
+            }
+        }
+
+        Ok(())
     }
 }

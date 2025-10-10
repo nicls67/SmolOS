@@ -8,6 +8,7 @@ edition = "2024"
 cortex-m-rt = { version = "0.7.0" }
 kernel = { path = "libs/kernel" }
 hal_interface = { path = "libs/hal_interface" }
+heapless = "0.9.1"
 
 [[bin]]
 name = "SmolOS"

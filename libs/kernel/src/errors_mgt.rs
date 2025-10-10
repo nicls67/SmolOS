@@ -9,6 +9,7 @@ use crate::{
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
+use display::Colors;
 use hal_interface::{GpioWriteAction, InterfaceWriteActions};
 
 /// The HardFault exception handler.
@@ -247,6 +248,7 @@ impl ErrorsManager {
                 if self.has_error != Some(Fatal) {
                     self.has_error = Some(Critical);
                 }
+                Kernel::terminal().set_color(Colors::Magenta);
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
                     .unwrap_or(());
@@ -280,6 +282,7 @@ impl ErrorsManager {
                     }
                 }
 
+                Kernel::terminal().set_color(Colors::Red);
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
                     .unwrap_or(())

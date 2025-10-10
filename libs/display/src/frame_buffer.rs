@@ -1,5 +1,3 @@
-use hal_interface::Hal;
-
 const FRAME_BUFFER_1_ADDRESS: u32 = 0xC0000000;
 const FRAME_BUFFER_2_ADDRESS: u32 = 0xC0200000;
 

@@ -17,9 +17,9 @@ use crate::scheduler::Scheduler;
 pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
 pub use data::cortex_init;
 use display::FontSize::Font24;
-use display::{Colors, Display, FontSize};
+use display::{Colors, Display};
 use hal_interface::Hal;
-use heapless::format;
+use heapless::{Vec, format};
 pub use syscall::*;
 pub use systick::init_systick;
 pub use types::*;
@@ -28,8 +28,7 @@ pub struct BootConfig {
     pub sched_period: Milliseconds,
     pub kernel_time_data: KernelTimeData,
     pub hal: Hal,
-    pub system_terminal_name: &'static str,
-    pub system_terminal_type: TerminalType,
+    pub system_terminals: Vec<TerminalType, 8>,
     pub err_led_name: Option<&'static str>,
     pub display_name: Option<&'static str>,
 }
@@ -65,7 +64,7 @@ pub fn boot(config: BootConfig) {
         config.hal,
         Display::new(),
         config.kernel_time_data.clone(),
-        Terminal::new(config.system_terminal_name, config.system_terminal_type),
+        Terminal::new(config.system_terminals),
         sched,
         ErrorsManager::new(),
     );
@@ -77,20 +76,6 @@ pub fn boot(config: BootConfig) {
         .init(config.display_name.unwrap(), Kernel::hal(), Colors::Black)
         .unwrap();
     Kernel::display().set_font(Font24);
-    Kernel::display()
-        .draw_string_at_cursor("Booting...\n", Colors::White)
-        .unwrap();
-    Kernel::display()
-        .draw_string_at_cursor(
-            format!(30; "{} version {}\n", KERNEL_NAME, KERNEL_VERSION)
-                .unwrap()
-                .as_str(),
-            Colors::White,
-        )
-        .unwrap();
-    Kernel::display().draw_string_at_cursor(format!(30; "Core frequency is {} MHz\n", Kernel::time_data().core_frequency.to_u32() / 1_000_000)
-        .unwrap()
-        .as_str(), Colors::White).unwrap();
 
     ////////////////////////////
     // Terminal start
@@ -127,14 +112,9 @@ pub fn boot(config: BootConfig) {
     init_systick(Some(config.kernel_time_data.systick_period));
 
     //Boot completed
+    terminal.set_color(Colors::Green);
     terminal
         .write(&TerminalFormatting::StrNewLineBoth("Kernel ready !"))
-        .unwrap();
-    Kernel::display()
-        .draw_string_at_cursor(
-            format!(30; "\nKernel ready !\n").unwrap().as_str(),
-            Colors::Green,
-        )
         .unwrap();
 }
 

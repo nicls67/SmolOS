@@ -105,22 +105,61 @@ impl Display {
         // Initialize the frame buffer
         self.frame_buffer = Some(FrameBuffer::new());
 
-        // Clean the buffer and then switch to the other buffer
-        self.hal
-            .as_mut()
-            .unwrap()
-            .interface_write(
-                self.hal_id.unwrap(),
-                InterfaceWriteActions::Lcd(LcdActions::Clear(
-                    LcdLayer::FOREGROUND,
-                    background_color.to_argb(),
-                )),
-            )
-            .map_err(DisplayError::HalError)?;
-
+        // Mark the driver as initialized
         self.initialized = true;
 
+        // Clean the buffer
+        self.clear(background_color)?;
+
         Ok(())
+    }
+
+    /// Clears the display's foreground layer with the specified color.
+    ///
+    /// # Parameters
+    ///
+    /// * `color` - A value of type `Colors` representing the color to fill the entire foreground layer of the display.
+    ///
+    /// # Returns
+    ///
+    /// * `DisplayResult<()>` -
+    ///     * Returns `Ok(())` if the foreground layer is successfully cleared with the specified color.
+    ///     * Returns an `Err(DisplayError)` if an error occurs during the process, such as
+    ///         - `DisplayError::HalError` if the hardware abstraction layer (HAL) fails during the interface write operation.
+    ///         - `DisplayError::DisplayDriverNotInitialized` if the display driver has not been properly initialized.
+    ///
+    /// # Behavior
+    ///
+    /// * If the display driver is initialized (`self.initialized` is true), the method writes the `Clear` action with the specified color
+    ///   to the hardware abstraction layer through the driver interface (`interface_write`).
+    ///
+    /// * If the display driver is not initialized, the method returns a `DisplayError::DisplayDriverNotInitialized` error.
+    ///
+    /// # Errors
+    ///
+    /// * `DisplayError::DisplayDriverNotInitialized`: Thrown if the display driver has not been initialized.
+    /// * `DisplayError::HalError`: Thrown if the HAL interface write operation fails.
+    ///
+    /// # Notes
+    ///
+    /// * Ensure that the display driver is initialized before calling this method.
+    /// * The `self.hal` and `self.hal_id` must be `Some` values for successful operation.
+    pub fn clear(&mut self, color: Colors) -> DisplayResult<()> {
+        if self.initialized {
+            self.hal
+                .as_mut()
+                .unwrap()
+                .interface_write(
+                    self.hal_id.unwrap(),
+                    InterfaceWriteActions::Lcd(LcdActions::Clear(
+                        LcdLayer::FOREGROUND,
+                        color.to_argb(),
+                    )),
+                )
+                .map_err(DisplayError::HalError)
+        } else {
+            Err(DisplayError::DisplayDriverNotInitialized)
+        }
     }
 
     /// Switches the current frame buffer and updates the display hardware with the new frame buffer address.
@@ -223,7 +262,7 @@ impl Display {
             // Check for new line
             if *char_to_display == b'\n' {
                 self.set_cursor_at_new_line();
-            } else {
+            } else if *char_to_display != b'\r' {
                 // Display chat at the current position
                 for line in 0..char_size.1 {
                     for col in 0..char_size.0 {
