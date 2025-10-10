@@ -1,3 +1,6 @@
+pub const FIRST_ASCII_CHAR: u8 = 0x20;
+pub const LAST_ASCII_CHAR: u8 = 0x7E;
+
 const FONT_ASCII_12: [u8; 1140] = [
     // @0 ' ' (7 pixels wide)
     0x00, //

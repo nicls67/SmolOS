@@ -11,6 +11,7 @@ use hal_interface::{
 };
 
 use crate::FontSize::Font16;
+use crate::fonts::{FIRST_ASCII_CHAR, LAST_ASCII_CHAR};
 use crate::frame_buffer::FrameBuffer;
 pub use colors::Colors;
 use hal_interface::InterfaceReadResult::LcdRead;
@@ -25,8 +26,6 @@ pub struct Display {
     cursor_pos: (u16, u16),
     font: FontSize,
     color: Colors,
-    line_feed_executed: bool,
-    line_return_executed: bool,
 }
 
 impl Default for Display {
@@ -55,8 +54,6 @@ impl Display {
             cursor_pos: (0, 0),
             font: Font16,
             color: Colors::White,
-            line_feed_executed: false,
-            line_return_executed: false,
         }
     }
 
@@ -162,7 +159,9 @@ impl Display {
                         color.to_argb(),
                     )),
                 )
-                .map_err(DisplayError::HalError)
+                .map_err(DisplayError::HalError)?;
+            self.cursor_pos = (0, 0);
+            Ok(())
         } else {
             Err(DisplayError::DisplayDriverNotInitialized)
         }
@@ -372,13 +371,9 @@ impl Display {
         char_size: (u8, u8),
         color_argb: u32,
     ) -> DisplayResult<()> {
-        // Check for new line
-        if char_to_display == b'\n' {
-            self.set_cursor_line_feed()?;
-            self.line_feed_executed = true;
-        } else if char_to_display == b'\r' {
-            self.set_cursor_return();
-            self.line_return_executed = true;
+        // Check if the character to display is valid
+        if !(FIRST_ASCII_CHAR..=LAST_ASCII_CHAR).contains(&char_to_display) {
+            return Err(DisplayError::UnknownCharacter(char_to_display));
         } else {
             // Display chat at the current position
             for line in 0..char_size.1 {
@@ -401,88 +396,80 @@ impl Display {
         Ok(())
     }
 
-    /// Draws a string at the current cursor position on the display, with the specified color and font size.
+    /// Draws a provided string at the current cursor position on the display.
     ///
-    /// # Parameters
-    /// - `string`: A string slice (`&str`) containing the text to be drawn.
-    /// - `color`: A `Colors` enum value specifying the color of the text.
+    /// This method takes a string slice `string` and iterates through its characters,
+    /// drawing each character one by one at the current cursor position.
+    /// If a color is provided, it will be used to set the color of the characters. If `color`
+    /// is `None`, the default color will be used.
     ///
-    /// # Behavior
-    /// - The method internally calls `draw_string` to render the provided string at the current cursor position (`cursor_pos`).
-    /// - After successfully rendering the string, the horizontal cursor position (`cursor_pos.0`) is updated based on the character size of the provided font and the length of the string.
+    /// The method automatically handles advancing the cursor position after rendering
+    /// each character.
     ///
-    /// # Return Value
-    /// - Returns a `DisplayResult<()>`, which is `Ok(())` if the operation succeeds, or an error variant if the operation fails.
+    /// # Arguments
+    ///
+    /// * `string` - A string slice containing the characters to be rendered.
+    /// * `color` - An optional parameter specifying the color of the string. If `None`,
+    ///   the default color for the display will be applied.
+    ///
+    /// # Returns
+    ///
+    /// A `DisplayResult<()>` which indicates success. If drawing any individual
+    /// character fails, it will return an error contained within the `DisplayResult`.
     ///
     /// # Errors
-    /// - If the `draw_string` method fails, this method will propagate the error.
     ///
-    /// # Notes
-    /// - This method does not handle line wrapping. If the updated cursor position exceeds the display boundary, rendering issues may occur.
-    /// - Ensure to set the initial `cursor_pos` before calling this method, or the behavior might be unexpected.
+    /// The method will propagate any errors returned while drawing individual characters,
+    /// allowing the caller to handle such cases. Errors could arise from display rendering
+    /// issues or cursor operation failures.
+    ///
     pub fn draw_string_at_cursor(
         &mut self,
         string: &str,
         color: Option<Colors>,
     ) -> DisplayResult<()> {
         // Draw the string at the current cursor position
-        self.draw_string(string, self.cursor_pos.0, self.cursor_pos.1, color)?;
-
-        // Update the cursor position only if no line feed was found
-        if !self.line_feed_executed && !self.line_return_executed {
-            self.move_cursor()?;
-        } else {
-            self.line_feed_executed = false;
-            self.line_return_executed = false;
+        for char_to_display in string.as_bytes() {
+            self.draw_char_at_cursor(*char_to_display, color)?;
         }
         Ok(())
     }
 
-    /// Draws a character at the current cursor position on the display,
-    /// optionally with a specified color.
+    /// Draws a character at the current cursor position on the display.
     ///
-    /// # Arguments
+    /// This function places a given character (`char_to_display`) at the
+    /// current cursor position and optionally applies a specified color.
     ///
-    /// * `char_to_display` - The ASCII value of the character to be drawn.
-    /// * `color` - An optional parameter specifying the color in which the
-    ///   character should be drawn. If `None`, the default color will be used.
+    /// Special handling is applied for newline (`b'\n'`) and carriage return (`b'\r'`) characters:
+    /// - For `b'\n'`, the cursor is moved to the next line (line feed).
+    /// - For `b'\r'`, the cursor is moved back to the beginning of the current line (carriage return).
+    /// - For all other characters, the character is drawn at the current cursor position, and then
+    ///   the cursor is moved forward.
     ///
-    /// # Behavior
-    /// - This method calls `self.draw_char` to render the specified character
-    ///   at the current cursor position (`cursor_pos`).
-    /// - After the character is drawn, the horizontal position of the cursor
-    ///   is updated by the width of one character, as defined by the current
-    ///   font. The vertical position of the cursor is unchanged.
-    /// - The cursor's horizontal position will not be updated if the vertical
-    ///   position of the cursor (`cursor_pos.1`) is `0` (indicating a potential
-    ///   line feed or specific context).
+    /// # Parameters
+    /// - `char_to_display`: A `u8` representing the ASCII value of the character to draw.
+    /// - `color`: An optional `Colors` value that specifies the color of the character.
     ///
     /// # Returns
-    /// * `Ok(())` upon successful drawing of the character.
-    /// * `Err(DisplayError)` if an error occurs during the drawing process (e.g.,
-    ///   issues with rendering the character).
+    /// - `DisplayResult<()>`: Returns `Ok(())` on success, or an error if drawing or cursor movement fails.
     ///
     /// # Errors
-    /// This function will propagate any potential errors encountered by the
-    /// underlying `draw_char` method as a `DisplayError`.
+    /// This function returns an error if:
+    /// - The character drawing operation fails.
+    /// - Moving the cursor fails.
     ///
-    /// # Notes
-    /// Ensure the cursor is properly managed so it does not exceed
-    /// the display boundaries before calling this method.
     pub fn draw_char_at_cursor(
         &mut self,
         char_to_display: u8,
         color: Option<Colors>,
     ) -> DisplayResult<()> {
-        // Draw the char at the current cursor position
-        self.draw_char(char_to_display, self.cursor_pos.0, self.cursor_pos.1, color)?;
-
-        // Update the cursor position only if no line feed was found
-        if !self.line_feed_executed && !self.line_return_executed {
-            self.move_cursor()?;
+        if char_to_display == b'\n' {
+            self.set_cursor_line_feed()?;
+        } else if char_to_display == b'\r' {
+            self.set_cursor_return();
         } else {
-            self.line_feed_executed = false;
-            self.line_return_executed = false;
+            self.draw_char(char_to_display, self.cursor_pos.0, self.cursor_pos.1, color)?;
+            self.move_cursor()?;
         }
         Ok(())
     }

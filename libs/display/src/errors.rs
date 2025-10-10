@@ -1,7 +1,7 @@
 use crate::DisplayError::HalError;
 use crate::DisplayErrorLevel::{Critical, Error, Fatal};
 use hal_interface::{HalError as HalErrorDef, HalErrorLevel};
-use heapless::String;
+use heapless::{String, format};
 
 pub type DisplayResult<T> = Result<T, DisplayError>;
 
@@ -27,6 +27,7 @@ pub enum DisplayError {
     HalError(HalErrorDef),
     DisplayDriverNotInitialized,
     OutOfScreenBounds,
+    UnknownCharacter(u8),
     UnknownError,
 }
 
@@ -47,6 +48,11 @@ impl DisplayError {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str("Out of screen bounds").unwrap()
             }
+            DisplayError::UnknownCharacter(c) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(format!(25; "Unknown character: {}", c).unwrap().as_str())
+                    .unwrap()
+            }
         }
         msg
     }
@@ -61,6 +67,7 @@ impl DisplayError {
             DisplayError::DisplayDriverNotInitialized => Error,
             DisplayError::UnknownError => Error,
             DisplayError::OutOfScreenBounds => Error,
+            DisplayError::UnknownCharacter(_) => Error,
         }
     }
 }
