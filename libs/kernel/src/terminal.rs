@@ -296,7 +296,7 @@ impl Terminal {
                 TerminalType::Display => KernelData::display()
                     .draw_string_at_cursor(
                         str::from_utf8(&[data as u8]).unwrap(),
-                        self.current_color,
+                        Some(self.current_color),
                     )
                     .map_err(KernelError::DisplayError)?,
             }
@@ -361,7 +361,7 @@ impl Terminal {
                     )
                     .map_err(KernelError::HalError)?,
                 TerminalType::Display => KernelData::display()
-                    .draw_string_at_cursor(data, self.current_color)
+                    .draw_string_at_cursor(data, Some(self.current_color))
                     .map_err(KernelError::DisplayError)?,
             }
         }

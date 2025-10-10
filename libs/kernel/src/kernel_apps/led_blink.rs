@@ -1,5 +1,7 @@
+use crate::SysCallDisplayArgs::WriteCharAtCursor;
 use crate::{KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall};
 use core::sync::atomic::{AtomicUsize, Ordering};
+use display::Colors;
 use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::InterfaceWriteActions;
 
@@ -12,7 +14,11 @@ pub fn led_blink() -> KernelResult<()> {
     syscall(Syscall::Hal(SysCallHalArgs {
         id: LED_ID.load(Ordering::Relaxed),
         action: InterfaceWriteActions::GpioWrite(Toggle),
-    }))
+    }))?;
+    syscall(Syscall::Display(WriteCharAtCursor(
+        '.',
+        Some(Colors::White),
+    )))
 }
 
 pub fn init_led_blink() -> KernelResult<()> {

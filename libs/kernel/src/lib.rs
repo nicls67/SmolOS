@@ -75,7 +75,7 @@ pub fn boot(config: BootConfig) {
     Kernel::display()
         .init(config.display_name.unwrap(), Kernel::hal(), Colors::Black)
         .unwrap();
-    Kernel::display().set_font(Font24);
+    Kernel::display().set_font(Font24).unwrap();
 
     ////////////////////////////
     // Terminal start

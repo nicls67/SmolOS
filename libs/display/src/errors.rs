@@ -26,6 +26,7 @@ impl DisplayErrorLevel {
 pub enum DisplayError {
     HalError(HalErrorDef),
     DisplayDriverNotInitialized,
+    OutOfScreenBounds,
     UnknownError,
 }
 
@@ -42,6 +43,10 @@ impl DisplayError {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str("Unknown error").unwrap()
             }
+            DisplayError::OutOfScreenBounds => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str("Out of screen bounds").unwrap()
+            }
         }
         msg
     }
@@ -55,6 +60,7 @@ impl DisplayError {
             },
             DisplayError::DisplayDriverNotInitialized => Error,
             DisplayError::UnknownError => Error,
+            DisplayError::OutOfScreenBounds => Error,
         }
     }
 }

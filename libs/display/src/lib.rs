@@ -24,6 +24,8 @@ pub struct Display {
     initialized: bool,
     cursor_pos: (u16, u16),
     font: FontSize,
+    color: Colors,
+    line_feed_executed: bool,
 }
 
 impl Default for Display {
@@ -51,6 +53,8 @@ impl Display {
             initialized: false,
             cursor_pos: (0, 0),
             font: Font16,
+            color: Colors::White,
+            line_feed_executed: false,
         }
     }
 
@@ -244,7 +248,7 @@ impl Display {
         string: &str,
         x: u16,
         y: u16,
-        color: Colors,
+        color: Option<Colors>,
     ) -> DisplayResult<()> {
         // Returns error if not initialized
         if !self.initialized {
@@ -254,37 +258,138 @@ impl Display {
         // Initialize variables
         let char_size = self.font.get_char_size();
         let mut current_x = x;
-        let color_argb = color.to_argb().as_u32();
+
+        // Get display color
+        let color_argb = if let Some(c) = color {
+            c.to_argb().as_u32()
+        } else {
+            self.color.to_argb().as_u32()
+        };
+
+        // Compute frame buffer address
         let mut fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
             + 4 * (y as u32 * self.size.unwrap().0 as u32 + x as u32);
 
         for char_to_display in string.as_bytes() {
-            // Check for new line
-            if *char_to_display == b'\n' {
-                self.set_cursor_at_new_line();
-            } else if *char_to_display != b'\r' {
-                // Display chat at the current position
-                for line in 0..char_size.1 {
-                    for col in 0..char_size.0 {
-                        if self.font.is_pixel_set(*char_to_display, col, line) {
-                            unsafe {
-                                *(fb_write_address as *mut u32) = color_argb;
-                            }
-                        }
+            self.draw_char_in_fb(*char_to_display, fb_write_address, char_size, color_argb)?;
 
-                        // Increment frame buffer address
-                        fb_write_address += 4;
+            // Compute next char position
+            current_x += char_size.0 as u16;
+            // Increment frame buffer address
+            fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
+                + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
+        }
+
+        Ok(())
+    }
+
+    /// Draws a single character on the display at the specified position with an optional custom color.
+    ///
+    /// # Parameters
+    /// - `char_to_display`: The ASCII value of the character to be displayed.
+    /// - `x`: The horizontal position (in pixels) where the character will be drawn.
+    /// - `y`: The vertical position (in pixels) where the character will be drawn.
+    /// - `color`: An optional parameter specifying the color of the character. If `None`, the default color of the display is used.
+    ///
+    /// # Returns
+    /// - `DisplayResult<()>`: Returns `Ok(())` if the operation is successful. Returns an error if the display driver is not initialized or if there is a failure while drawing the character.
+    ///
+    /// # Errors
+    /// - `DisplayError::DisplayDriverNotInitialized`: Returned if the display has not been initialized prior to calling this method.
+    /// - Other errors propagated from the underlying `draw_char_in_fb` function.
+    ///
+    /// # Behavior
+    /// 1. Checks if the display has been properly initialized. If not, it returns an appropriate error.
+    /// 2. Uses the font information to determine the size of the character.
+    /// 3. Computes the address in the frame buffer where the character's pixel data will be written.
+    /// 4. Calls `draw_char_in_fb` to render the character into the frame buffer with the calculated position and color.
+    ///
+    /// # Note
+    /// - The `frame_buffer` must be correctly set up and mutable before calling this function.
+    /// - The `Colors` enum should provide an `to_argb` method that converts the color to an ARGB format.
+    ///
+    pub fn draw_char(
+        &mut self,
+        char_to_display: u8,
+        x: u16,
+        y: u16,
+        color: Option<Colors>,
+    ) -> DisplayResult<()> {
+        // Returns error if not initialized
+        if !self.initialized {
+            return Err(DisplayError::DisplayDriverNotInitialized);
+        }
+
+        let char_size = self.font.get_char_size();
+
+        // Get display color
+        let color_argb = if let Some(c) = color {
+            c.to_argb().as_u32()
+        } else {
+            self.color.to_argb().as_u32()
+        };
+
+        // Compute frame buffer address
+        let fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
+            + 4 * (y as u32 * self.size.unwrap().0 as u32 + x as u32);
+
+        // Draw char in fb
+        self.draw_char_in_fb(char_to_display, fb_write_address, char_size, color_argb)?;
+
+        Ok(())
+    }
+
+    ///
+    /// Draws a character onto the frame buffer at the specified location with the given size and color.
+    ///
+    /// # Parameters
+    /// - `char_to_display`: The ASCII value of the character to be displayed.
+    ///     * Special handling is applied for:
+    ///         - `b'\n'`: Moves the cursor to a new line.
+    ///         - `b'\r'`: Ignored during rendering.
+    /// - `fb_write_address`: The memory address in the frame buffer where the character drawing starts.
+    /// - `char_size`: A tuple specifying the dimensions of the character `(width, height)` in pixels.
+    /// - `color_argb`: The color of the character in 32-bit ARGB format.
+    ///
+    /// # Returns
+    /// A `DisplayResult<()>` which is `Ok` on successful completion or contains an error if something goes wrong.
+    ///
+    /// # Behavior
+    /// - If the character is a newline (`b'\n'`), the cursor position is updated to a new line using `self.set_cursor_at_new_line()`.
+    /// - If the character is not a carriage return (`b'\r'`), the function iteratively checks the corresponding bitmap
+    ///   for the character using `self.font.is_pixel_set()`. If a pixel is set, it writes the `color_argb` value
+    ///   at the position in the frame buffer defined by `fb_write_address`.
+    /// - The frame buffer's address is incremented as necessary to step through pixels or rows after drawing.
+    ///
+    /// # Safety
+    /// - Directly writes to the frame buffer through unsafe raw pointer dereferencing. Ensure valid memory address
+    fn draw_char_in_fb(
+        &mut self,
+        char_to_display: u8,
+        mut fb_write_address: u32,
+        char_size: (u8, u8),
+        color_argb: u32,
+    ) -> DisplayResult<()> {
+        // Check for new line
+        if char_to_display == b'\n' {
+            self.set_cursor_at_new_line();
+            self.line_feed_executed = true;
+        } else if char_to_display != b'\r' {
+            // Display chat at the current position
+            for line in 0..char_size.1 {
+                for col in 0..char_size.0 {
+                    if self.font.is_pixel_set(char_to_display, col, line) {
+                        unsafe {
+                            *(fb_write_address as *mut u32) = color_argb;
+                        }
                     }
 
                     // Increment frame buffer address
-                    fb_write_address += self.size.unwrap().0 as u32 * 4 - char_size.0 as u32 * 4;
+                    fb_write_address += 4;
                 }
 
-                // Compute next char position
-                current_x += char_size.0 as u16;
                 // Increment frame buffer address
-                fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
-                    + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
+                fb_write_address += self.size.unwrap().0 as u32 * 4 - char_size.0 as u32 * 4;
             }
         }
 
@@ -310,14 +415,67 @@ impl Display {
     /// # Notes
     /// - This method does not handle line wrapping. If the updated cursor position exceeds the display boundary, rendering issues may occur.
     /// - Ensure to set the initial `cursor_pos` before calling this method, or the behavior might be unexpected.
-    pub fn draw_string_at_cursor(&mut self, string: &str, color: Colors) -> DisplayResult<()> {
-        let y_pos = self.cursor_pos.1;
-
+    pub fn draw_string_at_cursor(
+        &mut self,
+        string: &str,
+        color: Option<Colors>,
+    ) -> DisplayResult<()> {
+        // Draw the string at the current cursor position
         self.draw_string(string, self.cursor_pos.0, self.cursor_pos.1, color)?;
 
         // Update the cursor position only if no line feed was found
-        if self.cursor_pos.1 == y_pos {
+        if !self.line_feed_executed {
             self.cursor_pos.0 += self.font.get_char_size().0 as u16 * string.len() as u16;
+        } else {
+            self.line_feed_executed = false;
+        }
+        Ok(())
+    }
+
+    /// Draws a character at the current cursor position on the display,
+    /// optionally with a specified color.
+    ///
+    /// # Arguments
+    ///
+    /// * `char_to_display` - The ASCII value of the character to be drawn.
+    /// * `color` - An optional parameter specifying the color in which the
+    ///   character should be drawn. If `None`, the default color will be used.
+    ///
+    /// # Behavior
+    /// - This method calls `self.draw_char` to render the specified character
+    ///   at the current cursor position (`cursor_pos`).
+    /// - After the character is drawn, the horizontal position of the cursor
+    ///   is updated by the width of one character, as defined by the current
+    ///   font. The vertical position of the cursor is unchanged.
+    /// - The cursor's horizontal position will not be updated if the vertical
+    ///   position of the cursor (`cursor_pos.1`) is `0` (indicating a potential
+    ///   line feed or specific context).
+    ///
+    /// # Returns
+    /// * `Ok(())` upon successful drawing of the character.
+    /// * `Err(DisplayError)` if an error occurs during the drawing process (e.g.,
+    ///   issues with rendering the character).
+    ///
+    /// # Errors
+    /// This function will propagate any potential errors encountered by the
+    /// underlying `draw_char` method as a `DisplayError`.
+    ///
+    /// # Notes
+    /// Ensure the cursor is properly managed so it does not exceed
+    /// the display boundaries before calling this method.
+    pub fn draw_char_at_cursor(
+        &mut self,
+        char_to_display: u8,
+        color: Option<Colors>,
+    ) -> DisplayResult<()> {
+        // Draw the char at the current cursor position
+        self.draw_char(char_to_display, self.cursor_pos.0, self.cursor_pos.1, color)?;
+
+        // Update the cursor position only if no line feed was found
+        if !self.line_feed_executed {
+            self.cursor_pos.0 += self.font.get_char_size().0 as u16;
+        } else {
+            self.line_feed_executed = false;
         }
         Ok(())
     }
@@ -330,8 +488,9 @@ impl Display {
     /// # Remarks
     /// This function updates the `font` property of the object to the specified value.
     /// The new font size will replace any previously set value.
-    pub fn set_font(&mut self, font: FontSize) {
+    pub fn set_font(&mut self, font: FontSize) -> DisplayResult<()> {
         self.font = font;
+        Ok(())
     }
 
     /// Moves the cursor to the beginning of a new line.
@@ -345,5 +504,52 @@ impl Display {
     pub fn set_cursor_at_new_line(&mut self) {
         self.cursor_pos.0 = 0;
         self.cursor_pos.1 += self.font.get_char_size().1 as u16;
+    }
+
+    /// Sets the cursor position on the display.
+    ///
+    /// # Parameters
+    /// - `x`: The horizontal position of the cursor, specified as a `u16`.
+    /// - `y`: The vertical position of the cursor, specified as a `u16`.
+    ///
+    /// # Returns
+    /// - `Ok(())`: If the cursor position was successfully updated.
+    /// - `Err(DisplayError)`: If an error occurred preventing the operation.
+    ///
+    /// # Errors
+    /// - `DisplayError::DisplayDriverNotInitialized`: Returned if the display driver
+    ///   has not been initialized before attempting to set the cursor position.
+    /// - `DisplayError::OutOfScreenBounds`: Returned if the specified `x` or `y`
+    ///   coordinates exceed the screen boundaries
+    pub fn set_cursor_pos(&mut self, x: u16, y: u16) -> DisplayResult<()> {
+        if !self.initialized {
+            return Err(DisplayError::DisplayDriverNotInitialized);
+        }
+
+        if x < self.size.unwrap().0 && y < self.size.unwrap().1 {
+            self.cursor_pos.0 = x;
+            self.cursor_pos.1 = y;
+            Ok(())
+        } else {
+            Err(DisplayError::OutOfScreenBounds)
+        }
+    }
+
+    /// Sets the color of the display to the specified value.
+    ///
+    /// # Arguments
+    ///
+    /// * `color` - A value of the `Colors` enum representing the color to set.
+    ///
+    /// # Returns
+    ///
+    /// * `DisplayResult<()>` - Returns `Ok(())` if the color is successfully set.
+    ///
+    /// # Errors
+    ///
+    /// This function does not produce any errors in its current implementation.
+    pub fn set_color(&mut self, color: Colors) -> DisplayResult<()> {
+        self.color = color;
+        Ok(())
     }
 }
