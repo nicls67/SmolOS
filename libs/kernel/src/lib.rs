@@ -82,12 +82,15 @@ pub fn boot(config: BootConfig) {
         .unwrap();
     Kernel::display()
         .draw_string_at_cursor(
-            format!(30; "{} version {}", KERNEL_NAME, KERNEL_VERSION)
+            format!(30; "{} version {}\n", KERNEL_NAME, KERNEL_VERSION)
                 .unwrap()
                 .as_str(),
             Colors::White,
         )
         .unwrap();
+    Kernel::display().draw_string_at_cursor(format!(30; "Core frequency is {} MHz\n", Kernel::time_data().core_frequency.to_u32() / 1_000_000)
+        .unwrap()
+        .as_str(), Colors::White).unwrap();
 
     ////////////////////////////
     // Terminal start
@@ -126,6 +129,12 @@ pub fn boot(config: BootConfig) {
     //Boot completed
     terminal
         .write(&TerminalFormatting::StrNewLineBoth("Kernel ready !"))
+        .unwrap();
+    Kernel::display()
+        .draw_string_at_cursor(
+            format!(30; "\nKernel ready !\n").unwrap().as_str(),
+            Colors::Green,
+        )
         .unwrap();
 }
 

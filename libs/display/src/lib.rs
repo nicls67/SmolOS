@@ -295,6 +295,14 @@ impl Display {
         self.font = font;
     }
 
+    /// Moves the cursor to the beginning of a new line.
+    ///
+    /// This method resets the horizontal position of the cursor (`self.cursor_pos.0`)
+    /// to `0` and increments the vertical position (`self.cursor_pos.1`) by the height
+    /// of a character. The character height is determined by the `get_char_size` method
+    /// of the `font` attribute.
+    ///
+    /// After calling this method, the cursor will be positioned at the start of the next line.
     pub fn set_cursor_at_new_line(&mut self) {
         self.cursor_pos.0 = 0;
         self.cursor_pos.1 += self.font.get_char_size().1 as u16;
