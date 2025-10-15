@@ -382,6 +382,10 @@ impl Display {
                         unsafe {
                             *(fb_write_address as *mut u32) = color_argb;
                         }
+                    } else {
+                        unsafe {
+                            *(fb_write_address as *mut u32) = 0;
+                        }
                     }
 
                     // Increment frame buffer address
