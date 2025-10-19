@@ -1,5 +1,5 @@
 use crate::SysCallDisplayArgs::WriteCharAtCursor;
-use crate::{KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall};
+use crate::{KernelResult, Milliseconds, SysCallHalActions, SysCallHalArgs, Syscall, syscall};
 use core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering};
 use display::Colors;
 use hal_interface::GpioWriteAction::Toggle;
@@ -17,7 +17,7 @@ pub fn led_blink() -> KernelResult<()> {
     syscall(
         Syscall::Hal(SysCallHalArgs {
             id: LED_ID.load(Ordering::Relaxed),
-            action: InterfaceWriteActions::GpioWrite(Toggle),
+            action: SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(Toggle)),
         }),
         LED_APP_ID.load(Ordering::Relaxed),
     )?;
@@ -59,8 +59,18 @@ pub fn led_blink() -> KernelResult<()> {
 }
 
 pub fn init_led_blink() -> KernelResult<()> {
+    // Get LED interface ID
     let mut id = 0;
-    syscall(Syscall::HalGetId(LED_NAME, &mut id), 0)?;
+    syscall(
+        Syscall::Hal(SysCallHalArgs {
+            id,
+            action: SysCallHalActions::GetID(LED_NAME, &mut id),
+        }),
+        0,
+    )?;
     LED_ID.store(id, Ordering::Relaxed);
+
+    // Try to get a lock on the interface
+
     Ok(())
 }

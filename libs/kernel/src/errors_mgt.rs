@@ -4,7 +4,8 @@ use crate::data::Kernel;
 use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME};
 use crate::scheduler::AppCall;
 use crate::{
-    KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall,
+    KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalActions, SysCallHalArgs,
+    Syscall, syscall,
 };
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
@@ -359,7 +360,9 @@ fn blink_err_led(id: u32) -> KernelResult<()> {
     syscall(
         Syscall::Hal(SysCallHalArgs {
             id: id as usize,
-            action: InterfaceWriteActions::GpioWrite(GpioWriteAction::Toggle),
+            action: SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(
+                GpioWriteAction::Toggle,
+            )),
         }),
         KERNEL_MASTER_ID,
     )

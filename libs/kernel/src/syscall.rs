@@ -6,7 +6,14 @@ use hal_interface::InterfaceWriteActions;
 
 pub struct SysCallHalArgs<'a> {
     pub id: usize,
-    pub action: InterfaceWriteActions<'a>,
+    pub action: SysCallHalActions<'a>,
+}
+
+pub enum SysCallHalActions<'a> {
+    Write(InterfaceWriteActions<'a>),
+    Lock,
+    Unlock,
+    GetID(&'static str, &'a mut usize),
 }
 
 pub enum SysCallDisplayArgs<'a> {
@@ -22,7 +29,6 @@ pub enum SysCallDisplayArgs<'a> {
 
 pub enum Syscall<'a> {
     Hal(SysCallHalArgs<'a>),
-    HalGetId(&'static str, &'a mut usize),
     AddPeriodicTask(
         &'static str,
         AppCall,
@@ -36,66 +42,85 @@ pub enum Syscall<'a> {
     Display(SysCallDisplayArgs<'a>),
 }
 
-/// Handles system calls to interact with various kernel subsystems like HAL, Scheduler, and Display.
+/// Executes a system call operation based on the specified `syscall_type` and `caller_id`.
 ///
 /// # Parameters
-/// - `syscall_type`: Specifies the type of system call being requested. It includes various operations supported by the kernel (e.g., interacting with HAL, Scheduler, or Display).
-/// - `caller_id`: The identifier of the entity making the system call, often used for permissions or tracking purposes.
+///
+/// - `syscall_type`: The type of system call operation to execute, defined in the `Syscall` enum.
+/// - `caller_id`: The unique identifier of the calling process or application.
 ///
 /// # Returns
-/// - `KernelResult<()>`: Returns `Ok(())` if the system call completes successfully.
-///   Returns an error wrapped in `KernelResult` if the system call encounters an issue.
+///
+/// Returns a `KernelResult<()>`, which is:
+/// - `Ok(())` if the system call operation is executed successfully.
+/// - `Err(KernelError)` if an error occurs during the execution of the system call. The error is
+///   logged via the kernel's error handler.
 ///
 /// # Supported System Calls
 ///
-/// ## HAL (Hardware Abstraction Layer)
-/// - `Syscall::Hal(args)`:
-///   Executes an action on a HAL interface identified by `args.id`.
-/// - `Syscall::HalGetId(name, id)`:
-///   Retrieves the ID of a HAL interface by its `name` and sets its value in `id`.
+/// ## `Syscall::Hal`:
+/// Handles hardware abstraction layer (HAL) operations, specified in `SysCallHalActions`.
+/// - `Write`: Writes data to the hardware interface associated with the provided ID.
+/// - `Lock`: Locks the hardware interface for the caller.
+/// - `Unlock`: Unlocks the hardware interface for the caller.
+/// - `GetID`: Retrieves the hardware interface ID by name and updates the provided pointer with this ID.
 ///
-/// ## Scheduler
-/// - `Syscall::AddPeriodicTask(name, app, init, period, ends_in, id)`:
-///   Adds a periodic task to the scheduler.
-///   Assigns a new ID for the task in `id`.
-/// - `Syscall::RemovePeriodicTask(name, param)`:
-///   Removes a periodic task identified by `name` and optionally `param`.
-/// - `Syscall::NewTaskDuration(name, param, time)`:
-///   Updates the duration of an existing task in the scheduler.
+/// ## `Syscall::AddPeriodicTask`:
+/// Registers a new periodic task in the kernel's scheduler.
+/// - Parameters:
+///     - `name`: Name of the task.
+///     - `app`: Function pointer or closure defining the task's logic.
+///     - `init`: Initial delay before the first execution of the task.
+///     - `period`: Interval period for recurring task execution.
+///     - `ends_in`: Optional duration to stop task execution after.
+///     - `id`: Pointer to store the new task's unique ID.
 ///
-/// ## Display
-/// Handles various graphical display operations:
-/// - `SysCallDisplayArgs::Clear(color)`:
-///   Clears the screen with the specified `color`.
-/// - `SysCallDisplayArgs::SetColor(color)`:
-///   Sets the display's active color.
-/// - `SysCallDisplayArgs::SetFont(font)`:
-///   Updates the display's font.
-/// - `SysCallDisplayArgs::SetCursorPos(x, y)`:
-///   Moves the display's cursor to the specified coordinates (`x`, `y`).
-/// - `SysCallDisplayArgs::WriteCharAtCursor(c, color)`:
-///   Writes a single character `c` with `color` at the current cursor position.
-/// - `SysCallDisplayArgs::WriteChar(c, x, y, color)`:
-///   Writes a character `c` at coordinates (`x`, `y`) with the specified `color`.
-/// - `SysCallDisplayArgs::WriteStrAtCursor(str, color)`:
-///   Writes a string `str` starting at the current cursor position with the specified `color`.
-/// - `SysCallDisplayArgs::WriteStr(str, x, y, color)`:
-///   Writes a string `str` at coordinates (`x`, `y`) with the specified `color`.
+/// ## `Syscall::RemovePeriodicTask`:
+/// Removes an existing periodic task by its name and optional parameters.
+///
+/// ## `Syscall::NewTaskDuration`:
+/// Updates the execution duration of a task.
+/// - Parameters:
+///     - `name`: The name of the task.
+///     - `param`: Additional parameters for task selection.
+///     - `time`: New execution duration for the task.
+///
+/// ## `Syscall::Display`:
+/// Provides various display operations for rendering and graphics, specified by `SysCallDisplayArgs`.
+/// - `Clear`: Clears the display with the specified `color`.
+/// - `SetColor`: Sets the drawing color for graphics or text.
+/// - `SetFont`: Sets the font used for displaying text.
+/// - `SetCursorPos`: Sets the cursor position on the display.
+/// - `WriteCharAtCursor`: Writes a character at the current cursor position with a specified color.
+/// - `WriteChar`: Writes a character at a specific `(x, y)` position with a specified color.
+/// - `WriteStrAtCursor`: Writes a string starting from the current cursor position with a specified color.
+/// - `WriteStr`: Writes a string at a specific `(x, y)` position with a specified color.
 ///
 /// # Error Handling
-/// If any subsystem operation fails, the appropriate error is logged using the kernel's error handler via `Kernel::errors().error_handler(&err)`.
+///
+/// If an error occurs during the execution of the system call:
+/// - The kernel's error handler (`Kernel::errors().error_handler`) is invoked with the specific error.
+/// - The function returns the error encapsulated in `Err(KernelError)`.
 ///
 pub fn syscall(syscall_type: Syscall, caller_id: u32) -> KernelResult<()> {
     let result = match syscall_type {
-        Syscall::Hal(args) => Kernel::hal()
-            .interface_write(args.id, caller_id, args.action)
-            .map_err(KernelError::HalError),
-        Syscall::HalGetId(name, id) => match Kernel::hal().get_interface_id(name) {
-            Ok(hal_id) => {
-                *id = hal_id;
-                Ok(())
-            }
-            Err(e) => Err(KernelError::HalError(e)),
+        Syscall::Hal(args) => match args.action {
+            SysCallHalActions::Write(act) => Kernel::hal()
+                .interface_write(args.id, caller_id, act)
+                .map_err(KernelError::HalError),
+            SysCallHalActions::Lock => Kernel::hal()
+                .lock_interface(args.id, caller_id)
+                .map_err(KernelError::HalError),
+            SysCallHalActions::Unlock => Kernel::hal()
+                .unlock_interface(args.id, caller_id)
+                .map_err(KernelError::HalError),
+            SysCallHalActions::GetID(name, id) => match Kernel::hal().get_interface_id(name) {
+                Ok(hal_id) => {
+                    *id = hal_id;
+                    Ok(())
+                }
+                Err(e) => Err(KernelError::HalError(e)),
+            },
         },
         Syscall::AddPeriodicTask(name, app, init, period, ends_in, id) => {
             match Kernel::scheduler().add_periodic_app(name, app, init, period, ends_in) {
