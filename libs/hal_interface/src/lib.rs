@@ -4,81 +4,157 @@ mod bindings;
 mod errors;
 mod interface_read;
 mod interface_write;
+mod lock;
 
 pub use interface_read::*;
 pub use interface_write::*;
 
 use crate::bindings::{HalInterfaceResult, get_core_clk, get_interface_id, gpio_write, hal_init};
+use crate::lock::Locker;
 pub use errors::*;
 
-pub struct Hal;
-
-impl Default for Hal {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct Hal {
+    locker: Locker,
 }
 
 impl Hal {
-    /// Creates a new instance of the struct.
+    /// Initializes a new instance of the struct.
     ///
-    /// This function initializes the hardware abstraction layer (HAL) by calling
-    /// the `hal_init()` function. The `hal_init()` function is marked as `unsafe`,
-    /// meaning it could perform operations that may break memory safety or depend on specific
-    /// hardware context.
-    ///
-    /// # Safety
-    /// - Ensure that all preconditions for calling `hal_init()` are met.
-    /// - This function directly utilizes unsafe code and should therefore be used with caution.
+    /// # Parameters
+    /// - `master_id`: A `u32` representing the ID of the master resource or entity to be associated with the instance.
     ///
     /// # Returns
-    /// - A new instance of the struct.
+    /// An instance of `Self` with the specified `master_id`.
     ///
-    pub fn new() -> Self {
+    /// # Safety
+    /// This function calls the `hal_init()` function, which is marked as `unsafe`. Ensure that `hal_init()` is safe to call
+    /// in the context where this function is used, as it may involve accessing or modifying low-level hardware or memory.
+    ///
+    pub fn new(master_id: u32) -> Self {
         unsafe { hal_init() }
-        Self
+        Self {
+            locker: Locker::new(master_id),
+        }
     }
 
-    /// Retrieves the interface ID associated with a given interface name.
+    /// Fetches the unique identifier (ID) of a hardware interface by its name.
     ///
     /// # Arguments
     ///
-    /// * `name` - A string slice (`'static`) representing the name of the interface.
+    /// * `name` - A static string slice representing the name of the hardware interface.
     ///
     /// # Returns
     ///
-    /// If the provided `name` corresponds to a valid interface, the function will return
-    /// a `HalResult<usize>` containing the ID of the interface. The ID is returned as a `usize`.
+    /// * `Ok(usize)` - The interface ID as a `usize` if the interface is successfully found.
+    /// * `Err(HalError)` - Returns an appropriate error if the interface could not be found or another issue occurs:
+    ///     - `HalError::InterfaceNotFound(name)` - Returned if the specified interface is not found.
+    ///     - `HalError::UnknownError` - Returned in case of an unknown error.
     ///
-    /// On failure, the function will return a `HalError::InterfaceNotFound`
-    /// error encapsulated in the `HalResult::Err` variant. This occurs
-    /// if the interface name is not found.
+    /// # Behavior
+    ///
+    /// * This function internally calls an external `unsafe` function `get_interface_id`.
+    ///   - If the result is `HalInterfaceResult::OK`, it registers the interface ID
+    ///     in the `locker` and returns the ID.
+    ///   - If the interface is not found, it returns the `HalError::InterfaceNotFound` error.
+    ///   - For any other result, it returns a generic `HalError::UnknownError`.
     ///
     /// # Safety
     ///
-    /// This function calls an unsafe block relying on `get_interface_id`,
-    /// which assumes that the provided `name` string pointer and mutable ID
-    /// reference (`&mut id`) are valid. Ensure that the memory integrity
-    /// and the lifecycle of the provided variables are guaranteed when using
-    /// this function.
+    /// * The usage of `unsafe` code is required due to calling and interacting with the
+    ///   external `get_interface_id` function. As such, it is assumed that `get_interface_id`
+    ///   operates correctly and adheres to its expected behavior.
     ///
     /// # Errors
     ///
-    /// * Returns `Err(HalError::InterfaceNotFound)` if the interface name
-    ///   does not exist.
-    ///
-    /// # Notes
-    ///
-    /// This function is part of a HAL (Hardware Abstraction Layer) implementation
-    /// and assumes that the HAL interface provides an external `get_interface_id`
-    /// function with appropriate error handling via the `HalInterfaceResult` enumeration.
-    pub fn get_interface_id(&self, name: &'static str) -> HalResult<usize> {
+    /// This function may fail if:
+    /// * The requested interface does not exist.
+    /// * An unknown error occurs during the ID lookup.
+    pub fn get_interface_id(&mut self, name: &'static str) -> HalResult<usize> {
         let mut id = 0;
         match unsafe { get_interface_id(name.as_ptr(), &mut id) } {
-            HalInterfaceResult::OK => Ok(id as usize),
+            HalInterfaceResult::OK => {
+                self.locker.add_interface(id as usize);
+                Ok(id as usize)
+            }
             HalInterfaceResult::ErrInterfaceNotFound => Err(HalError::InterfaceNotFound(name)),
             _ => Err(HalError::UnknownError),
         }
+    }
+
+    /// Locks a specific interface using a given locker ID.
+    ///
+    /// This method attempts to lock an interface identified by its `id` using a provided `locker_id`.
+    /// It delegates the locking operation to the `locker` instance within the current object.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: The unique identifier of the interface to be locked.
+    /// - `locker_id`: The identifier of the entity attempting to lock the interface.
+    ///
+    /// # Returns
+    ///
+    /// - `HalResult<()>`: Returns `Ok(())` if the operation is successful or an appropriate error
+    ///   wrapped in `HalResult` if the operation fails.
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error in the following cases:
+    /// - The interface identified by `id` is already locked.
+    /// - The `locker_id` is invalid or does not have the required permissions.
+    ///
+    pub fn lock_interface(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
+        self.locker.lock_interface(id, locker_id)
+    }
+
+    /// Unlocks a specific interface identified by its ID.
+    ///
+    /// This function delegates the unlocking operation to the underlying locker
+    /// system by passing the interface ID and the locker ID. It is used to re-enable
+    /// access to an interface that has previously been locked.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The unique identifier of the interface to be unlocked.
+    /// * `locker_id` - The identifier of the locking entity or system that is
+    ///   performing the unlock operation.
+    ///
+    /// # Returns
+    ///
+    /// * `HalResult<()>` - Returns a result indicating the success (`Ok`) or error
+    ///   (`Err`) of the unlocking operation.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the underlying locker system encounters
+    /// an issue while unlocking the specified interface.
+    ///
+    pub fn unlock_interface(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
+        self.locker.unlock_interface(id, locker_id)
+    }
+
+    /// Authorizes an action for a given locker and user.
+    ///
+    /// This method delegates the authorization process to the `authorize_action`
+    /// method of the `locker` instance and returns the result of that operation.
+    ///
+    /// # Parameters
+    /// - `id`: The unique identifier of the user for whom the action is being authorized.
+    /// - `locker_id`: The unique identifier of the locker for which the action is being authorized.
+    ///
+    /// # Returns
+    /// - `HalResult<()>`: Returns a result indicating success or failure of the authorization process.
+    ///
+    /// If the authorization process completes successfully, the result will be `Ok(())`. If there is
+    /// an error during authorization, the result will be an `Err` containing the error details.
+    ///
+    /// # Errors
+    /// This method may return an error if:
+    /// - The specified user ID is invalid or does not exist.
+    /// - The specified locker ID is invalid or does not exist.
+    /// - The authorization fails due to business logic constraints.
+    ///
+    pub fn authorize_action(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
+        self.locker.authorize_action(id, locker_id)
     }
 
     /// Performs a write operation on the specified interface based on the action provided.
@@ -109,38 +185,61 @@ impl Hal {
     /// - The `to_result` method is used in all cases to convert the invoked action's return value into an ` HalResult `
     ///   while providing context with the optional identifiers (`id`, `action`).
     ///
-    pub fn interface_write(&mut self, id: usize, action: InterfaceWriteActions) -> HalResult<()> {
+    pub fn interface_write(
+        &mut self,
+        ressource_id: usize,
+        caller_id: u32,
+        action: InterfaceWriteActions,
+    ) -> HalResult<()> {
+        // Check for lock on interface
+        self.locker.authorize_action(ressource_id, caller_id)?;
+
+        // Perform action
         match action {
             InterfaceWriteActions::GpioWrite(act) => unsafe {
-                gpio_write(id as u8, act).to_result(Some(id), None, Some(action), None)
+                gpio_write(ressource_id as u8, act).to_result(
+                    Some(ressource_id),
+                    None,
+                    Some(action),
+                    None,
+                )
             },
-            InterfaceWriteActions::UartWrite(act) => {
-                act.action(id as u8)
-                    .to_result(Some(id), None, Some(action), None)
-            }
-            InterfaceWriteActions::Lcd(act) => {
-                act.action(id as u8)
-                    .to_result(Some(id), None, Some(action), None)
-            }
+            InterfaceWriteActions::UartWrite(act) => act.action(ressource_id as u8).to_result(
+                Some(ressource_id),
+                None,
+                Some(action),
+                None,
+            ),
+            InterfaceWriteActions::Lcd(act) => act.action(ressource_id as u8).to_result(
+                Some(ressource_id),
+                None,
+                Some(action),
+                None,
+            ),
         }
     }
 
     pub fn interface_read(
         &mut self,
-        id: usize,
+        ressource_id: usize,
+        caller_id: u32,
         read_action: InterfaceReadAction,
     ) -> HalResult<InterfaceReadResult> {
+        // Check for lock on interface
+        self.locker.authorize_action(ressource_id, caller_id)?;
+
+        // Perform action
         let read_result;
         let interface_res;
 
         match read_action {
             InterfaceReadAction::LcdRead(act) => {
                 let mut lcd_result = LcdRead::LcdSize(0, 0);
-                interface_res = act.read(id, &mut lcd_result);
+                interface_res = act.read(ressource_id, &mut lcd_result);
                 read_result = InterfaceReadResult::LcdRead(lcd_result);
             }
         };
-        match interface_res.to_result(Some(id), None, None, Some(read_action)) {
+        match interface_res.to_result(Some(ressource_id), None, None, Some(read_action)) {
             Ok(_) => Ok(read_result),
             Err(e) => Err(e),
         }

@@ -1,7 +1,7 @@
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use crate::TerminalFormatting::StrNewLineBoth;
 use crate::data::Kernel;
-use crate::ident::KERNEL_NAME;
+use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME};
 use crate::scheduler::AppCall;
 use crate::{
     KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall,
@@ -102,10 +102,6 @@ fn panic(info: &PanicInfo) -> ! {
 /// * `err_led_id` - An optional identifier for the LED associated with
 ///   displaying the error status. If `None`, no LED is assigned to handle the error.
 ///
-/// * `err_app_id` - An optional application identifier (app ID) that specifies
-///   the source or specific application tied to the error. If `None`, no
-///   application is linked to the error.
-///
 /// * `has_error` - An optional `KernelErrorLevel` indicating the severity or
 ///   type of error currently being managed. `None` represents no error.
 ///
@@ -117,7 +113,6 @@ fn panic(info: &PanicInfo) -> ! {
 ///
 pub struct ErrorsManager {
     err_led_id: Option<usize>,
-    err_app_id: u8,
     has_error: Option<KernelErrorLevel>,
 }
 
@@ -133,7 +128,6 @@ impl ErrorsManager {
     pub fn new() -> ErrorsManager {
         ErrorsManager {
             err_led_id: None,
-            err_app_id: 0,
             has_error: None,
         }
     }
@@ -202,6 +196,7 @@ impl ErrorsManager {
             Kernel::hal()
                 .interface_write(
                     id,
+                    KERNEL_MASTER_ID,
                     InterfaceWriteActions::GpioWrite(if state {
                         GpioWriteAction::Set
                     } else {
@@ -270,21 +265,28 @@ impl ErrorsManager {
                         .app_exists(Self::LED_BLINK_APP_NAME, self.err_led_id.map(|x| x as u32))
                         .is_none()
                     {
-                        syscall(Syscall::AddPeriodicTask(
-                            Self::LED_BLINK_APP_NAME,
-                            AppCall::AppParam(blink_err_led, id as u32, Some(reset_err_led)),
-                            None,
-                            Milliseconds(100),
-                            Some(Milliseconds(10000)),
-                            &mut self.err_app_id,
-                        ))
+                        let mut err_app_id = 0;
+                        syscall(
+                            Syscall::AddPeriodicTask(
+                                Self::LED_BLINK_APP_NAME,
+                                AppCall::AppParam(blink_err_led, id as u32, Some(reset_err_led)),
+                                None,
+                                Milliseconds(100),
+                                Some(Milliseconds(10000)),
+                                &mut err_app_id,
+                            ),
+                            KERNEL_MASTER_ID,
+                        )
                         .unwrap_or(());
                     } else {
-                        syscall(Syscall::NewTaskDuration(
-                            Self::LED_BLINK_APP_NAME,
-                            Some(id as u32),
-                            Milliseconds(10000),
-                        ))
+                        syscall(
+                            Syscall::NewTaskDuration(
+                                Self::LED_BLINK_APP_NAME,
+                                Some(id as u32),
+                                Milliseconds(10000),
+                            ),
+                            KERNEL_MASTER_ID,
+                        )
                         .unwrap_or(())
                     }
                 }
@@ -354,10 +356,13 @@ impl ErrorsManager {
 ///   cannot be completed.
 ///
 fn blink_err_led(id: u32) -> KernelResult<()> {
-    syscall(Syscall::Hal(SysCallHalArgs {
-        id: id as usize,
-        action: InterfaceWriteActions::GpioWrite(GpioWriteAction::Toggle),
-    }))
+    syscall(
+        Syscall::Hal(SysCallHalArgs {
+            id: id as usize,
+            action: InterfaceWriteActions::GpioWrite(GpioWriteAction::Toggle),
+        }),
+        KERNEL_MASTER_ID,
+    )
 }
 
 /// Resets the error LED indicator.

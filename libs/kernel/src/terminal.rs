@@ -1,4 +1,5 @@
 use crate::data::Kernel as KernelData;
+use crate::ident::KERNEL_MASTER_ID;
 use crate::terminal::TerminalState::Kernel;
 use crate::{KernelError, KernelResult, SysCallDisplayArgs, Syscall, syscall};
 use display::Colors;
@@ -290,12 +291,17 @@ impl Terminal {
                 TerminalType::Usart(_) => KernelData::hal()
                     .interface_write(
                         self.interface_id[i],
+                        KERNEL_MASTER_ID,
                         InterfaceWriteActions::UartWrite(UartWriteActions::SendChar(data as u8)),
                     )
                     .map_err(KernelError::HalError)?,
-                TerminalType::Display => syscall(Syscall::Display(
-                    SysCallDisplayArgs::WriteCharAtCursor(data, Some(self.current_color)),
-                ))?,
+                TerminalType::Display => syscall(
+                    Syscall::Display(SysCallDisplayArgs::WriteCharAtCursor(
+                        data,
+                        Some(self.current_color),
+                    )),
+                    KERNEL_MASTER_ID,
+                )?,
             }
         }
 
@@ -354,12 +360,17 @@ impl Terminal {
                 TerminalType::Usart(_) => KernelData::hal()
                     .interface_write(
                         self.interface_id[i],
+                        KERNEL_MASTER_ID,
                         InterfaceWriteActions::UartWrite(UartWriteActions::SendString(data)),
                     )
                     .map_err(KernelError::HalError)?,
-                TerminalType::Display => syscall(Syscall::Display(
-                    SysCallDisplayArgs::WriteStrAtCursor(data, Some(self.current_color)),
-                ))?,
+                TerminalType::Display => syscall(
+                    Syscall::Display(SysCallDisplayArgs::WriteStrAtCursor(
+                        data,
+                        Some(self.current_color),
+                    )),
+                    KERNEL_MASTER_ID,
+                )?,
             }
         }
 
@@ -395,14 +406,16 @@ impl Terminal {
                 TerminalType::Usart(_) => KernelData::hal()
                     .interface_write(
                         self.interface_id[i],
+                        KERNEL_MASTER_ID,
                         InterfaceWriteActions::UartWrite(UartWriteActions::SendString(
                             "\x1B[2J\x1B[H",
                         )),
                     )
                     .map_err(KernelError::HalError)?,
-                TerminalType::Display => {
-                    syscall(Syscall::Display(SysCallDisplayArgs::Clear(Colors::Black)))?
-                }
+                TerminalType::Display => syscall(
+                    Syscall::Display(SysCallDisplayArgs::Clear(Colors::Black)),
+                    KERNEL_MASTER_ID,
+                )?,
             }
         }
 

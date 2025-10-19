@@ -86,6 +86,7 @@ impl Display {
         // Enable display
         hal.interface_write(
             self.hal_id.unwrap(),
+            0,
             InterfaceWriteActions::Lcd(LcdActions::Enable(true)),
         )
         .map_err(DisplayError::HalError)?;
@@ -94,6 +95,7 @@ impl Display {
         self.size = match hal
             .interface_read(
                 self.hal_id.unwrap(),
+                0,
                 InterfaceReadAction::LcdRead(LcdReadAction::LcdSize),
             )
             .map_err(DisplayError::HalError)?
@@ -112,48 +114,97 @@ impl Display {
         self.initialized = true;
 
         // Clean the buffer
-        self.clear(background_color)?;
+        self.clear(background_color, 0)?;
 
         Ok(())
     }
 
-    /// Clears the display's foreground layer with the specified color.
+    /// Attempts to acquire a lock on the display interface for a specific caller.
     ///
     /// # Parameters
+    /// - `caller_id` (u32): The unique identifier for the caller attempting to acquire the lock.
     ///
-    /// * `color` - A value of type `Colors` representing the color to fill the entire foreground layer of the display.
+    /// # Returns
+    /// - `DisplayResult<()>`: Returns `Ok(())` if the lock operation is successful; otherwise, returns
+    ///   an error of type `DisplayError::HalError` if the Hardware Abstraction Layer (HAL) encounters an issue.
+    ///
+    /// # Errors
+    /// - Returns `DisplayError::HalError` if the HAL fails to lock the interface for the given `caller_id`.
+    ///
+    /// # Panics
+    /// - This function will panic if `self.hal` is `None` or if `self.hal_id` is `None`, as both are
+    ///   expected to be initialized before calling this method.
+    pub fn lock(&mut self, caller_id: u32) -> DisplayResult<()> {
+        self.hal
+            .as_mut()
+            .unwrap()
+            .lock_interface(self.hal_id.unwrap(), caller_id)
+            .map_err(DisplayError::HalError)
+    }
+
+    /// Unlocks a hardware interface for a calling entity.
+    ///
+    /// This method attempts to unlock the hardware interface by invoking the `unlock_interface`
+    /// function on the underlying Hardware Abstraction Layer (HAL). It is expected to be called when
+    /// a specific caller, identified by `caller_id`, needs access to the interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `caller_id` - A `u32` identifier representing the caller requesting the unlock operation.
     ///
     /// # Returns
     ///
-    /// * `DisplayResult<()>` -
-    ///     * Returns `Ok(())` if the foreground layer is successfully cleared with the specified color.
-    ///     * Returns an `Err(DisplayError)` if an error occurs during the process, such as
-    ///         - `DisplayError::HalError` if the hardware abstraction layer (HAL) fails during the interface write operation.
-    ///         - `DisplayError::DisplayDriverNotInitialized` if the display driver has not been properly initialized.
+    /// * `Ok(())` if the interface is successfully unlocked.
+    /// * `Err(DisplayError::HalError)` if there is an error while unlocking the interface via the HAL.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if:
+    /// * The `hal` or `hal_id` fields of the object are `None`, indicating that the HAL is not properly initialized.
+    ///
+    pub fn unlock(&mut self, caller_id: u32) -> DisplayResult<()> {
+        self.hal
+            .as_mut()
+            .unwrap()
+            .unlock_interface(self.hal_id.unwrap(), caller_id)
+            .map_err(DisplayError::HalError)
+    }
+
+    /// Clears the display with the specified color and resets the cursor position to the top-left corner.
+    ///
+    /// # Parameters
+    ///
+    /// - `color`: The `Colors` enum value representing the color to fill the display with.
+    /// - `caller_id`: A `u32` value representing the identifier of the operation's caller.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` if the clear operation is successful.
+    /// - `Err(DisplayError::DisplayDriverNotInitialized)` if the display driver is not initialized.
+    /// - `Err(DisplayError::HalError)` if an error occurs while interacting with the hardware abstraction layer (HAL).
     ///
     /// # Behavior
     ///
-    /// * If the display driver is initialized (`self.initialized` is true), the method writes the `Clear` action with the specified color
-    ///   to the hardware abstraction layer through the driver interface (`interface_write`).
-    ///
-    /// * If the display driver is not initialized, the method returns a `DisplayError::DisplayDriverNotInitialized` error.
+    /// - If the display driver is initialized (`self.initialized` is `true`), this function sends a command to
+    ///   the hardware abstraction layer to clear the foreground layer of the display with the specified `color`.
+    /// - The cursor position is reset to `(0, 0)` after clearing the display.
+    /// - If the display driver is not initialized (`self.initialized` is `false`), an error of type
+    ///   `DisplayError::DisplayDriverNotInitialized` is returned.
     ///
     /// # Errors
     ///
-    /// * `DisplayError::DisplayDriverNotInitialized`: Thrown if the display driver has not been initialized.
-    /// * `DisplayError::HalError`: Thrown if the HAL interface write operation fails.
-    ///
-    /// # Notes
-    ///
-    /// * Ensure that the display driver is initialized before calling this method.
-    /// * The `self.hal` and `self.hal_id` must be `Some` values for successful operation.
-    pub fn clear(&mut self, color: Colors) -> DisplayResult<()> {
+    /// - `DisplayError::DisplayDriverNotInitialized`: Indicates that the display driver has not been initialized
+    ///   before attempting to call this function.
+    /// - `DisplayError::HalError`: Indicates that a failure occurred during interaction with the hardware abstraction
+    ///   layer (HAL), which is likely related to the `interface_write` function or command execution.
+    pub fn clear(&mut self, color: Colors, caller_id: u32) -> DisplayResult<()> {
         if self.initialized {
             self.hal
                 .as_mut()
                 .unwrap()
                 .interface_write(
                     self.hal_id.unwrap(),
+                    caller_id,
                     InterfaceWriteActions::Lcd(LcdActions::Clear(
                         LcdLayer::FOREGROUND,
                         color.to_argb(),
@@ -167,34 +218,27 @@ impl Display {
         }
     }
 
-    /// Switches the current frame buffer and updates the display hardware with the new frame buffer address.
+    /// Switches the frame buffer used by the display and updates the hardware with the new address.
     ///
-    /// This function switches the current frame buffer to a new one by calling the `switch`
-    /// method on the existing frame buffer. Once the new frame buffer address is determined,
-    /// it communicates with the hardware abstraction layer (HAL) to inform the display hardware
-    /// of the new frame buffer address for the foreground layer.
+    /// # Parameters
+    /// - `caller_id` - The identifier for the caller requesting the frame buffer switch.
     ///
     /// # Returns
+    /// Returns a `DisplayResult` indicating success (`Ok(())`) or a `DisplayError` in case of failure.
     ///
-    /// Returns `Ok(())` if the frame buffer switch and hardware update were successful.
-    /// If an error occurs during a HAL interface write operation, it returns a `DisplayError::HalError`.
+    /// # Behavior
+    /// 1. Switches the internal frame buffer to the next available one via the `switch` method of `frame_buffer`.
+    /// 2. Retrieves the new frame buffer address (`fb_addr`) and sends this address to the hardware abstraction layer (HAL)
+    ///    through `interface_write`, instructing it to use the new buffer for the foreground layer of the display.
     ///
     /// # Errors
+    /// If an error occurs during the communication with the HAL, a `DisplayError::HalError` is returned with the details.
     ///
-    /// This function may return a `DisplayError::HalError` if there is an issue writing
-    /// to the HAL interface.
+    /// # Requirements
+    /// - The `frame_buffer` must be initialized (`Some` value).
+    /// - The `hal` and `hal_id` must also be initialized (`Some` values).
     ///
-    /// # Panics
-    ///
-    /// This function will panic if:
-    /// - The `frame_buffer` field is `None`. This indicates that the frame buffer has not been properly
-    /// initialized.
-    /// - The `hal` field is `None`. This indicates that the hardware abstraction layer is not initialized.
-    /// - The `hal_id` field is `None`. This indicates the HAL identifier is missing.
-    ///
-    /// In this example, the function switches the current frame buffer and updates the associated
-    /// hardware accordingly.
-    pub fn switch_frame_buffer(&mut self) -> DisplayResult<()> {
+    pub fn switch_frame_buffer(&mut self, caller_id: u32) -> DisplayResult<()> {
         let fb_addr = self.frame_buffer.as_mut().unwrap().switch();
 
         self.hal
@@ -202,6 +246,7 @@ impl Display {
             .unwrap()
             .interface_write(
                 self.hal_id.unwrap(),
+                caller_id,
                 InterfaceWriteActions::Lcd(LcdActions::SetFbAddress(LcdLayer::FOREGROUND, fb_addr)),
             )
             .map_err(DisplayError::HalError)?;
@@ -209,52 +254,63 @@ impl Display {
         Ok(())
     }
 
-    /// Draws a string on the display at the specified position, with a given color.
+    /// Draws a string on the display at the specified position with the given color.
+    ///
+    /// This function renders a string on the display starting at coordinates `(x, y)`.
+    /// If a color is provided, it uses the specified color; otherwise, it defaults to
+    /// the object's current color configuration. The function also ensures the display
+    /// is properly initialized and performs an authorization check based on the
+    /// `caller_id`.
     ///
     /// # Parameters
-    /// - `string`: A reference to the string (`&str`) to be displayed on the screen.
-    /// - `x`: The x-coordinate (horizontal position) on the display where the string will start.
-    /// - `y`: The y-coordinate (vertical position) on the display where the string will start.
-    /// - `color`: A `Colors` object that represents the color in which the text will be displayed.
     ///
-    /// # Errors
-    /// Returns an error of type `DisplayError::DisplayDriverNotInitialized` if the display driver
-    /// has not been initialized before calling this method. Ensure the display is properly initialized
-    /// by the time this function is invoked.
-    ///
-    /// # Behavior
-    /// - The function iterates through each character in the input string and draws it sequentially
-    ///   at the appropriate position on the display, based on the given coordinates.
-    /// - For each character, the method computes the pixel positions, checks the font map to determine
-    ///   which pixels are set, and updates the frame buffer with the corresponding color for the active
-    ///   pixels.
-    ///
-    /// # Notes
-    /// - The function assumes a linear frame buffer addressing scheme.
-    /// - The position of each drawn character advances horizontally by the character width, as defined
-    ///   by the selected font size.
-    /// - Frame buffer addressing takes into account the display width and the dimensions of the font
-    ///   characters to ensure proper placement of the string.
+    /// - `string`: A reference to the string to be drawn on the display.
+    /// - `x`: The horizontal (x-axis) starting position for the string in pixels.
+    /// - `y`: The vertical (y-axis) starting position for the string in pixels.
+    /// - `color`: An optional `Colors` enum specifying the color of the string.
+    ///     If `None`, the default color of the display is used.
+    /// - `caller_id`: A unique identifier for the caller to perform authorization
+    ///   checks for modifying the display.
     ///
     /// # Returns
-    /// Returns `Ok(())` if the string was drawn successfully on the display. Otherwise, it returns
-    /// a `DisplayError` if an error occurred, such as the display being uninitialized.
     ///
-    /// # Performance
-    /// This function involves pixel-level operations for every character in the string. For large
-    /// strings or high-resolution fonts, the time to render may increase significantly. Consider
-    /// optimizing the frame buffer access if drawing speed is critical.
+    /// - `Ok(())` if the string is successfully drawn on the display.
+    /// - `Err(DisplayError)` if an error occurs. Possible errors include:
+    ///   - `DisplayError::DisplayDriverNotInitialized`: The display driver is not initialized.
+    ///   - `DisplayError::HalError`: An error occurred in the hardware abstraction layer.
+    ///
+    /// # Behavior
+    /// - The function calculates where each character of the string should be drawn,
+    ///   accounting for font size and starting position.
+    /// - The string is rendered character by character, adjusting the frame buffer's
+    ///   address accordingly.
+    /// - The `color` is converted to an ARGB format and applied to the characters.
+    ///
+    /// # Errors
+    /// - If the display has not been initialized (`self.initialized == false`),
+    ///   the function returns `DisplayError::DisplayDriverNotInitialized`.
+    /// - If the `authorize_action` function of the hardware abstraction layer (HAL)
+    ///   fails, the function returns `DisplayError::HalError`.
+    ///
+    /// # Important Notes
+    /// - This function assumes the display is being updated through a frame buffer.
+    /// - The `caller_id` must match the authorized ID for the display's HAL interface,
+    ///   or the operation will fail.
     pub fn draw_string(
         &mut self,
         string: &str,
         x: u16,
         y: u16,
         color: Option<Colors>,
+        caller_id: u32,
     ) -> DisplayResult<()> {
         // Returns error if not initialized
         if !self.initialized {
             return Err(DisplayError::DisplayDriverNotInitialized);
         }
+
+        // Check for lock on interface
+        self.authorize_display_action(caller_id)?;
 
         // Initialize variables
         let char_size = self.font.get_char_size();
@@ -284,42 +340,57 @@ impl Display {
         Ok(())
     }
 
-    /// Draws a single character on the display at the specified position with an optional custom color.
+    /// Draws a character on the display at the specified position with an optional color.
     ///
     /// # Parameters
     /// - `char_to_display`: The ASCII value of the character to be displayed.
-    /// - `x`: The horizontal position (in pixels) where the character will be drawn.
-    /// - `y`: The vertical position (in pixels) where the character will be drawn.
-    /// - `color`: An optional parameter specifying the color of the character. If `None`, the default color of the display is used.
+    /// - `x`: The x-coordinate where the character should be drawn (in pixels).
+    /// - `y`: The y-coordinate where the character should be drawn (in pixels).
+    /// - `color`: An optional color parameter of type `Colors`. If this is `None`, the default color
+    ///   of the display will be used.
+    /// - `caller_id`: A unique identifier for the caller, used for authorization. This ensures
+    ///   actions are performed by authorized entities.
     ///
     /// # Returns
-    /// - `DisplayResult<()>`: Returns `Ok(())` if the operation is successful. Returns an error if the display driver is not initialized or if there is a failure while drawing the character.
+    /// - `Ok(())` if the character is successfully drawn on the display.
+    /// - `Err(DisplayError)` if the display is not initialized, authorization fails, or if there is
+    ///   an error during drawing operations.
     ///
     /// # Errors
-    /// - `DisplayError::DisplayDriverNotInitialized`: Returned if the display has not been initialized prior to calling this method.
-    /// - Other errors propagated from the underlying `draw_char_in_fb` function.
+    /// - `DisplayError::DisplayDriverNotInitialized`: Returned if the display driver is not initialized.
+    /// - `DisplayError::HalError`: Returned if authorization for the action fails or the underlying
+    ///   hardware abstraction layer (HAL) encounters an error.
+    /// - Other errors related to framebuffer or rendering may also be propagated.
     ///
     /// # Behavior
-    /// 1. Checks if the display has been properly initialized. If not, it returns an appropriate error.
-    /// 2. Uses the font information to determine the size of the character.
-    /// 3. Computes the address in the frame buffer where the character's pixel data will be written.
-    /// 4. Calls `draw_char_in_fb` to render the character into the frame buffer with the calculated position and color.
+    /// - Verifies that the display has been initialized before performing any operations. If not, an
+    ///   error is returned.
+    /// - Checks for a lock on the hardware abstraction layer (HAL) and ensures that the caller is
+    ///   authorized to perform the drawing action.
+    /// - Retrieves the size of the character from the current font and computes the destination
+    ///   address within the frame buffer for rendering.
+    /// - Uses the provided color or falls back to the default display color if one is not specified.
+    /// - Draws the character at the specified position on the display's frame buffer.
     ///
-    /// # Note
-    /// - The `frame_buffer` must be correctly set up and mutable before calling this function.
-    /// - The `Colors` enum should provide an `to_argb` method that converts the color to an ARGB format.
-    ///
+    /// # Notes
+    /// - Ensure the display is properly initialized before invoking this method.
+    /// - The method relies on the font and color information configured on the display.
+    /// - The caller needs appropriate authorization access to perform the drawing operation.
     pub fn draw_char(
         &mut self,
         char_to_display: u8,
         x: u16,
         y: u16,
         color: Option<Colors>,
+        caller_id: u32,
     ) -> DisplayResult<()> {
         // Returns error if not initialized
         if !self.initialized {
             return Err(DisplayError::DisplayDriverNotInitialized);
         }
+
+        // Check for lock on interface
+        self.authorize_display_action(caller_id)?;
 
         let char_size = self.font.get_char_size();
 
@@ -400,101 +471,110 @@ impl Display {
         Ok(())
     }
 
-    /// Draws a provided string at the current cursor position on the display.
+    /// Draws a given string at the current cursor position on the display. Each character
+    /// in the string is processed and rendered sequentially.
     ///
-    /// This method takes a string slice `string` and iterates through its characters,
-    /// drawing each character one by one at the current cursor position.
-    /// If a color is provided, it will be used to set the color of the characters. If `color`
-    /// is `None`, the default color will be used.
+    /// # Parameters
     ///
-    /// The method automatically handles advancing the cursor position after rendering
-    /// each character.
-    ///
-    /// # Arguments
-    ///
-    /// * `string` - A string slice containing the characters to be rendered.
-    /// * `color` - An optional parameter specifying the color of the string. If `None`,
-    ///   the default color for the display will be applied.
+    /// * `string` - A reference to the string slice (`&str`) that contains the characters to be drawn.
+    /// * `color` - An optional parameter specifying the color to use for drawing the string.
+    ///             If `None` is provided, a default color may be applied.
+    /// * `caller_id` - An identifier (u32) of the caller, potentially used for tracking, logging,
+    ///                 or access control.
     ///
     /// # Returns
     ///
-    /// A `DisplayResult<()>` which indicates success. If drawing any individual
-    /// character fails, it will return an error contained within the `DisplayResult`.
-    ///
-    /// # Errors
-    ///
-    /// The method will propagate any errors returned while drawing individual characters,
-    /// allowing the caller to handle such cases. Errors could arise from display rendering
-    /// issues or cursor operation failures.
-    ///
+    /// * `DisplayResult<()>` - A result type which is `Ok(())` if the string is
     pub fn draw_string_at_cursor(
         &mut self,
         string: &str,
         color: Option<Colors>,
+        caller_id: u32,
     ) -> DisplayResult<()> {
         // Draw the string at the current cursor position
         for char_to_display in string.as_bytes() {
-            self.draw_char_at_cursor(*char_to_display, color)?;
+            self.draw_char_at_cursor(*char_to_display, color, caller_id)?;
         }
         Ok(())
     }
 
+    ///
     /// Draws a character at the current cursor position on the display.
     ///
-    /// This function places a given character (`char_to_display`) at the
-    /// current cursor position and optionally applies a specified color.
-    ///
-    /// Special handling is applied for newline (`b'\n'`) and carriage return (`b'\r'`) characters:
-    /// - For `b'\n'`, the cursor is moved to the next line (line feed).
-    /// - For `b'\r'`, the cursor is moved back to the beginning of the current line (carriage return).
-    /// - For all other characters, the character is drawn at the current cursor position, and then
-    ///   the cursor is moved forward.
-    ///
     /// # Parameters
-    /// - `char_to_display`: A `u8` representing the ASCII value of the character to draw.
-    /// - `color`: An optional `Colors` value that specifies the color of the character.
+    /// - `char_to_display`: A `u8` representing the ASCII value of the character to be displayed.
+    /// - `color`: An `Option<Colors>` representing the optional color of the character. If `None`, a default color will be used.
+    /// - `caller_id`: A `u32` identifier for the caller, used for tracking or logging purposes.
+    ///
+    /// # Behavior
+    /// - If the character is a newline (`b'\n'`), it moves the cursor to the next line using `set_cursor_line_feed`.
+    /// - If the character is a carriage return (`b'\r'`), it moves the cursor back to the start of the current line using `set_cursor_return`.
+    /// - For any other character:
+    ///   - The character is drawn at the current cursor position using the `draw_char` method.
+    ///   - The cursor is then advanced to the next position using the `move_cursor` method.
     ///
     /// # Returns
-    /// - `DisplayResult<()>`: Returns `Ok(())` on success, or an error if drawing or cursor movement fails.
+    /// - A `DisplayResult<()>`, which indicates success or contains an error if an operation fails.
     ///
     /// # Errors
-    /// This function returns an error if:
-    /// - The character drawing operation fails.
-    /// - Moving the cursor fails.
+    /// - May return an error if:
+    ///   - Moving the cursor fails.
+    ///   - Drawing the character on the display fails.
     ///
     pub fn draw_char_at_cursor(
         &mut self,
         char_to_display: u8,
         color: Option<Colors>,
+        caller_id: u32,
     ) -> DisplayResult<()> {
         if char_to_display == b'\n' {
-            self.set_cursor_line_feed()?;
+            self.set_cursor_line_feed(caller_id)?;
         } else if char_to_display == b'\r' {
-            self.set_cursor_return();
+            self.set_cursor_return(caller_id)?;
         } else {
-            self.draw_char(char_to_display, self.cursor_pos.0, self.cursor_pos.1, color)?;
-            self.move_cursor()?;
+            self.draw_char(
+                char_to_display,
+                self.cursor_pos.0,
+                self.cursor_pos.1,
+                color,
+                caller_id,
+            )?;
+            self.move_cursor(caller_id)?;
         }
         Ok(())
     }
 
-    /// Moves the cursor position to the next location, handling line wrapping and screen bounds.
+    /// Moves the cursor position on the display, ensuring it remains within the allowable bounds.
     ///
-    /// The method increments the cursor's horizontal position by the width of a single character.
-    /// If the cursor reaches the end of the line, it wraps to the beginning of the next line and
-    /// increments the vertical position by the height of a character. If the cursor moves beyond
-    /// the vertical bounds of the screen, it returns an error.
+    /// This function updates the cursor's position based on the width and height of the font's character size.
+    /// If the cursor reaches the end of a line, it wraps to the beginning of the next line. If the cursor exceeds
+    /// the display's allowable dimensions, an error (`DisplayError::OutOfScreenBounds`) is returned.
+    ///
+    /// Additionally, the function checks if the calling entity is authorized to perform this action through the
+    /// provided hardware abstraction layer (HAL).
+    ///
+    /// # Parameters
+    /// - `caller_id` (`u32`): The ID of the calling entity requesting the cursor move. This ID is used to authorize
+    /// their action through the hardware abstraction layer (HAL).
     ///
     /// # Errors
-    ///
-    /// Returns `Err(DisplayError::OutOfScreenBounds)` if moving the cursor vertically
-    /// would exceed the screen's height.
+    /// - `DisplayError::HalError`: Returned if the HAL denies the caller's authorization to perform the action.
+    /// - `DisplayError::OutOfScreenBounds`: Returned if the cursor moves outside the allowable area of the display.
     ///
     /// # Returns
+    /// - `DisplayResult<()>`: Returns `Ok(())` if the cursor was successfully moved, or an appropriate error otherwise.
     ///
-    /// Returns `Ok(())` if the cursor successfully moves to the new position.
+    /// # Behavior
+    /// - Checks for authorization by calling the `authorize_action` method of the HAL with the provided `caller_id`.
+    /// - Moves the cursor horizontally by the font's character width.
+    /// - If the next horizontal position exceeds the screen width, wraps the cursor to the beginning of the next line.
+    /// - If the next line position exceeds the screen height, returns `DisplayError::OutOfScreenBounds`.
     ///
-    fn move_cursor(&mut self) -> DisplayResult<()> {
+    fn move_cursor(&mut self, caller_id: u32) -> DisplayResult<()> {
+        // Check for lock on interface
+        self.authorize_display_action(caller_id)?;
+
+        // Move cursor
         let mut next_cursor_pos = self.cursor_pos;
         next_cursor_pos.0 += self.font.get_char_size().0 as u16;
         if next_cursor_pos.0 > self.size.unwrap().0 - self.font.get_char_size().0 as u16 {
@@ -508,37 +588,63 @@ impl Display {
         Ok(())
     }
 
-    /// Sets the font size for the current object.
+    /// Sets the font size for the display.
     ///
     /// # Parameters
-    /// - `font`: The new font size to be set. This should be a value of type `FontSize`.
+    /// - `font`: The `FontSize` to be applied to the display.
+    /// - `caller_id`: A `u32` representing the identifier of the caller attempting to change the font.
     ///
-    /// # Remarks
-    /// This function updates the `font` property of the object to the specified value.
-    /// The new font size will replace any previously set value.
-    pub fn set_font(&mut self, font: FontSize) -> DisplayResult<()> {
+    /// # Returns
+    /// A `DisplayResult<()>` which:
+    /// - Returns `Ok(())` if the font size is successfully updated.
+    /// - Propagates any error that occurs during the authorization process.
+    ///
+    /// # Errors
+    /// Returns an error if the `authorize_display_action` fails, indicating the caller is not authorized
+    /// to perform this action.
+    ///
+    pub fn set_font(&mut self, font: FontSize, caller_id: u32) -> DisplayResult<()> {
+        self.authorize_display_action(caller_id)?;
+
         self.font = font;
         Ok(())
     }
 
-    /// Moves the cursor position down by one line, taking into account the character height of the font.
+    /// Adjusts the cursor position by performing a line feed, moving the cursor down by the height
+    /// of a character as defined by the font. Ensures the new position does not exceed the boundaries
+    /// of the display.
     ///
-    /// # Behavior
-    /// - The `cursor_pos.1` (the vertical position) is incremented by the height of a single character, as defined by the font's character size.
-    /// - If the new vertical position exceeds the display's height limit, an error is returned.
+    /// # Arguments
+    ///
+    /// * `caller_id` - The unique identifier of the caller attempting to perform this action. Used
+    ///   for authorizing the display action.
     ///
     /// # Returns
-    /// - `Ok(())` if the cursor was successfully moved to the next line within screen bounds.
-    /// - `Err(DisplayError::OutOfScreenBounds)` if the operation would move the cursor beyond the bottom boundary of the screen.
+    ///
+    /// * `Ok(())` - If the cursor position is updated successfully within the screen boundaries.
+    /// * `Err(DisplayError::OutOfScreenBounds)` - If the new cursor position exceeds the screen's
+    ///   bottom boundary.
+    /// * `Err(DisplayError::AuthorizationFailed)` - If the caller is not authorized to perform the
+    ///   action (propagated from `authorize_display_action`).
     ///
     /// # Errors
-    /// - Returns `DisplayError::OutOfScreenBounds` if the cursor is moved beyond the screen's vertical size.
     ///
-    /// # Notes
-    /// - The display size is expected to be set (via `self.size.unwrap()`), and the result relies on the font's character size.
-    /// - Cursor movement assumes that the font, display size, and cursor position are valid and properly managed.
+    /// This method will return an error if:
+    /// 1. The cursor's updated vertical position goes beyond the lower display boundary.
+    /// 2. The caller is not authorized to modify the display (via `authorize_display_action`).
     ///
-    pub fn set_cursor_line_feed(&mut self) -> DisplayResult<()> {
+    /// # Behavior
+    ///
+    /// - The method first checks for authorization to ensure the caller has the right to modify
+    ///   the display.
+    /// - The cursor's vertical position (`cursor_pos.1`) is incremented by the font's character
+    ///   height.
+    /// - If the new vertical position exceeds the screen's height minus the character height, the
+    ///   screen bounds are considered
+    pub fn set_cursor_line_feed(&mut self, caller_id: u32) -> DisplayResult<()> {
+        // Check for lock on interface
+        self.authorize_display_action(caller_id)?;
+
         self.cursor_pos.1 += self.font.get_char_size().1 as u16;
         if self.cursor_pos.1 > self.size.unwrap().1 - self.font.get_char_size().1 as u16 {
             Err(DisplayError::OutOfScreenBounds)
@@ -547,37 +653,58 @@ impl Display {
         }
     }
 
-    /// Sets the cursor to the starting position of the current line.
-    ///
-    /// This function resets the horizontal position of the cursor (`cursor_pos.0`) to 0,
-    /// effectively moving the cursor to the beginning of the current line.
-    ///
-    /// # Note
-    /// This function does not modify the vertical position (`cursor_pos.1`) of the cursor,
-    /// nor does it affect any other part of the cursor state.
-    pub fn set_cursor_return(&mut self) {
-        self.cursor_pos.0 = 0;
-    }
-
-    /// Sets the cursor position on the display.
+    /// Sets the cursor position to the starting position (return to the beginning of the line).
     ///
     /// # Parameters
-    /// - `x`: The horizontal position of the cursor, specified as a `u16`.
-    /// - `y`: The vertical position of the cursor, specified as a `u16`.
+    /// - `caller_id` (`u32`): The identifier of the caller, used to authorize the action.
     ///
     /// # Returns
-    /// - `Ok(())`: If the cursor position was successfully updated.
-    /// - `Err(DisplayError)`: If an error occurred preventing the operation.
+    /// `DisplayResult<()>`: Returns an `Ok(())` if the cursor position was successfully reset,
+    /// or an error if the caller is not authorized to perform this action.
     ///
     /// # Errors
-    /// - `DisplayError::DisplayDriverNotInitialized`: Returned if the display driver
-    ///   has not been initialized before attempting to set the cursor position.
-    /// - `DisplayError::OutOfScreenBounds`: Returned if the specified `x` or `y`
-    ///   coordinates exceed the screen boundaries
-    pub fn set_cursor_pos(&mut self, x: u16, y: u16) -> DisplayResult<()> {
+    /// - Returns an error if the `authorize_display_action` check fails, indicating the caller is not authorized.
+    ///
+    /// # Behavior
+    /// - Resets the horizontal cursor position (`cursor_pos.0`) to `0`, effectively returning the cursor to the start.
+    pub fn set_cursor_return(&mut self, caller_id: u32) -> DisplayResult<()> {
+        // Check for lock on interface
+        self.authorize_display_action(caller_id)?;
+
+        self.cursor_pos.0 = 0;
+
+        Ok(())
+    }
+
+    /// Sets the cursor position on the display to the specified coordinates.
+    ///
+    /// # Parameters
+    /// - `x`: The x-coordinate of the position to set the cursor to. Must be within the screen bounds.
+    /// - `y`: The y-coordinate of the position to set the cursor to. Must be within the screen bounds.
+    /// - `caller_id`: An identifier for the caller, which is used to verify the authorization of the action.
+    ///
+    /// # Returns
+    /// - `Ok(())` if the cursor position was successfully updated.
+    /// - `Err(DisplayError::DisplayDriverNotInitialized)` if the display driver has not been initialized.
+    /// - `Err(DisplayError::OutOfScreenBounds)` if the specified coordinates are outside the screen bounds.
+    /// - An error propagated from the `authorize_display_action` method if the caller is not authorized.
+    ///
+    /// # Preconditions
+    /// - The display driver must be initialized before calling this method.
+    /// - The provided `x` and `y` coordinates must fall within the display's dimensions.
+    ///
+    /// # Behavior
+    /// - If the display has not been initialized, the method immediately returns a `DisplayDriverNotInitialized` error.
+    /// - The method checks the caller's authorization using `authorize_display_action`.
+    /// - If the coordinates are valid and authorized, the internal `cursor_pos` is updated.
+    /// - If the coordinates are outside the screen bounds, the method returns an `OutOfScreenBounds` error.
+    pub fn set_cursor_pos(&mut self, x: u16, y: u16, caller_id: u32) -> DisplayResult<()> {
         if !self.initialized {
             return Err(DisplayError::DisplayDriverNotInitialized);
         }
+
+        // Check for lock on interface
+        self.authorize_display_action(caller_id)?;
 
         if x < self.size.unwrap().0 && y < self.size.unwrap().1 {
             self.cursor_pos.0 = x;
@@ -588,21 +715,53 @@ impl Display {
         }
     }
 
-    /// Sets the color of the display to the specified value.
+    /// Sets the display color to the specified value.
     ///
-    /// # Arguments
-    ///
-    /// * `color` - A value of the `Colors` enum representing the color to set.
+    /// # Parameters
+    /// - `color`: The new color to set for the display. Must be a valid value of the `Colors` enum.
+    /// - `caller_id`: The unique identifier of the caller attempting to set the color. It is used
+    ///   for authorization purposes.
     ///
     /// # Returns
-    ///
-    /// * `DisplayResult<()>` - Returns `Ok(())` if the color is successfully set.
+    /// - `DisplayResult<()>`: Returns `Ok(())` if the color is successfully set.
+    ///   Returns an error if the caller is not authorized or another issue occurs.
     ///
     /// # Errors
+    /// - Returns an error if the `caller_id` does not pass the authorization
+    ///   check using `authorize_display_action`.
     ///
-    /// This function does not produce any errors in its current implementation.
-    pub fn set_color(&mut self, color: Colors) -> DisplayResult<()> {
+    /// # Notes
+    /// - The method requires successful authorization before changing the display's color.
+    pub fn set_color(&mut self, color: Colors, caller_id: u32) -> DisplayResult<()> {
+        // Check for lock on interface
+        self.authorize_display_action(caller_id)?;
+
         self.color = color;
         Ok(())
+    }
+
+    /// Attempts to authorize a display action for the given caller ID.
+    ///
+    /// # Parameters
+    /// - `caller_id`: The unique identifier of the caller attempting to perform the display action.
+    ///
+    /// # Returns
+    /// - `Ok(())`: If the authorization succeeds.
+    /// - `Err(DisplayError::HalError)`: If an error occurs during the authorization process.
+    ///
+    /// # Behavior
+    /// - This function interacts with the hardware abstraction layer (HAL) to determine
+    ///   if the requested action can be authorized.
+    /// - It first checks for the existence of the HAL instance (`self.hal`) and halts execution
+    ///   if the instance is not present.
+    /// - Once the HAL instance is confirmed, the action is authorized using the HAL's
+    ///   `authorize_action` method, which takes the
+    fn authorize_display_action(&mut self, caller_id: u32) -> DisplayResult<()> {
+        // Check for lock on interface
+        self.hal
+            .as_mut()
+            .unwrap()
+            .authorize_action(self.hal_id.unwrap(), caller_id)
+            .map_err(DisplayError::HalError)
     }
 }

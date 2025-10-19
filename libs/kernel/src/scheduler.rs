@@ -91,39 +91,25 @@ struct AppWrapper {
     ends_in: Option<u32>,
     active: bool,
 }
-/// The `Scheduler` struct is responsible for managing and executing a collection
-/// of tasks that have been scheduled. It keeps track of task execution order,
-/// maintains the state of its operation, and handles task-related errors.
+/// Struct representing a Scheduler, which manages tasks and their execution
+/// in a cyclic time period.
+///
+/// The `Scheduler` is responsible for maintaining a collection of tasks,
+/// orchestrating their execution based on a periodic schedule, and handling
+/// runtime states like error occurrences or the currently executing task.
 ///
 /// # Fields
+/// * `tasks` - A fixed-size vector containing the scheduled tasks (`AppWrapper`) managed by the scheduler.
+///             Limited to a size of 128.
+/// * `cycle_counter` - A counter representing the number of completed execution cycles.
+/// * `sched_period` - The scheduling period, represented in milliseconds, specifying the frequency
+///                    at which the scheduler cycles through tasks.
+/// * `started` - A public boolean indicating whether the scheduler has been started for execution.
+/// * `current_task_id` - An optional `usize` representing the index of the currently executing task within the `tasks` vector.
+///                       If no task is currently active, it is `None`.
+/// * `current_task_has_error` - A boolean flag indicating whether the currently executing task has encountered an error.
+/// * `next_id` - A unique identifier (`u32`) for assigning to newly added tasks within the scheduler.
 ///
-/// * `tasks`:
-///   A fixed-size vector of up to 128 tasks wrapped in `AppWrapper`. This vector
-///   stores all the tasks that are managed and scheduled by the `Scheduler`.
-///
-/// * `cycle_counter`:
-///   A 32-bit unsigned integer that tracks the number of completed scheduling
-///   cycles. It increments periodically whenever the scheduler completes a full cycle
-///   through its tasks.
-///
-/// * `sched_period`:
-///   Represents the interval between scheduler cycles expressed in `Milliseconds`.
-///   This period defines how frequently the scheduler executes and rotates through
-///   its tasks.
-///
-/// * `started`:
-///   A boolean flag that indicates whether the scheduler is currently active (`true`)
-///   or stopped (`false`). Starting the scheduler initializes task execution and
-///   cycling.
-///
-/// * `current_task_id`:
-///   An optional `usize` that stores the index of the currently executing task within
-///   the `tasks` list. If `None`, it indicates that no task is currently being executed.
-///
-/// * `current_task_has_error`:
-///   A boolean flag that reflects whether the currently executing task has encountered
-///   an error (`true`). This is used to record task failures during execution and may
-///   influence scheduler behavior.
 pub struct Scheduler {
     tasks: Vec<AppWrapper, 128>,
     cycle_counter: u32,
@@ -131,7 +117,7 @@ pub struct Scheduler {
     pub started: bool,
     current_task_id: Option<usize>,
     current_task_has_error: bool,
-    next_id: u8,
+    next_id: u32,
 }
 
 impl Scheduler {
@@ -214,7 +200,7 @@ impl Scheduler {
     ///
     /// # Returns
     /// Returns a `KernelResult<u8>` which contains:
-    /// - `Ok(u8)`: If the application is successfully registered, the length of the internal task list after addition is returned.
+    /// - `Ok(u32)`: If the application is successfully registered, the application ID is returned.
     /// - `Err(KernelError)`: Returns an error if one of the following occurs:
     ///   - `AppAlreadyExists`: If an application with the given `name` (and optionally, `app` parameters) is already registered.
     ///   - `AppInitError`: If the initialization function (`init`) fails.
@@ -237,7 +223,7 @@ impl Scheduler {
         init: Option<App>,
         period: Milliseconds,
         ends_in: Option<Milliseconds>,
-    ) -> KernelResult<u8> {
+    ) -> KernelResult<u32> {
         // Check if the app already exists
         if (match app {
             AppCall::AppNoParam(_, _) => self.app_exists(name, None),

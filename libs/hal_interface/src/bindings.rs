@@ -142,7 +142,7 @@ unsafe extern "C" {
  * # Errors
  * - Returns `Err(WrongInterfaceId)` if `get_interface_name` indicates an invalid interface ID or other failure.
  */
-fn interface_name(id: usize) -> HalResult<&'static str> {
+pub fn interface_name(id: usize) -> HalResult<&'static str> {
     let mut name = [0; 32];
     match unsafe { get_interface_name(id as u8, &mut name[0]) } {
         HalInterfaceResult::OK => {

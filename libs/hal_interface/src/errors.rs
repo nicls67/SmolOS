@@ -3,8 +3,8 @@
 //! related errors with different severity levels and format
 
 use crate::HalError::{
-    IncompatibleAction, InterfaceNotFound, ReadError, ReadOnlyInterface, UnknownError, WriteError,
-    WriteOnlyInterface, WrongInterfaceId,
+    IncompatibleAction, InterfaceAlreadyLocked, InterfaceNotFound, LockedInterface, ReadError,
+    ReadOnlyInterface, UnknownError, WriteError, WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::HalErrorLevel::{Critical, Error, Fatal};
 use heapless::{String, format};
@@ -68,6 +68,8 @@ pub enum HalError {
     IncompatibleAction(&'static str, &'static str),
     WriteError(HalErrorLevel, &'static str),
     ReadError(HalErrorLevel, &'static str),
+    LockedInterface(&'static str),
+    InterfaceAlreadyLocked(&'static str),
     UnknownError,
 }
 
@@ -177,6 +179,24 @@ impl HalError {
                 msg.push_str(format!(256; "Unknown HAL error").unwrap().as_str())
                     .unwrap();
             }
+            LockedInterface(ift) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Interface {} is locked", ift)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            InterfaceAlreadyLocked(ift) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Interface {} is locked by another app", ift)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
         }
         msg
     }
@@ -210,6 +230,8 @@ impl HalError {
             WriteError(lvl, _) => *lvl,
             ReadError(lvl, _) => *lvl,
             UnknownError => Error,
+            LockedInterface(_) => Critical,
+            InterfaceAlreadyLocked(_) => Critical,
         }
     }
 }
