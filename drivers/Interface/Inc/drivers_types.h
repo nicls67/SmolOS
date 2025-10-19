@@ -27,7 +27,8 @@
 typedef enum
 {
     GPIO,
-    USART
+    USART,
+    LCD
 } INTERFACE_TYPE;
 
 typedef enum

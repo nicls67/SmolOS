@@ -1,9 +1,11 @@
 use crate::HalError::{
     IncompatibleAction, InterfaceNotFound, ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
 };
-use crate::{GpioWriteAction, HalResult, InterfaceActions};
+use crate::interface_read::InterfaceReadAction;
+use crate::{GpioWriteAction, HalResult, InterfaceWriteActions, LcdLayer};
 
 #[repr(u8)]
+#[allow(dead_code)]
 pub enum HalInterfaceResult {
     OK = 0,
     ErrInterfaceNotFound = 1,
@@ -54,7 +56,8 @@ impl HalInterfaceResult {
         &self,
         id: Option<usize>,
         name: Option<&'static str>,
-        action: Option<InterfaceActions>,
+        action_write: Option<InterfaceWriteActions>,
+        action_read: Option<InterfaceReadAction>,
     ) -> HalResult<()> {
         match self {
             HalInterfaceResult::OK => Ok(()),
@@ -67,7 +70,15 @@ impl HalInterfaceResult {
                 Err(WriteOnlyInterface(interface_name(id.unwrap())?))
             }
             HalInterfaceResult::ErrIncompatibleAction => Err(IncompatibleAction(
-                action.unwrap().name(),
+                {
+                    if let Some(action) = action_write {
+                        action.name()
+                    } else if let Some(action) = action_read {
+                        action.name()
+                    } else {
+                        "Unknown"
+                    }
+                },
                 interface_name(id.unwrap())?,
             )),
         }
@@ -86,6 +97,24 @@ unsafe extern "C" {
     pub fn usart_write(id: u8, str: *const u8, len: u16) -> HalInterfaceResult;
 
     pub fn get_core_clk() -> u32;
+
+    pub fn lcd_enable(id: u8, enable: bool) -> HalInterfaceResult;
+
+    pub fn lcd_clear(id: u8, layer: LcdLayer, color: u32) -> HalInterfaceResult;
+
+    pub fn lcd_draw_pixel(
+        id: u8,
+        layer: LcdLayer,
+        x: u16,
+        y: u16,
+        color: u32,
+    ) -> HalInterfaceResult;
+
+    pub fn get_lcd_size(id: u8, x: *mut u16, y: *mut u16) -> HalInterfaceResult;
+
+    pub fn get_fb_address(id: u8, layer: LcdLayer, fb_address: *mut u32) -> HalInterfaceResult;
+
+    pub fn set_fb_address(id: u8, layer: LcdLayer, fb_address: u32) -> HalInterfaceResult;
 }
 
 /**

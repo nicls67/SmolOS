@@ -3,6 +3,7 @@ use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
 use crate::{Mhz, Milliseconds};
 use cortex_m::Peripherals;
+use display::Display;
 use hal_interface::Hal;
 
 pub static mut KERNEL_DATA: Kernel = Kernel {
@@ -12,6 +13,7 @@ pub static mut KERNEL_DATA: Kernel = Kernel {
     terminal: None,
     scheduler: None,
     errors: None,
+    display: None,
 };
 
 /// A data structure representing timing-related configuration for the system kernel.
@@ -85,38 +87,45 @@ pub struct Kernel {
     terminal: Option<Terminal>,
     scheduler: Option<Scheduler>,
     errors: Option<ErrorsManager>,
+    display: Option<Display>,
 }
 
 impl Kernel {
     /// Initializes the global kernel data structure with the provided components.
     ///
-    /// This function is responsible for setting up the core components of the kernel,
-    /// assigning each of them to the global `KERNEL_DATA` structure safely within an
-    /// `unsafe` block. This includes hardware abstraction layers, time management, terminal handling,
-    /// scheduler, and error management.
-    ///
     /// # Arguments
-    /// - `hal`: The hardware abstraction layer (HAL) object to manage platform-specific hardware.
-    /// - `kernel_time_data`: The time data object used for kernel time management.
-    /// - `terminal`: The terminal object to manage terminal input and output for the kernel.
-    /// - `scheduler`: The scheduler object to manage task scheduling in the kernel.
-    /// - `errors`: The error manager object to handle and track kernel errors.
+    ///
+    /// * `hal` - A hardware abstraction layer (`Hal`) instance for interacting with low-level hardware features.
+    /// * `display` - A `Display` instance to handle graphical or textual output.
+    /// * `kernel_time_data` - A `KernelTimeData` instance to manage kernel-related timing and scheduling.
+    /// * `terminal` - A `Terminal` instance to handle terminal input/output interactions.
+    /// * `scheduler` - A `Scheduler` instance responsible for managing task scheduling.
+    /// * `errors` - An `ErrorsManager` instance for managing and reporting errors throughout the kernel.
     ///
     /// # Safety
-    /// This function operates within an `unsafe` block as it directly modifies the static, global `KERNEL_DATA` object.
-    /// The caller must ensure that `init_kernel_data` is only called once during the system initialization phase
-    /// to avoid any unintended behavior or double initialization.
+    ///
+    /// This function directly writes to the global `KERNEL_DATA` structure using `unsafe` code. It is the caller's
+    /// responsibility to ensure that:
+    /// 1. The provided components are properly initialized before calling this function.
+    /// 2. The function is not called more than once, as it overwrites existing global data, which could lead to
+    ///    undefined behavior.
+    ///
+    /// # Notes
+    ///
+    /// This function is meant to be called during the kernel initialization stage to set up all the required
+    /// components for kernel operation.
     ///
     pub fn init_kernel_data(
         hal: Hal,
+        display: Display,
         kernel_time_data: KernelTimeData,
         terminal: Terminal,
         scheduler: Scheduler,
         errors: ErrorsManager,
     ) {
         unsafe {
-            KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
             KERNEL_DATA.hal = Some(hal);
+            KERNEL_DATA.display = Some(display);
             KERNEL_DATA.kernel_time_data = Some(kernel_time_data);
             KERNEL_DATA.terminal = Some(terminal);
             KERNEL_DATA.scheduler = Some(scheduler);
@@ -155,6 +164,29 @@ impl Kernel {
                 KERNEL_DATA.hal.as_mut().unwrap()
             } else {
                 panic!("Hal not initialized");
+            }
+        }
+    }
+
+    /// Provides a mutable reference to the global display driver.
+    ///
+    /// This function retrieves a mutable reference to the global `Display` object stored within
+    /// the `KERNEL_DATA` structure. If the `Display` driver has already been initialized,
+    /// it safely accesses the `Display`. If the driver is not initialized, it panics with an error message.
+    ///
+    /// # Safety
+    /// - The function uses `unsafe` to access a static mutable reference. Static mutable references
+    ///   can lead to undefined behavior if improperly used. Ensure no simultaneous mutable and immutable
+    ///   borrows occur to maintain memory safety.
+    /// - This function assumes that the global `KERNEL_DATA.display` has been properly initialized
+    ///
+    #[allow(static_mut_refs)]
+    pub fn display() -> &'static mut Display {
+        unsafe {
+            if KERNEL_DATA.display.is_some() {
+                KERNEL_DATA.display.as_mut().unwrap()
+            } else {
+                panic!("Display driver not initialized");
             }
         }
     }
@@ -302,5 +334,31 @@ impl Kernel {
                 panic!("Errors manager is not initialized");
             }
         }
+    }
+}
+
+/// Initializes the Cortex-M peripherals used by the kernel.
+///
+/// This function is responsible for initializing the peripherals of the Cortex-M microcontroller
+/// that the kernel depends on. It accesses the global `KERNEL_DATA` structure and assigns the
+/// retrieved peripherals object to the `cortex_peripherals` field.
+///
+/// # Safety
+///
+/// This function performs an unsafe operation to directly modify the global `KERNEL_DATA` structure.
+/// It assumes exclusive access to this data structure and relies on the safe initialization of
+/// `KERNEL_DATA` and the presence of Cortex-M peripherals.
+///
+/// Calling this function multiple times without proper synchronization or in an invalid state
+/// may result in undefined behavior.
+///
+/// # Panics
+///
+/// This function will panic if it fails to retrieve the Cortex-M peripherals via `Peripherals::take()`,
+/// which occurs if the peripherals have already been taken elsewhere in the program.
+///
+pub fn cortex_init() {
+    unsafe {
+        KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
     }
 }

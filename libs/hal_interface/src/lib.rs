@@ -2,9 +2,11 @@
 
 mod bindings;
 mod errors;
-mod interface_actions;
+mod interface_read;
+mod interface_write;
 
-pub use interface_actions::*;
+pub use interface_read::*;
+pub use interface_write::*;
 
 use crate::bindings::{HalInterfaceResult, get_core_clk, get_interface_id, gpio_write, hal_init};
 pub use errors::*;
@@ -79,31 +81,68 @@ impl Hal {
         }
     }
 
-    /// Executes a specified interface action on a given hardware interface, identified by its ID,
-    /// and translates the action result into a `HalResult`.
+    /// Performs a write operation on the specified interface based on the action provided.
     ///
     /// # Parameters
-    /// - `id`: The identifier (index) of the hardware interface where the action needs to be performed.
-    /// - `action`: The `InterfaceActions` enum instance that specifies the action to execute.
-    ///   The actions currently supported are:
-    ///   - `InterfaceActions::GpioWrite`: Performs a GPIO write operation.
-    ///   - `InterfaceActions::UartWrite`: Performs a UART write operation.
+    /// - `id`: The unique identifier of the interface to act upon. This parameter is of type `usize`.
+    /// - `action`: The specific action to be performed on the interface. This is an enum of type `InterfaceActions`,
+    ///   which determines what kind of operation will be executed (e.g., `GpioWrite`, `UartWrite`, `Lcd`).
     ///
     /// # Returns
-    /// - `HalResult<()>`: A result indicating the outcome of the action.
-    ///   - On success: Returns an empty `Ok(())`, implying the action was executed successfully.
-    ///   - On failure: Returns an error describing the issue that occurred.
+    /// - `HalResult<()>`: Result indicating the success or failure of the operation. If the operation executes successfully,
+    ///   the result contains `()`. Errors are propagated through the `HalResult` type.
+    ///
+    /// # Behavior
+    /// - The function matches on the provided `InterfaceActions`:
+    ///   - `InterfaceActions::GpioWrite`: Calls the `gpio_write` function, passing the `id` (as `u8`) and the provided action.
+    ///     Converts the result of `gpio_write` into a `HalResult` using `to_result()`.
+    ///   - `InterfaceActions::UartWrite`: Executes the action linked to the `UartWrite` operation by calling its `action` method
+    ///     with the `id` (as `u8`), then processes its result with `to_result()`.
+    ///   - `InterfaceActions::Lcd`: Similar to `UartWrite`, it calls the `action` method for LCD, passing the `id`
+    ///     (as `u8`) and processes its result using `to_result()`.
     ///
     /// # Safety
-    /// - The `gpio
-    pub fn interface_action(&mut self, id: usize, action: InterfaceActions) -> HalResult<()> {
+    /// - The `GpioWrite` case executes an `unsafe` block when invoking the `gpio_write` function. Ensure that the usage
+    ///   of the unsafe code does not introduce undefined behavior.
+    ///
+    /// # Conversion
+    /// - The `to_result` method is used in all cases to convert the invoked action's return value into an ` HalResult `
+    ///   while providing context with the optional identifiers (`id`, `action`).
+    ///
+    pub fn interface_write(&mut self, id: usize, action: InterfaceWriteActions) -> HalResult<()> {
         match action {
-            InterfaceActions::GpioWrite(act) => unsafe {
-                gpio_write(id as u8, act).to_result(Some(id), None, Some(action))
+            InterfaceWriteActions::GpioWrite(act) => unsafe {
+                gpio_write(id as u8, act).to_result(Some(id), None, Some(action), None)
             },
-            InterfaceActions::UartWrite(act) => {
-                act.action(id as u8).to_result(Some(id), None, Some(action))
+            InterfaceWriteActions::UartWrite(act) => {
+                act.action(id as u8)
+                    .to_result(Some(id), None, Some(action), None)
             }
+            InterfaceWriteActions::Lcd(act) => {
+                act.action(id as u8)
+                    .to_result(Some(id), None, Some(action), None)
+            }
+        }
+    }
+
+    pub fn interface_read(
+        &mut self,
+        id: usize,
+        read_action: InterfaceReadAction,
+    ) -> HalResult<InterfaceReadResult> {
+        let read_result;
+        let interface_res;
+
+        match read_action {
+            InterfaceReadAction::LcdRead(act) => {
+                let mut lcd_result = LcdRead::LcdSize(0, 0);
+                interface_res = act.read(id, &mut lcd_result);
+                read_result = InterfaceReadResult::LcdRead(lcd_result);
+            }
+        };
+        match interface_res.to_result(Some(id), None, None, Some(read_action)) {
+            Ok(_) => Ok(read_result),
+            Err(e) => Err(e),
         }
     }
 

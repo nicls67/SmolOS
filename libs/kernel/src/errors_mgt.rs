@@ -9,7 +9,8 @@ use crate::{
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
-use hal_interface::{GpioWriteAction, InterfaceActions};
+use display::Colors;
+use hal_interface::{GpioWriteAction, InterfaceWriteActions};
 
 /// The HardFault exception handler.
 ///
@@ -193,9 +194,9 @@ impl ErrorsManager {
     fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
         if let Some(id) = self.err_led_id {
             Kernel::hal()
-                .interface_action(
+                .interface_write(
                     id,
-                    InterfaceActions::GpioWrite(if state {
+                    InterfaceWriteActions::GpioWrite(if state {
                         GpioWriteAction::Set
                     } else {
                         GpioWriteAction::Clear
@@ -247,6 +248,7 @@ impl ErrorsManager {
                 if self.has_error != Some(Fatal) {
                     self.has_error = Some(Critical);
                 }
+                Kernel::terminal().set_color(Colors::Magenta);
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
                     .unwrap_or(());
@@ -280,6 +282,8 @@ impl ErrorsManager {
                     }
                 }
 
+                Kernel::terminal().clear_terminal().unwrap();
+                Kernel::terminal().set_color(Colors::Red);
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
                     .unwrap_or(())
@@ -345,7 +349,7 @@ impl ErrorsManager {
 fn blink_err_led(id: u32) -> KernelResult<()> {
     syscall(Syscall::Hal(SysCallHalArgs {
         id: id as usize,
-        action: InterfaceActions::GpioWrite(GpioWriteAction::Toggle),
+        action: InterfaceWriteActions::GpioWrite(GpioWriteAction::Toggle),
     }))
 }
 

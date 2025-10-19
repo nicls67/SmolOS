@@ -28,3 +28,8 @@ drivers:
     peripheral:
       port: J
       pin: 13
+
+  - name: LCD
+    type: LCD
+    direction: INOUT
+    peripheral: None

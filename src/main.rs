@@ -3,10 +3,17 @@
 
 use cortex_m_rt::entry;
 use hal_interface::Hal;
+use heapless::Vec;
 use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds, TerminalType};
 
 #[entry]
 fn main() -> ! {
+    // Initialize Cortex-M core
+    kernel::cortex_init();
+
+    // Start systick
+    kernel::init_systick(None);
+
     // Initialize HAL
     let hal = Hal::new();
 
@@ -18,9 +25,13 @@ fn main() -> ! {
             systick_period: Milliseconds(1),
         },
         hal,
-        system_terminal_name: "SERIAL_MAIN",
-        system_terminal_type: TerminalType::Usart,
+        system_terminals: Vec::from_slice(&[
+            TerminalType::Usart("SERIAL_MAIN"),
+            TerminalType::Display,
+        ])
+        .unwrap(),
         err_led_name: Some("ERR_LED"),
+        display_name: Some("LCD"),
     });
 
     kernel::start_kernel_apps();

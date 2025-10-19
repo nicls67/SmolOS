@@ -1,6 +1,6 @@
 use crate::KernelError::CannotAddNewPeriodicApp;
 use crate::data::Kernel;
-use crate::except::set_ticks_target;
+use crate::systick::set_ticks_target;
 use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
 use cortex_m::peripheral::SCB;
 use cortex_m::peripheral::scb::{Exception, SystemHandler, VectActive};
@@ -161,48 +161,28 @@ impl Scheduler {
         }
     }
 
-    /// Starts the kernel's scheduler with the specified system tick period.
+    /// Starts the kernel scheduler with a specified SysTick period.
+    ///
+    /// This method initializes the scheduler by configuring the PendSV interrupt priority
+    /// and calculates the target ticks for the scheduler based on the specified SysTick period.
+    /// It also logs a message indicating that the scheduler has started successfully. The method
+    /// overrides the `self.started` flag to ensure the scheduler can run.
     ///
     /// # Parameters
-    /// - `systick_period`: The duration of the system tick interval, specified as a `Milliseconds` value.
-    ///   This parameter represents the periodicity at which the system tick timer is triggered.
+    /// - `systick_period`: The period or duration of a single SysTick in milliseconds, which is
+    /// used to calculate the number of ticks between scheduler executions.
     ///
     /// # Returns
-    /// - `KernelResult<()>`: Returns `Ok(())` if the scheduler starts successfully. If any error occurs
-    ///   during the operation, an appropriate error result is returned.
+    /// - `KernelResult<()>`: Returns an empty result on success, or an error if the operation fails.
     ///
-    /// # Description
-    /// This function initializes and starts the kernel's scheduler by performing the following steps:
-    /// 1. Retrieves the Cortex-M peripherals through `Kernel::cortex_peripherals()`.
-    /// 2. Configures the priority of the PendSV system handler to the lowest priority (`0xFF`).
-    /// 3. Sets the target tick period for the scheduler by computing the ratio of the scheduler period to the
-    ///    system tick period (`self.sched_period.to_u32() / systick_period.to_u32()`).
-    /// 4. Enables the SysTick counter by calling `cortex_p.SYST.enable_counter()`.
-    /// 5. Marks the scheduler as started by setting `self.started` to `true`.
-    ///
-    /// Additionally, the function writes a notification message, "Scheduler started!", to the kernel's
-    /// terminal to indicate successful start of the scheduler.
+    /// # Panics
+    /// This method may panic if there is an issue interacting with the underlying terminal logging system.
     ///
     /// # Safety
-    /// Unsafe code is used to set the priority of the PendSV system handler and configure the scheduler's
-    /// tick period. Care should be taken to ensure proper configuration of system-level components to avoid
-    /// unintended behavior or crashing.
+    /// This method uses unsafe code to manipulate hardware peripherals. It sets the priority for the PendSV
+    /// interrupt to its lowest value (0xFF), and initializes periodic interrupts by setting the scheduler ticks target.
+    /// The unsafe block must ensure safe interaction with shared hardware resources to avoid undefined behavior.
     ///
-    /// # Errors
-    /// - Returns a `KernelResult` with an error value if the terminal writing operation fails.
-    ///
-    /// # Notes
-    /// - The function assumes that `self.sched_period` is already set prior to calling this function.
-    /// - The function writes a status message to the terminal, which may fail if the terminal subsystem is not ready.
-    ///
-    /// # Requirements
-    /// - The system must support Cortex-M processor peripherals as used within this implementation.
-    /// - The `set_ticks_target()` function must handle the tick period computation correctly.
-    ///
-    /// # See Also
-    /// - `Kernel::cortex_peripherals()`
-    /// - `Kernel::terminal()`
-    /// - `cortex_m::peripheral::SYST::enable_counter`
     pub fn start(&mut self, systick_period: Milliseconds) -> KernelResult<()> {
         let cortex_p = Kernel::cortex_peripherals();
 
@@ -212,7 +192,6 @@ impl Scheduler {
             set_ticks_target(self.sched_period.to_u32() / systick_period.to_u32())
         }
 
-        cortex_p.SYST.enable_counter();
         self.started = true;
         Kernel::terminal().write(&TerminalFormatting::StrNewLineBoth("Scheduler started !"))
     }

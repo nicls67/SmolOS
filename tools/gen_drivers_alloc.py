@@ -168,6 +168,8 @@ def get_peripheral_handler(peripheral, handlers_init: list):
                             True)
         )
         return f"&{gpio_strict_name}"
+    elif peripheral["peripheral"] == "None":
+        return "0"
     else:
         return ""
 

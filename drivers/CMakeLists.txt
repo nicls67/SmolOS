@@ -37,7 +37,11 @@ add_library(${CMAKE_PROJECT_NAME} STATIC
         Interface/Src/drivers_alloc.c
         Interface/Inc/lib_interface.h
         Interface/Inc/drivers_alloc.h
-        Interface/Inc/drivers_types.h)
+        Interface/Inc/drivers_types.h
+        Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_lcd.c
+        Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_sdram.c
+        Drivers/BSP/Components/nt35510/nt35510.c
+        Drivers/BSP/Components/otm8009a/otm8009a.c)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -55,6 +59,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
+        Drivers/BSP/STM32F769I-Discovery
 )
 
 # Add project symbols (macros)
