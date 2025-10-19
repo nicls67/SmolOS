@@ -1,6 +1,6 @@
 use crate::data::Kernel as KernelData;
 use crate::terminal::TerminalState::Kernel;
-use crate::{KernelError, KernelResult};
+use crate::{KernelError, KernelResult, SysCallDisplayArgs, Syscall, syscall};
 use display::Colors;
 use hal_interface::{InterfaceWriteActions, UartWriteActions};
 use heapless::{String, Vec};
@@ -293,9 +293,9 @@ impl Terminal {
                         InterfaceWriteActions::UartWrite(UartWriteActions::SendChar(data as u8)),
                     )
                     .map_err(KernelError::HalError)?,
-                TerminalType::Display => KernelData::display()
-                    .draw_char_at_cursor(data as u8, Some(self.current_color))
-                    .map_err(KernelError::DisplayError)?,
+                TerminalType::Display => syscall(Syscall::Display(
+                    SysCallDisplayArgs::WriteCharAtCursor(data, Some(self.current_color)),
+                ))?,
             }
         }
 
@@ -357,9 +357,9 @@ impl Terminal {
                         InterfaceWriteActions::UartWrite(UartWriteActions::SendString(data)),
                     )
                     .map_err(KernelError::HalError)?,
-                TerminalType::Display => KernelData::display()
-                    .draw_string_at_cursor(data, Some(self.current_color))
-                    .map_err(KernelError::DisplayError)?,
+                TerminalType::Display => syscall(Syscall::Display(
+                    SysCallDisplayArgs::WriteStrAtCursor(data, Some(self.current_color)),
+                ))?,
             }
         }
 
@@ -400,9 +400,9 @@ impl Terminal {
                         )),
                     )
                     .map_err(KernelError::HalError)?,
-                TerminalType::Display => KernelData::display()
-                    .clear(Colors::Black)
-                    .map_err(KernelError::DisplayError)?,
+                TerminalType::Display => {
+                    syscall(Syscall::Display(SysCallDisplayArgs::Clear(Colors::Black)))?
+                }
             }
         }
 
