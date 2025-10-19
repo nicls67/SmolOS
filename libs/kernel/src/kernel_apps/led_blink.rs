@@ -71,6 +71,11 @@ pub fn init_led_blink() -> KernelResult<()> {
     LED_ID.store(id, Ordering::Relaxed);
 
     // Try to get a lock on the interface
-
-    Ok(())
+    syscall(
+        Syscall::Hal(SysCallHalArgs {
+            id,
+            action: SysCallHalActions::Lock,
+        }),
+        LED_APP_ID.load(Ordering::Relaxed),
+    )
 }
