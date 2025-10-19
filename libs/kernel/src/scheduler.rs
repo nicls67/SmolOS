@@ -131,6 +131,7 @@ pub struct Scheduler {
     pub started: bool,
     current_task_id: Option<usize>,
     current_task_has_error: bool,
+    next_id: u8,
 }
 
 impl Scheduler {
@@ -158,6 +159,7 @@ impl Scheduler {
             started: false,
             current_task_id: None,
             current_task_has_error: false,
+            next_id: 0,
         }
     }
 
@@ -198,39 +200,36 @@ impl Scheduler {
 
     /// Adds a periodic application to the scheduler.
     ///
-    /// This method registers a new application that will be executed periodically by the system.
-    /// The application can optionally run an initialization function and have a specific lifetime.
+    /// This function registers a periodic application with the scheduler.
+    /// It verifies if the application already exists, optionally initializes
+    /// the application, and schedules it to be executed at the specified intervals.
     ///
     /// # Parameters
-    /// - `name`: A static string slice representing the name of the app. This name must be unique.
-    /// - `app`: The function or closure that will be executed periodically. It can optionally take a parameter.
-    /// - `init`: An optional initialization function for the app. This is useful for setting up app-specific resources.
-    /// - `period`: The period in milliseconds between consecutive executions of the app.
-    /// - `ends_in`: An optional duration (in milliseconds) after which the app will stop executing. If `None`, the app will not have a fixed lifetime.
+    /// - `name`: A static string slice that represents the unique name of the application.
+    /// - `app`: An `AppCall` variant specifying the callback function that implements the app's functionality.
+    /// - `init`: An optional initialization function (`App`) to be executed before scheduling the application. This can be `None` if no initialization is required.
+    /// - `period`: The periodic interval (in milliseconds) at which the application will be executed.
+    /// - `ends_in`: An optional time duration (in milliseconds) specifying when the application should stop executing.
+    ///              If `None`, the application will run indefinitely.
     ///
-    /// # Return
-    /// Returns a [`KernelResult<()>`] which is:
-    /// - `Ok(())` on successful registration of the app.
-    /// - `Err(KernelError)` if the registration failed:
-    ///   - [`KernelError::AppAlreadyExists`]: If an app with the same `name` and parameters already exists.
-    ///   - [`KernelError::AppInitError`]: If the provided initialization function fails.
-    ///   - [`CannotAddNewPeriodicApp`]: If the app cannot be pushed into the internal scheduler (e.g., due to capacity issues).
+    /// # Returns
+    /// Returns a `KernelResult<u8>` which contains:
+    /// - `Ok(u8)`: If the application is successfully registered, the length of the internal task list after addition is returned.
+    /// - `Err(KernelError)`: Returns an error if one of the following occurs:
+    ///   - `AppAlreadyExists`: If an application with the given `name` (and optionally, `app` parameters) is already registered.
+    ///   - `AppInitError`: If the initialization function (`init`) fails.
+    ///   - `CannotAddNewPeriodicApp`: If the application could not be registered in the scheduler due to capacity limits or internal errors.
     ///
     /// # Errors
-    /// - **AppAlreadyExists:** If an application with the same name and parameters is already registered.
-    /// - **AppInitError:** If the initialization function for the app fails.
-    /// - **CannotAddNewPeriodicApp:** If the task cannot be added to the scheduler's task list.
-    ///
-    /// # Behavior
-    /// - If `init` is provided, it is executed before the app is registered. A failure in the initialization will result in the app not being added.
-    /// - The periodicity of the app execution is decided based on the provided `period` and the system's scheduling period (`sched_period`).
-    /// - If `ends_in` is provided, the app will automatically deactivate once the duration elapses.
-    /// - All apps are set to `active` by default upon registration.
+    /// - `KernelError::AppAlreadyExists(name)`: Triggered if an application with the same name already exists in the scheduler.
+    /// - `KernelError::AppInitError(name)`: Triggered if the provided initialization function fails to execute successfully.
+    /// - `KernelError::CannotAddNewPeriodicApp(name)`: Triggered if the scheduler is unable to add this periodic application.
     ///
     /// # Notes
-    /// - This function requires that the `name` parameter is unique for each app.
-    /// - The `period` must be compatible with the system's scheduler. Ensure it is an integer multiple or factor of the `sched_period` for predictable behavior.
-    /// - The scheduler holds only a finite number of apps. Adding beyond its capacity will result in an error.
+    /// - The `app_exists` method is used internally to check for duplicate application names.
+    /// - Before scheduling, the function converts both the `period` and `sched_period` to `u32` units for computation.
+    /// - The function calculates the execution periods relative to the scheduler's configured period (`sched_period`) using integer division.
+    ///
     pub fn add_periodic_app(
         &mut self,
         name: &'static str,
@@ -238,7 +237,7 @@ impl Scheduler {
         init: Option<App>,
         period: Milliseconds,
         ends_in: Option<Milliseconds>,
-    ) -> KernelResult<()> {
+    ) -> KernelResult<u8> {
         // Check if the app already exists
         if (match app {
             AppCall::AppNoParam(_, _) => self.app_exists(name, None),
@@ -263,7 +262,13 @@ impl Scheduler {
                 active: true,
                 ends_in: ends_in.map(|e| e.to_u32() / period.to_u32()),
             })
-            .map_err(|_| CannotAddNewPeriodicApp(name))
+            .map_err(|_| CannotAddNewPeriodicApp(name))?;
+
+        // Increment app ID
+        self.next_id += 1;
+
+        // Return ID
+        Ok(self.next_id)
     }
 
     /// Removes a periodic application from the task list.

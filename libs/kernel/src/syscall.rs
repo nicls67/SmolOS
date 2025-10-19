@@ -29,6 +29,7 @@ pub enum Syscall<'a> {
         Option<App>,
         Milliseconds,
         Option<Milliseconds>,
+        &'a mut u8,
     ),
     RemovePeriodicTask(&'static str, Option<u32>),
     NewTaskDuration(&'static str, Option<u32>, Milliseconds),
@@ -69,8 +70,14 @@ pub fn syscall(syscall_type: Syscall) -> KernelResult<()> {
             }
             Err(e) => Err(KernelError::HalError(e)),
         },
-        Syscall::AddPeriodicTask(name, app, init, period, ends_in) => {
-            Kernel::scheduler().add_periodic_app(name, app, init, period, ends_in)
+        Syscall::AddPeriodicTask(name, app, init, period, ends_in, id) => {
+            match Kernel::scheduler().add_periodic_app(name, app, init, period, ends_in) {
+                Ok(new_id) => {
+                    *id = new_id;
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
         }
         Syscall::RemovePeriodicTask(name, param) => {
             Kernel::scheduler().remove_periodic_app(name, param)

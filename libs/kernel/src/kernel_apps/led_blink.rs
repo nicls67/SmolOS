@@ -5,11 +5,12 @@ use display::Colors;
 use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::InterfaceWriteActions;
 
-static LED_ID: AtomicUsize = AtomicUsize::new(0);
 const LED_NAME: &str = "ACT_LED";
 pub const LED_BLINK_NAME: &str = "LED Blink";
 pub const LED_BLINK_PERIOD: Milliseconds = Milliseconds(1000);
 
+static LED_ID: AtomicUsize = AtomicUsize::new(0);
+pub static LED_APP_ID: AtomicU8 = AtomicU8::new(0);
 static DOT_COUNTER: AtomicU8 = AtomicU8::new(0);
 
 pub fn led_blink() -> KernelResult<()> {

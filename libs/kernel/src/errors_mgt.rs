@@ -93,26 +93,31 @@ fn panic(info: &PanicInfo) -> ! {
     cortex_m::peripheral::SCB::sys_reset();
 }
 
-/// A struct that manages error states and associated components within a system.
-///
-/// The `ErrorsManager` struct is used to track and handle error states, including
-/// associating an error level and a corresponding LED identifier (if applicable)
-/// to signal the error condition.
+/// A structure for managing error statuses in an application. This structure
+/// is used to represent and handle different error conditions that may arise
+/// during the execution of the program.
 ///
 /// # Fields
 ///
-/// * `err_led_id` - An optional identifier for an LED that can be used to
-///   visually indicate the presence of an error. If set to `None`, no LED
-///   is associated with the error condition.
+/// * `err_led_id` - An optional identifier for the LED associated with
+///   displaying the error status. If `None`, no LED is assigned to handle the error.
 ///
-/// * `has_error` - An optional error level of type `KernelErrorLevel` that
-///   represents the current error state. If set to `None`, it indicates that
-///   no error is currently present.
+/// * `err_app_id` - An optional application identifier (app ID) that specifies
+///   the source or specific application tied to the error. If `None`, no
+///   application is linked to the error.
 ///
-/// This struct can be extended or used in combination with other components
-/// to build robust error handling mechanisms in a kernel or embedded system context.
+/// * `has_error` - An optional `KernelErrorLevel` indicating the severity or
+///   type of error currently being managed. `None` represents no error.
+///
+/// # Usage
+///
+/// This struct can be used to monitor and respond to error states in a system
+/// by keeping track of which error occurred, what application caused it, and if
+/// a hardware indicator (like an LED) should reflect the error status.
+///
 pub struct ErrorsManager {
     err_led_id: Option<usize>,
+    err_app_id: u8,
     has_error: Option<KernelErrorLevel>,
 }
 
@@ -128,6 +133,7 @@ impl ErrorsManager {
     pub fn new() -> ErrorsManager {
         ErrorsManager {
             err_led_id: None,
+            err_app_id: 0,
             has_error: None,
         }
     }
@@ -270,6 +276,7 @@ impl ErrorsManager {
                             None,
                             Milliseconds(100),
                             Some(Milliseconds(10000)),
+                            &mut self.err_app_id,
                         ))
                         .unwrap_or(());
                     } else {
