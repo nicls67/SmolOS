@@ -281,51 +281,42 @@ impl Terminal {
         Ok(())
     }
 
-    /// Writes a single character to all configured terminal outputs.
+    /// Writes a character to all configured terminal devices.
     ///
-    /// This method iterates through an internal list of terminal types (e.g., USART, Display)
-    /// and writes the provided character to each terminal using their respective operations.
-    /// Each terminal type has its own implementation for handling the character.
+    /// This function iterates through the list of terminals specified in the
+    /// `self.terminals` vector. Depending on the terminal type, it performs
+    /// the appropriate write action:
     ///
-    /// # Arguments
+    /// - **`TerminalType::Usart`**: Sends the provided character as a `u8` via UART.
+    /// - **`TerminalType::Display`**: Writes the character to the display at the current
+    ///   cursor position with the optional current color.
     ///
-    /// * `data` - The character to be written to the terminals.
+    /// The function uses system calls (`syscall`) to interact with hardware interfaces,
+    /// passing the appropriate arguments for each terminal type.
     ///
-    /// # Return
+    /// ### Parameters:
+    /// - `data`: The character (`char`) to be written to all terminal devices.
     ///
-    /// * `KernelResult<()>` - Returns `Ok(())` if the character is successfully written to all terminals.
-    ///   Returns an error wrapped in `KernelResult` if any operation fails while writing.
+    /// ### Returns:
+    /// - `KernelResult<()>`: A result indicating success (`Ok(())`) or an error if the
+    ///   operation fails. Errors encountered during system calls for any terminal type
+    ///   are propagated directly.
     ///
-    /// # Behavior
-    ///
-    /// - For a terminal of type `TerminalType::Usart`, the character is converted to a `u8` and sent
-    ///   via the UART interface using `KernelData::hal().interface_write()`.
-    /// - For a terminal of type `TerminalType::Display`, the character is drawn on the display at the
-    ///   current cursor position using `KernelData::display().draw_string_at_cursor()`.
-    ///
-    /// # Errors
-    ///
-    /// Returns the following errors if an operation fails:
-    /// - `KernelError::HalError` if there is an issue writing to a `TerminalType::Usart`.
-    /// - `KernelError::DisplayError` if there is an issue writing/drawing to a `TerminalType::Display`.
-    ///
-    /// # Notes
-    ///
-    /// - The character is handled by their respective terminal type implementations based on the
-    ///   `TerminalType` enum.
-    /// - Assumes data is valid UTF-8, as it converts the `char` to a `&str` when writing to a display.
-    ///   Errors that may arise are propagated using the `?` operator.
-    ///
+    /// ### System Calls:
+    /// - For `TerminalType::Usart`: Sends a system call to the HAL layer with the
+    ///   `SysCallHalActions::Write` action containing `Uart
     fn write_char(&self, data: char) -> KernelResult<()> {
         for (i, terminal) in self.terminals.iter().enumerate() {
             match terminal {
-                TerminalType::Usart(_) => KernelData::hal()
-                    .interface_write(
-                        self.interface_id[i],
-                        KERNEL_MASTER_ID,
-                        InterfaceWriteActions::UartWrite(UartWriteActions::SendChar(data as u8)),
-                    )
-                    .map_err(KernelError::HalError)?,
+                TerminalType::Usart(_) => syscall(
+                    Syscall::Hal(SysCallHalArgs {
+                        id: self.interface_id[i],
+                        action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
+                            UartWriteActions::SendChar(data as u8),
+                        )),
+                    }),
+                    KERNEL_MASTER_ID,
+                )?,
                 TerminalType::Display => syscall(
                     Syscall::Display(SysCallDisplayArgs::WriteCharAtCursor(
                         data,
@@ -388,13 +379,15 @@ impl Terminal {
     fn write_str(&self, data: &str) -> KernelResult<()> {
         for (i, terminal) in self.terminals.iter().enumerate() {
             match terminal {
-                TerminalType::Usart(_) => KernelData::hal()
-                    .interface_write(
-                        self.interface_id[i],
-                        KERNEL_MASTER_ID,
-                        InterfaceWriteActions::UartWrite(UartWriteActions::SendString(data)),
-                    )
-                    .map_err(KernelError::HalError)?,
+                TerminalType::Usart(_) => syscall(
+                    Syscall::Hal(SysCallHalArgs {
+                        id: self.interface_id[i],
+                        action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
+                            UartWriteActions::SendString(data),
+                        )),
+                    }),
+                    KERNEL_MASTER_ID,
+                )?,
                 TerminalType::Display => syscall(
                     Syscall::Display(SysCallDisplayArgs::WriteStrAtCursor(
                         data,
@@ -434,15 +427,15 @@ impl Terminal {
     pub fn clear_terminal(&self) -> KernelResult<()> {
         for (i, terminal) in self.terminals.iter().enumerate() {
             match terminal {
-                TerminalType::Usart(_) => KernelData::hal()
-                    .interface_write(
-                        self.interface_id[i],
-                        KERNEL_MASTER_ID,
-                        InterfaceWriteActions::UartWrite(UartWriteActions::SendString(
-                            "\x1B[2J\x1B[H",
+                TerminalType::Usart(_) => syscall(
+                    Syscall::Hal(SysCallHalArgs {
+                        id: self.interface_id[i],
+                        action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
+                            UartWriteActions::SendString("\x1B[2J\x1B[H"),
                         )),
-                    )
-                    .map_err(KernelError::HalError)?,
+                    }),
+                    KERNEL_MASTER_ID,
+                )?,
                 TerminalType::Display => syscall(
                     Syscall::Display(SysCallDisplayArgs::Clear(Colors::Black)),
                     KERNEL_MASTER_ID,

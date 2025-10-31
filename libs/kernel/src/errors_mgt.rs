@@ -8,9 +8,11 @@ use crate::{
     Syscall, syscall,
 };
 use core::panic::PanicInfo;
+use core::sync::atomic::Ordering;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
 use display::Colors;
+use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::{GpioWriteAction, InterfaceWriteActions};
 
 /// The HardFault exception handler.
@@ -175,40 +177,42 @@ impl ErrorsManager {
         Ok(())
     }
 
-    /// Sets the state of the error LED.
+    /// Sets the state of the error LED based on the given boolean value.
     ///
-    /// This function changes the state of the error LED to the specified value (`true` to set it on, `false` to turn it off).
-    /// It uses the hardware abstraction layer (HAL) to perform the operation on the hardware interface associated
-    /// with the error LED.
+    /// This function changes the state of the error LED by performing a system call.
+    /// If the error LED identifier (`err_led_id`) exists, it sends a write action
+    /// to either set or clear the GPIO pin associated with the error LED based
+    /// on the `state` parameter.
     ///
-    /// # Parameters
-    /// - `state`: A boolean indicating the desired state of the error LED.
-    ///   - `true`: Turns the error LED on.
-    ///   - `false`: Turns the error LED off.
+    /// # Arguments
+    ///
+    /// * `state` - A boolean value representing the desired state of the error LED.
+    ///             - `true`: Turns the error LED on (GPIO set action).
+    ///             - `false`: Turns the error LED off (GPIO clear action).
     ///
     /// # Returns
-    /// - `Ok(())` if the state was successfully set or if no error LED is configured (`self.err_led_id` is `None`).
-    /// - `Err(KernelError)` if there was an error interfacing with the hardware abstraction layer (HAL).
+    ///
+    /// Returns `Ok(())` if the operation completes successfully. If a syscall error occurs,
+    /// it returns a `KernelResult` with the appropriate error.
     ///
     /// # Errors
-    /// Returns an error of type `KernelError::HalError` if the HAL operation to change the LED state fails.
     ///
-    /// # Safety
-    /// This function assumes that the hardware abstraction layer (HAL) is properly initialized.
-    /// Ensure that `self.err_led_id` is correctly configured to avoid any runtime issues.
+    /// This function will return an error if the syscall fails when attempting
+    /// to perform the GPIO write action.
+    ///
     fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
         if let Some(id) = self.err_led_id {
-            Kernel::hal()
-                .interface_write(
+            syscall(
+                Syscall::Hal(SysCallHalArgs {
                     id,
-                    KERNEL_MASTER_ID,
-                    InterfaceWriteActions::GpioWrite(if state {
+                    action: SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(if state {
                         GpioWriteAction::Set
                     } else {
                         GpioWriteAction::Clear
-                    }),
-                )
-                .map_err(KernelError::HalError)?;
+                    })),
+                }),
+                KERNEL_MASTER_ID,
+            )?;
         }
         Ok(())
     }
