@@ -69,6 +69,12 @@ pub fn boot(config: BootConfig) {
         sched,
         ErrorsManager::new(),
     );
+    Kernel::hal().configure_locker(KERNEL_MASTER_ID).unwrap();
+
+    ////////////////////////////////////
+    // Errors Manager initialization
+    ////////////////////////////////////
+    Kernel::errors().init(config.err_led_name).unwrap();
 
     //////////////////////////
     // Display initialization
@@ -103,11 +109,6 @@ pub fn boot(config: BootConfig) {
                 .as_str(),
         ))
         .unwrap();
-
-    ////////////////////////////////////
-    // Errors Manager initialization
-    ////////////////////////////////////
-    Kernel::errors().init(config.err_led_name).unwrap();
 
     ////////////////////////////////////
     // Systick initialization

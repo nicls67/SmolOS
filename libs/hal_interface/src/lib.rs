@@ -14,26 +14,48 @@ use crate::lock::Locker;
 pub use errors::*;
 
 pub struct Hal {
-    locker: Locker,
+    locker: Option<Locker>,
 }
 
 impl Hal {
-    /// Initializes a new instance of the struct.
+    /// Creates a new instance of the struct.
     ///
-    /// # Parameters
-    /// - `master_id`: A `u32` representing the ID of the master resource or entity to be associated with the instance.
-    ///
-    /// # Returns
-    /// An instance of `Self` with the specified `master_id`.
+    /// This function initializes the hardware abstraction layer by
+    /// calling an unsafe `hal_init` function and then constructs
+    /// the instance of the struct with default values.
     ///
     /// # Safety
-    /// This function calls the `hal_init()` function, which is marked as `unsafe`. Ensure that `hal_init()` is safe to call
-    /// in the context where this function is used, as it may involve accessing or modifying low-level hardware or memory.
+    /// The internal call to `hal_init` is marked as `unsafe`; ensure that
+    /// calling this function aligns with the requirements of that unsafe
+    /// function.
     ///
-    pub fn new(master_id: u32) -> Self {
+    /// # Returns
+    /// A new instance of the struct with the `locker` property set to `None`.
+    ///
+    pub fn new() -> Self {
         unsafe { hal_init() }
-        Self {
-            locker: Locker::new(master_id),
+        Self { locker: None }
+    }
+
+    /// Configures the locker with a master lock ID if it has not been previously configured.
+    ///
+    /// # Parameters
+    /// - `master_lock_id` (u32): An identifier for the master lock to configure the locker.
+    ///
+    /// # Returns
+    /// - `HalResult<()>`:
+    ///   - `Ok(())` if the locker is successfully configured.
+    ///   - `Err(HalError::LockerAlreadyConfigured)` if the locker has already been configured.
+    ///
+    /// # Errors
+    /// This function returns an error if the locker is already configured to prevent reconfiguration.
+    ///
+    pub fn configure_locker(&mut self, master_lock_id: u32) -> HalResult<()> {
+        if self.locker.is_none() {
+            self.locker = Some(Locker::new(master_lock_id));
+            Ok(())
+        } else {
+            Err(HalError::LockerAlreadyConfigured)
         }
     }
 
@@ -73,7 +95,9 @@ impl Hal {
         let mut id = 0;
         match unsafe { get_interface_id(name.as_ptr(), &mut id) } {
             HalInterfaceResult::OK => {
-                self.locker.add_interface(id as usize);
+                if let Some(locker) = &mut self.locker {
+                    locker.add_interface(id as usize);
+                }
                 Ok(id as usize)
             }
             HalInterfaceResult::ErrInterfaceNotFound => Err(HalError::InterfaceNotFound(name)),
@@ -81,80 +105,90 @@ impl Hal {
         }
     }
 
-    /// Locks a specific interface using a given locker ID.
+    /// Locks a specific interface using the provided locker identifier.
     ///
-    /// This method attempts to lock an interface identified by its `id` using a provided `locker_id`.
-    /// It delegates the locking operation to the `locker` instance within the current object.
+    /// This function attempts to lock an interface with the given `id` by delegating
+    /// the operation to an internal `locker` if available. The locking mechanism
+    /// ensures that only the specified `locker_id` has exclusive access to the interface.
     ///
     /// # Parameters
-    ///
     /// - `id`: The unique identifier of the interface to be locked.
-    /// - `locker_id`: The identifier of the entity attempting to lock the interface.
+    /// - `locker_id`: The identifier of the locker requesting access.
     ///
     /// # Returns
-    ///
-    /// - `HalResult<()>`: Returns `Ok(())` if the operation is successful or an appropriate error
-    ///   wrapped in `HalResult` if the operation fails.
+    /// - `HalResult<()>`: On success, returns `Ok(())`. If locking fails, it propagates
+    ///   an error from the `locker`.
     ///
     /// # Errors
+    /// This function will return an error if:
+    /// - The underlying `locker` encounters an issue while locking the interface.
     ///
-    /// This method will return an error in the following cases:
-    /// - The interface identified by `id` is already locked.
-    /// - The `locker_id` is invalid or does not have the required permissions.
-    ///
+    /// # Notes
+    /// - If the internal `locker` is not initialized (`None`), this function will simply
+    ///   return `Ok(())` without performing any lock operation.
     pub fn lock_interface(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
-        self.locker.lock_interface(id, locker_id)
+        if let Some(locker) = &mut self.locker {
+            locker.lock_interface(id, locker_id)?;
+        }
+        Ok(())
     }
 
-    /// Unlocks a specific interface identified by its ID.
+    /// Unlocks a specific interface by its ID using the provided locker ID.
     ///
-    /// This function delegates the unlocking operation to the underlying locker
-    /// system by passing the interface ID and the locker ID. It is used to re-enable
-    /// access to an interface that has previously been locked.
+    /// This function attempts to unlock an interface identified by the `id` parameter.
+    /// It utilizes the provided `locker_id` to perform the unlock operation. If the locker is present,
+    /// the method delegates the unlock functionality to the `locker.unlock_interface` method. Any errors
+    /// encountered during this process will be propagated as a `HalResult` error.
     ///
-    /// # Arguments
-    ///
-    /// * `id` - The unique identifier of the interface to be unlocked.
-    /// * `locker_id` - The identifier of the locking entity or system that is
-    ///   performing the unlock operation.
+    /// # Parameters
+    /// - `id`: The unique identifier of the interface to be unlocked.
+    /// - `locker_id`: The identifier of the locker used to authorize the unlocking process.
     ///
     /// # Returns
-    ///
-    /// * `HalResult<()>` - Returns a result indicating the success (`Ok`) or error
-    ///   (`Err`) of the unlocking operation.
+    /// - `HalResult<()>`: Returns `Ok(())` if the interface was successfully unlocked or if no locker exists.
+    ///   Propagates any error returned by the `locker.unlock_interface` method.
     ///
     /// # Errors
-    ///
-    /// This function will return an error if the underlying locker system encounters
-    /// an issue while unlocking the specified interface.
+    /// - This function returns a propagated error from the `locker.unlock_interface` method if the unlocking
+    ///   process fails.
     ///
     pub fn unlock_interface(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
-        self.locker.unlock_interface(id, locker_id)
+        if let Some(locker) = &mut self.locker {
+            locker.unlock_interface(id, locker_id)?;
+        }
+        Ok(())
     }
 
-    /// Authorizes an action for a given locker and user.
+    /// Authorizes an action for a given entity based on its ID and associated locker ID.
     ///
-    /// This method delegates the authorization process to the `authorize_action`
-    /// method of the `locker` instance and returns the result of that operation.
+    /// This function attempts to authorize an action by delegating the authorization
+    /// to an internal `locker` component if it exists. The provided `id` and `locker_id`
+    /// are used to perform the authorization.
     ///
     /// # Parameters
-    /// - `id`: The unique identifier of the user for whom the action is being authorized.
-    /// - `locker_id`: The unique identifier of the locker for which the action is being authorized.
+    /// - `id`: A `usize` representing the identifier of the entity requesting the action.
+    /// - `locker_id`: A `u32` representing the identifier of the associated locker.
     ///
     /// # Returns
-    /// - `HalResult<()>`: Returns a result indicating success or failure of the authorization process.
-    ///
-    /// If the authorization process completes successfully, the result will be `Ok(())`. If there is
-    /// an error during authorization, the result will be an `Err` containing the error details.
+    /// - `HalResult<()>`: Returns `Ok(())` if the authorization is successful or the `locker`
+    ///   is not present. Returns an error wrapped in `HalResult` if the authorization process fails.
     ///
     /// # Errors
-    /// This method may return an error if:
-    /// - The specified user ID is invalid or does not exist.
-    /// - The specified locker ID is invalid or does not exist.
-    /// - The authorization fails due to business logic constraints.
+    /// This function will return an error if:
+    /// - The `locker` is present but fails to authorize the action due to invalid input,
+    ///   mismatched IDs, or other internal validation criteria.
     ///
+    /// # Panics
+    /// This method will not panic.
+    ///
+    /// # Note
+    /// If the `locker` is `None`, this function will return `Ok(())` without performing
+    /// any authorization.
     pub fn authorize_action(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
-        self.locker.authorize_action(id, locker_id)
+        if let Some(locker) = &mut self.locker {
+            locker.authorize_action(id, locker_id)?;
+        }
+        Ok(())
     }
 
     /// Performs a write operation on the specified interface based on the action provided.
@@ -192,7 +226,9 @@ impl Hal {
         action: InterfaceWriteActions,
     ) -> HalResult<()> {
         // Check for lock on interface
-        self.locker.authorize_action(ressource_id, caller_id)?;
+        if let Some(locker) = &mut self.locker {
+            locker.authorize_action(ressource_id, caller_id)?;
+        }
 
         // Perform action
         match action {
@@ -219,6 +255,41 @@ impl Hal {
         }
     }
 
+    /// Reads from a specified interface resource using an authorized caller.
+    ///
+    /// # Parameters
+    ///
+    /// * `ressource_id` - The unique identifier of the resource to be read.
+    /// * `caller_id` - The unique identifier of the caller requesting the read action.
+    /// * `read_action` - The specific action to be performed, in this case, an `InterfaceReadAction`.
+    ///
+    /// # Returns
+    ///
+    /// If successful, returns a `HalResult` containing an `InterfaceReadResult` which encapsulates
+    /// the result of the read action (e.g., LCD size data).
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error in the following cases:
+    /// * If authorization fails because the caller is not permitted access to the requested resource.
+    /// * If the `read_action` fails to perform the read operation.
+    /// * Any other issue encountered while processing the request is wrapped in the resulting error.
+    ///
+    /// # Workflow
+    ///
+    /// 1. Checks if there is a lock on the interface resource and, if so, authorizes the caller
+    ///    by delegating to the resource's locker (if any).
+    /// 2. Executes the provided `read_action` for the given resource ID. The specific implementation
+    ///    details of the `read_action` are handled by the provided `InterfaceReadAction` implementation.
+    /// 3. Converts the result of the `read_action` into an `InterfaceReadResult` and associates
+    ///    it with the calling context for error handling consistency.
+    /// 4. Returns an `Ok` or an `Err` based on the result of the operation.
+    ///
+    /// # Notes
+    ///
+    /// * The function assumes that the `InterfaceReadAction` is properly implemented to handle
+    ///   the reading operation and return the expected data.
+    /// * Any locking or resource management is delegated to the `locker`'s `authorize_action` method.
     pub fn interface_read(
         &mut self,
         ressource_id: usize,
@@ -226,7 +297,9 @@ impl Hal {
         read_action: InterfaceReadAction,
     ) -> HalResult<InterfaceReadResult> {
         // Check for lock on interface
-        self.locker.authorize_action(ressource_id, caller_id)?;
+        if let Some(locker) = &mut self.locker {
+            locker.authorize_action(ressource_id, caller_id)?;
+        }
 
         // Perform action
         let read_result;

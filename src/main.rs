@@ -15,7 +15,7 @@ fn main() -> ! {
     kernel::init_systick(None);
 
     // Initialize HAL
-    let hal = Hal::new(0);
+    let hal = Hal::new();
 
     // Start kernel
     kernel::boot(BootConfig {

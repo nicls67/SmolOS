@@ -162,6 +162,7 @@ impl ErrorsManager {
     ///
     pub fn init(&mut self, err_led_name: Option<&'static str>) -> KernelResult<()> {
         if let Some(name) = err_led_name {
+            // Get LED interface ID from HAL
             let mut id = 0;
             syscall(
                 Syscall::Hal(SysCallHalArgs {
@@ -171,6 +172,15 @@ impl ErrorsManager {
                 KERNEL_MASTER_ID,
             )?;
             self.err_led_id = Some(id);
+
+            // Get a lock on the error LED
+            syscall(
+                Syscall::Hal(SysCallHalArgs {
+                    id: self.err_led_id.unwrap(),
+                    action: SysCallHalActions::Lock,
+                }),
+                KERNEL_MASTER_ID,
+            )?;
         }
 
         self.set_err_led(false)?;
