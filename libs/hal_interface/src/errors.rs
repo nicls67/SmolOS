@@ -3,7 +3,8 @@
 //! related errors with different severity levels and format
 
 use crate::HalError::{
-    IncompatibleAction, InterfaceNotFound, ReadError, ReadOnlyInterface, UnknownError, WriteError,
+    IncompatibleAction, InterfaceAlreadyLocked, InterfaceNotFound, LockedInterface,
+    LockerAlreadyConfigured, ReadError, ReadOnlyInterface, UnknownError, WriteError,
     WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::HalErrorLevel::{Critical, Error, Fatal};
@@ -68,6 +69,9 @@ pub enum HalError {
     IncompatibleAction(&'static str, &'static str),
     WriteError(HalErrorLevel, &'static str),
     ReadError(HalErrorLevel, &'static str),
+    LockedInterface(&'static str),
+    InterfaceAlreadyLocked(&'static str),
+    LockerAlreadyConfigured,
     UnknownError,
 }
 
@@ -80,19 +84,6 @@ impl HalError {
     ///
     /// # Returns
     /// A `String` with the descriptive message for the current object state or error.
-    ///
-    /// # Variants Handling
-    /// - **InterfaceNotFound(name)**: Produces a message indicating that an interface with the given `name` is not found.
-    /// - **WrongInterfaceId(id)**: Produces a message indicating that the provided interface ID `id` does not exist.
-    /// - **ReadOnlyInterface(name)**: Produces a message indicating that the interface named `name` is read-only.
-    /// - **WriteOnlyInterface(name)**: Produces a message indicating that the interface named `name` is write-only.
-    /// - **IncompatibleAction(action, interface)**: Produces a message indicating that the `action` is incompatible
-    ///   with the given `interface`.
-    /// - **WriteError(lvl, ift)**: Produces a message indicating an error during a write operation on the specified
-    ///   interface `ift`.
-    /// - **ReadError(lvl, ift)**: Produces a message indicating an error during a read operation on the specified
-    ///   interface `ift`.
-    /// - **UnknownError**: Produces a generic message indicating an unknown error occurred.
     ///
     /// # Behavior
     /// - Uses `self.severity().as_str()` to prefix the severity level to the message.
@@ -177,6 +168,33 @@ impl HalError {
                 msg.push_str(format!(256; "Unknown HAL error").unwrap().as_str())
                     .unwrap();
             }
+            LockedInterface(ift) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Interface {} is locked", ift)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            InterfaceAlreadyLocked(ift) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Interface {} is locked by another app", ift)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            LockerAlreadyConfigured => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Locker is already configured")
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
         }
         msg
     }
@@ -210,6 +228,9 @@ impl HalError {
             WriteError(lvl, _) => *lvl,
             ReadError(lvl, _) => *lvl,
             UnknownError => Error,
+            LockedInterface(_) => Critical,
+            InterfaceAlreadyLocked(_) => Critical,
+            LockerAlreadyConfigured => Error,
         }
     }
 }

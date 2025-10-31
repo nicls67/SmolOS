@@ -1,15 +1,18 @@
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use crate::TerminalFormatting::StrNewLineBoth;
 use crate::data::Kernel;
-use crate::ident::KERNEL_NAME;
+use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME};
 use crate::scheduler::AppCall;
 use crate::{
-    KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalArgs, Syscall, syscall,
+    KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalActions, SysCallHalArgs,
+    Syscall, syscall,
 };
 use core::panic::PanicInfo;
+use core::sync::atomic::Ordering;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
 use display::Colors;
+use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::{GpioWriteAction, InterfaceWriteActions};
 
 /// The HardFault exception handler.
@@ -93,24 +96,24 @@ fn panic(info: &PanicInfo) -> ! {
     cortex_m::peripheral::SCB::sys_reset();
 }
 
-/// A struct that manages error states and associated components within a system.
-///
-/// The `ErrorsManager` struct is used to track and handle error states, including
-/// associating an error level and a corresponding LED identifier (if applicable)
-/// to signal the error condition.
+/// A structure for managing error statuses in an application. This structure
+/// is used to represent and handle different error conditions that may arise
+/// during the execution of the program.
 ///
 /// # Fields
 ///
-/// * `err_led_id` - An optional identifier for an LED that can be used to
-///   visually indicate the presence of an error. If set to `None`, no LED
-///   is associated with the error condition.
+/// * `err_led_id` - An optional identifier for the LED associated with
+///   displaying the error status. If `None`, no LED is assigned to handle the error.
 ///
-/// * `has_error` - An optional error level of type `KernelErrorLevel` that
-///   represents the current error state. If set to `None`, it indicates that
-///   no error is currently present.
+/// * `has_error` - An optional `KernelErrorLevel` indicating the severity or
+///   type of error currently being managed. `None` represents no error.
 ///
-/// This struct can be extended or used in combination with other components
-/// to build robust error handling mechanisms in a kernel or embedded system context.
+/// # Usage
+///
+/// This struct can be used to monitor and respond to error states in a system
+/// by keeping track of which error occurred, what application caused it, and if
+/// a hardware indicator (like an LED) should reflect the error status.
+///
 pub struct ErrorsManager {
     err_led_id: Option<usize>,
     has_error: Option<KernelErrorLevel>,
@@ -159,50 +162,67 @@ impl ErrorsManager {
     ///
     pub fn init(&mut self, err_led_name: Option<&'static str>) -> KernelResult<()> {
         if let Some(name) = err_led_name {
-            self.err_led_id = Some(
-                Kernel::hal()
-                    .get_interface_id(name)
-                    .map_err(KernelError::HalError)?,
-            );
+            // Get LED interface ID from HAL
+            let mut id = 0;
+            syscall(
+                Syscall::Hal(SysCallHalArgs {
+                    id: 0,
+                    action: SysCallHalActions::GetID(name, &mut id),
+                }),
+                KERNEL_MASTER_ID,
+            )?;
+            self.err_led_id = Some(id);
+
+            // Get a lock on the error LED
+            syscall(
+                Syscall::Hal(SysCallHalArgs {
+                    id: self.err_led_id.unwrap(),
+                    action: SysCallHalActions::Lock,
+                }),
+                KERNEL_MASTER_ID,
+            )?;
         }
 
         self.set_err_led(false)?;
         Ok(())
     }
 
-    /// Sets the state of the error LED.
+    /// Sets the state of the error LED based on the given boolean value.
     ///
-    /// This function changes the state of the error LED to the specified value (`true` to set it on, `false` to turn it off).
-    /// It uses the hardware abstraction layer (HAL) to perform the operation on the hardware interface associated
-    /// with the error LED.
+    /// This function changes the state of the error LED by performing a system call.
+    /// If the error LED identifier (`err_led_id`) exists, it sends a write action
+    /// to either set or clear the GPIO pin associated with the error LED based
+    /// on the `state` parameter.
     ///
-    /// # Parameters
-    /// - `state`: A boolean indicating the desired state of the error LED.
-    ///   - `true`: Turns the error LED on.
-    ///   - `false`: Turns the error LED off.
+    /// # Arguments
+    ///
+    /// * `state` - A boolean value representing the desired state of the error LED.
+    ///             - `true`: Turns the error LED on (GPIO set action).
+    ///             - `false`: Turns the error LED off (GPIO clear action).
     ///
     /// # Returns
-    /// - `Ok(())` if the state was successfully set or if no error LED is configured (`self.err_led_id` is `None`).
-    /// - `Err(KernelError)` if there was an error interfacing with the hardware abstraction layer (HAL).
+    ///
+    /// Returns `Ok(())` if the operation completes successfully. If a syscall error occurs,
+    /// it returns a `KernelResult` with the appropriate error.
     ///
     /// # Errors
-    /// Returns an error of type `KernelError::HalError` if the HAL operation to change the LED state fails.
     ///
-    /// # Safety
-    /// This function assumes that the hardware abstraction layer (HAL) is properly initialized.
-    /// Ensure that `self.err_led_id` is correctly configured to avoid any runtime issues.
+    /// This function will return an error if the syscall fails when attempting
+    /// to perform the GPIO write action.
+    ///
     fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
         if let Some(id) = self.err_led_id {
-            Kernel::hal()
-                .interface_write(
+            syscall(
+                Syscall::Hal(SysCallHalArgs {
                     id,
-                    InterfaceWriteActions::GpioWrite(if state {
+                    action: SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(if state {
                         GpioWriteAction::Set
                     } else {
                         GpioWriteAction::Clear
-                    }),
-                )
-                .map_err(KernelError::HalError)?;
+                    })),
+                }),
+                KERNEL_MASTER_ID,
+            )?;
         }
         Ok(())
     }
@@ -264,20 +284,28 @@ impl ErrorsManager {
                         .app_exists(Self::LED_BLINK_APP_NAME, self.err_led_id.map(|x| x as u32))
                         .is_none()
                     {
-                        syscall(Syscall::AddPeriodicTask(
-                            Self::LED_BLINK_APP_NAME,
-                            AppCall::AppParam(blink_err_led, id as u32, Some(reset_err_led)),
-                            None,
-                            Milliseconds(100),
-                            Some(Milliseconds(10000)),
-                        ))
+                        let mut err_app_id = 0;
+                        syscall(
+                            Syscall::AddPeriodicTask(
+                                Self::LED_BLINK_APP_NAME,
+                                AppCall::AppParam(blink_err_led, id as u32, Some(reset_err_led)),
+                                None,
+                                Milliseconds(100),
+                                Some(Milliseconds(10000)),
+                                &mut err_app_id,
+                            ),
+                            KERNEL_MASTER_ID,
+                        )
                         .unwrap_or(());
                     } else {
-                        syscall(Syscall::NewTaskDuration(
-                            Self::LED_BLINK_APP_NAME,
-                            Some(id as u32),
-                            Milliseconds(10000),
-                        ))
+                        syscall(
+                            Syscall::NewTaskDuration(
+                                Self::LED_BLINK_APP_NAME,
+                                Some(id as u32),
+                                Milliseconds(10000),
+                            ),
+                            KERNEL_MASTER_ID,
+                        )
                         .unwrap_or(())
                     }
                 }
@@ -347,10 +375,15 @@ impl ErrorsManager {
 ///   cannot be completed.
 ///
 fn blink_err_led(id: u32) -> KernelResult<()> {
-    syscall(Syscall::Hal(SysCallHalArgs {
-        id: id as usize,
-        action: InterfaceWriteActions::GpioWrite(GpioWriteAction::Toggle),
-    }))
+    syscall(
+        Syscall::Hal(SysCallHalArgs {
+            id: id as usize,
+            action: SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(
+                GpioWriteAction::Toggle,
+            )),
+        }),
+        KERNEL_MASTER_ID,
+    )
 }
 
 /// Resets the error LED indicator.

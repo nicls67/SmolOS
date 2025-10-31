@@ -19,7 +19,7 @@ use std::process::Command;
 fn main() {
     // Generate drivers allocation file
     println!("cargo:rerun-if-changed=drivers_conf.yaml");
-    let gen_status = Command::new("python")
+    let gen_status = Command::new("python3")
         .arg("tools/gen_drivers_alloc.py")
         .arg("drivers_conf.yaml")
         .output()

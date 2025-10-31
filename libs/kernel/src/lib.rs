@@ -12,9 +12,10 @@ mod types;
 use crate::data::Kernel;
 pub use crate::data::KernelTimeData;
 use crate::errors_mgt::ErrorsManager;
-use crate::ident::{KERNEL_NAME, KERNEL_VERSION};
+use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME, KERNEL_VERSION};
 use crate::scheduler::Scheduler;
-pub use crate::terminal::{Terminal, TerminalFormatting, TerminalType};
+pub use crate::terminal::TerminalType;
+use crate::terminal::{Terminal, TerminalFormatting};
 pub use data::cortex_init;
 use display::FontSize::Font24;
 use display::{Colors, Display};
@@ -68,6 +69,12 @@ pub fn boot(config: BootConfig) {
         sched,
         ErrorsManager::new(),
     );
+    Kernel::hal().configure_locker(KERNEL_MASTER_ID).unwrap();
+
+    ////////////////////////////////////
+    // Errors Manager initialization
+    ////////////////////////////////////
+    Kernel::errors().init(config.err_led_name).unwrap();
 
     //////////////////////////
     // Display initialization
@@ -75,7 +82,9 @@ pub fn boot(config: BootConfig) {
     Kernel::display()
         .init(config.display_name.unwrap(), Kernel::hal(), Colors::Black)
         .unwrap();
-    Kernel::display().set_font(Font24).unwrap();
+    Kernel::display()
+        .set_font(Font24, KERNEL_MASTER_ID)
+        .unwrap();
 
     ////////////////////////////
     // Terminal start
@@ -102,11 +111,6 @@ pub fn boot(config: BootConfig) {
         .unwrap();
 
     ////////////////////////////////////
-    // Errors Manager initialization
-    ////////////////////////////////////
-    Kernel::errors().init(config.err_led_name).unwrap();
-
-    ////////////////////////////////////
     // Systick initialization
     ////////////////////////////////////
     init_systick(Some(config.kernel_time_data.systick_period));
@@ -116,6 +120,9 @@ pub fn boot(config: BootConfig) {
     terminal
         .write(&TerminalFormatting::StrNewLineBoth("Kernel ready !"))
         .unwrap();
+
+    // Start kernel apps
+    kernel_apps::initialize_kernel_apps().unwrap_or(());
 }
 
 /// Starts the system scheduler.
@@ -133,24 +140,4 @@ pub fn start_scheduler() {
     Kernel::scheduler()
         .start(Kernel::time_data().clone().systick_period)
         .unwrap();
-}
-
-/// Starts the kernel applications for the system.
-///
-/// This function initializes all kernel-level applications by invoking the
-/// `initialize_kernel_apps` method provided by the `kernel_apps` module.
-/// It ensures that the kernel apps are correctly set up and ready to use
-/// during the system's runtime.
-///
-/// # Panics
-///
-/// This function will panic if the initialization of kernel apps fails,
-/// as it propagates the error using `unwrap`. Ensure that proper setup and
-/// error handling are performed in `initialize_kernel_apps` to avoid runtime
-/// panics.
-///
-/// Make sure to call this function at the appropriate point during system
-/// initialization to correctly set up kernel applications.
-pub fn start_kernel_apps() {
-    kernel_apps::initialize_kernel_apps().unwrap()
 }

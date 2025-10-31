@@ -34,7 +34,6 @@ fn main() -> ! {
         display_name: Some("LCD"),
     });
 
-    kernel::start_kernel_apps();
     kernel::start_scheduler();
 
     #[allow(clippy::empty_loop)]
