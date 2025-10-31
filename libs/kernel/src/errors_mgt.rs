@@ -160,11 +160,15 @@ impl ErrorsManager {
     ///
     pub fn init(&mut self, err_led_name: Option<&'static str>) -> KernelResult<()> {
         if let Some(name) = err_led_name {
-            self.err_led_id = Some(
-                Kernel::hal()
-                    .get_interface_id(name)
-                    .map_err(KernelError::HalError)?,
-            );
+            let mut id = 0;
+            syscall(
+                Syscall::Hal(SysCallHalArgs {
+                    id: 0,
+                    action: SysCallHalActions::GetID(name, &mut id),
+                }),
+                KERNEL_MASTER_ID,
+            )?;
+            self.err_led_id = Some(id);
         }
 
         self.set_err_led(false)?;

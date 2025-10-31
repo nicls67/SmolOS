@@ -1,7 +1,10 @@
 use crate::data::Kernel as KernelData;
 use crate::ident::KERNEL_MASTER_ID;
 use crate::terminal::TerminalState::Kernel;
-use crate::{KernelError, KernelResult, SysCallDisplayArgs, Syscall, syscall};
+use crate::{
+    KernelError, KernelResult, SysCallDisplayArgs, SysCallHalActions, SysCallHalArgs, Syscall,
+    syscall,
+};
 use display::Colors;
 use hal_interface::{InterfaceWriteActions, UartWriteActions};
 use heapless::{String, Vec};
@@ -141,13 +144,41 @@ impl Terminal {
         Ok(())
     }
 
+    /// Updates the kernel state and retrieves interface IDs for all terminals.
+    ///
+    /// # Description
+    /// This function performs the following tasks:
+    /// 1. Iterates over all terminals in the `self.terminals` list.
+    /// 2. For each terminal of type `TerminalType::Usart`, it invokes a syscall to retrieve
+    ///    the interface ID and updates the corresponding entry in `self.interface_id`.
+    /// 3. Sets the state of the kernel to `Kernel` if it is not already set.
+    /// 4. Returns a `KernelResult` to indicate success or failure.
+    ///
+    /// # Return
+    /// Returns `KernelResult<()>` to indicate success (`Ok(())`) or an error.
+    ///
+    /// # Errors
+    /// This function may return an error if the syscall fails during the process of retrieving
+    /// the interface ID.
+    ///
+    /// # Assumptions
+    /// - `self.interface_id` has entries that correspond to each terminal in `self.terminals`.
+    /// - The syscall effectively updates the interface ID for USART terminals.
+    ///
+    /// # Note
+    /// Ensure proper error handling for the `syscall` function to detect potential failures
+    /// when retrieving interface IDs.
     pub fn set_kernel_state(&mut self) -> KernelResult<()> {
         // Retrieve interface id for all terminals
         for (i, terminal) in self.terminals.iter().enumerate() {
             if let TerminalType::Usart(name) = terminal {
-                self.interface_id[i] = KernelData::hal()
-                    .get_interface_id(name)
-                    .map_err(KernelError::HalError)?;
+                syscall(
+                    Syscall::Hal(SysCallHalArgs {
+                        id: self.interface_id[i],
+                        action: SysCallHalActions::GetID(name, &mut self.interface_id[i]),
+                    }),
+                    KERNEL_MASTER_ID,
+                )?;
             }
         }
 
