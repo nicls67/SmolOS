@@ -3,16 +3,15 @@ use crate::TerminalFormatting::StrNewLineBoth;
 use crate::data::Kernel;
 use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME};
 use crate::scheduler::AppCall;
+use crate::terminal::TerminalFormatting;
 use crate::{
     KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalActions, SysCallHalArgs,
     Syscall, syscall,
 };
 use core::panic::PanicInfo;
-use core::sync::atomic::Ordering;
 use cortex_m_rt::{ExceptionFrame, exception};
 use cortex_m_semihosting::hprintln;
 use display::Colors;
-use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::{GpioWriteAction, InterfaceWriteActions};
 
 /// The HardFault exception handler.
@@ -310,7 +309,9 @@ impl ErrorsManager {
                     }
                 }
 
-                Kernel::terminal().clear_terminal().unwrap();
+                Kernel::terminal()
+                    .write(&TerminalFormatting::Clear)
+                    .unwrap();
                 Kernel::terminal().set_color(Colors::Red);
                 Kernel::terminal()
                     .write(&StrNewLineBoth(err.to_string().as_str()))
