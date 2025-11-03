@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+mod interrupts;
+
 use cortex_m_rt::entry;
 use hal_interface::Hal;
 use heapless::Vec;

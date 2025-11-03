@@ -93,6 +93,10 @@ void hal_init()
     MX_USART1_UART_Init();
     MX_FMC_Init();
 
+    // Test
+    uint8_t test;
+    HAL_UART_Receive_IT(&huart1, &test, 1);
+
     // LCD Init
     BSP_LCD_Init();
     BSP_LCD_LayerDefaultInit(1, LCD_FB_START_ADDRESS);
