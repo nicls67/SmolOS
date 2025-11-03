@@ -14,6 +14,8 @@
 /********************/
 #include "../Inc/drivers_alloc.h"
 #include "usart.h"
+#include "gpio.h"
+#include "stm32f769i_discovery_lcd.h"
 
 /*******************/
 /* Private typedef */
@@ -40,6 +42,7 @@ const DRIVER_ALLOC DRIVERS_ALLOC[] = {
     { (uint8_t*)"ERR_LED", GPIO, OUT, (void*) &GPIO_PJ13, 2 },
     { (uint8_t*)"LCD", LCD, INOUT, (void*) 0, 3 },
 };
+uint8_t USART1_BUFFER[USART_BUFFER_SIZE];
 
 /******************/
 /* Private macros */
@@ -56,3 +59,20 @@ const DRIVER_ALLOC DRIVERS_ALLOC[] = {
 /********************/
 /* Public functions */
 /********************/
+void drivers_init()
+{
+    // USART1 initialization
+    MX_USART1_UART_Init();;
+
+    // USART1 initialization
+    HAL_UART_Receive_IT(&huart1, USART1_BUFFER, 1);;
+
+    // GPIO initialization
+    MX_GPIO_Init();;
+
+    // LCD initialization
+    BSP_LCD_Init();;
+    BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);;
+    BSP_LCD_DisplayOff();;
+
+}

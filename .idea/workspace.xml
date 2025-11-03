@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="BackendCodeEditorMiscSettings">
+    <option name="/Default/Housekeeping/FeatureSuggestion/FeatureSuggestionManager/DisabledSuggesters/=SwitchToGoToActionSuggester/@EntryIndexedValue" value="true" type="bool" />
+    <option name="/Default/Housekeeping/GlobalSettingsUpgraded/IsUpgraded/@EntryValue" value="true" type="bool" />
+  </component>
+  <component name="CMakeProjectFlavorService">
+    <option name="flavorId" value="CMakePlainProjectFlavor" />
+  </component>
+  <component name="CMakeRunConfigurationManager">
+    <generated />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml">
+      <package file="$PROJECT_DIR$">
+        <feature name="default" enabled="true" />
+      </package>
+    </cargoProject>
+    <cargoProject FILE="$PROJECT_DIR$/libs/display/Cargo.toml">
+      <package file="$PROJECT_DIR$/libs/display">
+        <feature name="default" enabled="true" />
+      </package>
+    </cargoProject>
+    <cargoProject FILE="$PROJECT_DIR$/libs/hal_interface/Cargo.toml">
+      <package file="$PROJECT_DIR$/libs/hal_interface">
+        <feature name="default" enabled="true" />
+      </package>
+    </cargoProject>
+    <cargoProject FILE="$PROJECT_DIR$/libs/kernel/Cargo.toml">
+      <package file="$PROJECT_DIR$/libs/kernel">
+        <feature name="default" enabled="true" />
+      </package>
+    </cargoProject>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="c908a1ac-3b82-45bd-8aca-12e806aa9f2e" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/SmolOS.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/SmolOS.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/customTargets.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/customTargets.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/project.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/editor.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/rust.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/tools/External Tools.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tools/External Tools.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/watcherTasks.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.rs" beforeDir="false" afterPath="$PROJECT_DIR$/build.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers/.idea/drivers.iml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/.idea/drivers.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers/.idea/editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/.idea/editor.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_alloc.h" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_alloc.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers_conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers_conf.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tools/c_file.template" beforeDir="false" afterPath="$PROJECT_DIR$/tools/c_file.template" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" beforeDir="false" afterPath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tools/h_file.template" beforeDir="false" afterPath="$PROJECT_DIR$/tools/h_file.template" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:release" />
+  <component name="FormatOnSaveOptions">
+    <option name="myRunOnSave" value="true" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitLabMergeRequestFiltersHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPENED&quot;,
+    &quot;assignee&quot;: {
+      &quot;type&quot;: &quot;org.jetbrains.plugins.gitlab.mergerequest.ui.filters.GitLabMergeRequestsFiltersValue.MergeRequestsMemberFilterValue.MergeRequestsAssigneeFilterValue&quot;,
+      &quot;username&quot;: &quot;nicosimon6790&quot;,
+      &quot;fullname&quot;: &quot;Nicolas SIMON&quot;
+    }
+  }
+}</component>
+  <component name="GitLabMergeRequestsSettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;first&quot;: &quot;http://serveur-dev.home/smolos/smolos.git&quot;,
+    &quot;second&quot;: &quot;5473455e-ba59-47d1-a94e-bba7fb078f3d&quot;
+  }
+}</component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="sRzfReeP" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="34xelJ06J4Bd5vfB1JRuKhyOop6" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Cargo.Build Release.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "OpenOCD Download & Run.Cargo Release.executor": "Run",
+    "Python.gen_drivers_alloc.executor": "Run",
+    "RunOnceActivity.RadMigrateCodeStyle": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "dart.analysis.tool.window.visible": "false",
+    "git-widget-placeholder": "!5 on 5-terminal-prompt",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "/home/nicolas/Documents/Programmation/CLionProjects/SmolOS",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.first.attach.projects": "true",
+    "settings.editor.selected.configurable": "preferences.keymap",
+    "to.speed.mode.migration.done": "true"
+  }
+}]]></component>
+  <component name="PyConsoleOptionsProvider">
+    <option name="myPythonConsoleState">
+      <console-settings module-name="SmolOS" sdk-home="/usr/bin/python3">
+        <option name="sdk">
+          <Sdk />
+        </option>
+        <option name="mySdkHome" value="/usr/bin/python3" />
+        <option name="mySdk">
+          <Sdk />
+        </option>
+        <option name="myModuleName" value="SmolOS" />
+      </console-settings>
+    </option>
+  </component>
+  <component name="RunManager" selected="OpenOCD Download &amp; Run.Cargo Release">
+    <configuration name="Build Release" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="buildProfileId" value="release" />
+      <option name="command" value="build --release" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Build" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="command" value="build" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Clean" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="command" value="clean" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="gen_drivers_alloc" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="SmolOS" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="SDK_NAME" value="Python 3.13" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/tools/gen_drivers_alloc.py" />
+      <option name="PARAMETERS" value="drivers_conf.yaml" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Cargo Debug" type="com.jetbrains.cidr.embedded.openocd.conf.type" factoryName="com.jetbrains.cidr.embedded.openocd.conf.factory" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SmolOS" TARGET_NAME="Cargo Debug" CONFIG_NAME="Cargo Debug" version="1" RUN_PATH="$PROJECT_DIR$/target/thumbv7em-none-eabihf/debug/SmolOS">
+      <openocd version="1" gdb-port="3333" telnet-port="4444" board-config="board/stm32f769i-disco.cfg" reset-type="HALT" download-type="UPDATED_ONLY">
+        <debugger kind="GDB" isBundled="true" />
+      </openocd>
+      <method v="2">
+        <option name="RunConfigurationTask" enabled="true" run_configuration_name="Build" run_configuration_type="CargoCommandRunConfiguration" run_configuration_target="RsBuildProfile:dev" />
+      </method>
+    </configuration>
+    <configuration name="Cargo Release" type="com.jetbrains.cidr.embedded.openocd.conf.type" factoryName="com.jetbrains.cidr.embedded.openocd.conf.factory" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SmolOS" TARGET_NAME="Cargo Release" CONFIG_NAME="Cargo Release" version="1" RUN_PATH="$PROJECT_DIR$/target/thumbv7em-none-eabihf/release/SmolOS">
+      <openocd version="1" gdb-port="3333" telnet-port="4444" board-config="board/stm32f769i-disco.cfg" reset-type="HALT" download-type="UPDATED_ONLY">
+        <debugger kind="GDB" isBundled="true" />
+      </openocd>
+      <method v="2">
+        <option name="RunConfigurationTask" enabled="true" run_configuration_name="Build Release" run_configuration_type="CargoCommandRunConfiguration" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Cargo.Build Release" />
+      <item itemvalue="Cargo.Build" />
+      <item itemvalue="Cargo.Clean" />
+      <item itemvalue="OpenOCD Download &amp; Run.Cargo Debug" />
+      <item itemvalue="OpenOCD Download &amp; Run.Cargo Release" />
+      <item itemvalue="Python.gen_drivers_alloc" />
+    </list>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="/snap/bin" />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="c908a1ac-3b82-45bd-8aca-12e806aa9f2e" name="Changes" comment="" />
+      <created>1762159800195</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1762159800195</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.template" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>

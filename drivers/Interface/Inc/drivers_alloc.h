@@ -20,6 +20,10 @@
 /* Exported defines */
 /********************/
 #define DRIVERS_ALLOC_SIZE 4
+#define DRIVER_ACTIVATE_USART
+#define DRIVER_ACTIVATE_GPIO
+#define DRIVER_ACTIVATE_LCD
+#define USART_BUFFER_SIZE 32
 
 /******************/
 /* Exported types */
@@ -30,6 +34,7 @@
 /* Exported constants */
 /**********************/
 extern const DRIVER_ALLOC DRIVERS_ALLOC[];
+extern uint8_t USART1_BUFFER[USART_BUFFER_SIZE];
 
 /**********************/
 /* Exported variables */
@@ -42,6 +47,6 @@ extern const DRIVER_ALLOC DRIVERS_ALLOC[];
 /**********************/
 /* Exported functions */
 /**********************/
-
+void drivers_init();
 
 #endif

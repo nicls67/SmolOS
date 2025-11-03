@@ -40,7 +40,7 @@ fn main() {
         .arg("--target")
         .arg("drivers")
         .arg("--preset")
-        .arg("Debug")
+        .arg("Release")
         .output()
         .expect("Failed to build drivers");
     if !build_status.status.success() {
