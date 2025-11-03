@@ -41,27 +41,14 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c908a1ac-3b82-45bd-8aca-12e806aa9f2e" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/SmolOS.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/SmolOS.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/customTargets.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/customTargets.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/project.xml" beforeDir="false" />
+    <list default="true" id="c908a1ac-3b82-45bd-8aca-12e806aa9f2e" name="Changes" comment="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`.">
       <change beforePath="$PROJECT_DIR$/.idea/editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/editor.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/rust.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/tools/External Tools.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tools/External Tools.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/watcherTasks.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.rs" beforeDir="false" afterPath="$PROJECT_DIR$/build.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/.idea/drivers.iml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/.idea/drivers.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/.idea/editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/.idea/editor.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_alloc.h" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_alloc.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/drivers_conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers_conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/c_file.template" beforeDir="false" afterPath="$PROJECT_DIR$/tools/c_file.template" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interrupts.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interrupts.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" beforeDir="false" afterPath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/h_file.template" beforeDir="false" afterPath="$PROJECT_DIR$/tools/h_file.template" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -70,6 +57,22 @@
   </component>
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="EmbeddedSvdWindowState">
+    <option name="columnWidths">
+      <list>
+        <option value="212" />
+        <option value="92" />
+        <option value="2124" />
+      </list>
+    </option>
+    <option name="columnOrder">
+      <list>
+        <option value="Name" />
+        <option value="Value" />
+        <option value="Description" />
+      </list>
+    </option>
   </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:release" />
   <component name="FormatOnSaveOptions">
@@ -94,6 +97,41 @@
     &quot;second&quot;: &quot;5473455e-ba59-47d1-a94e-bba7fb078f3d&quot;
   }
 }</component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="mock:///AIAssistantSnippet.." root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+  </component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="sRzfReeP" />
   </component>
@@ -114,6 +152,7 @@
     "Python.gen_drivers_alloc.executor": "Run",
     "RunOnceActivity.RadMigrateCodeStyle": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
@@ -251,10 +290,23 @@
       <option name="presentableId" value="Default" />
       <updated>1762159800195</updated>
     </task>
+    <task id="LOCAL-00001" summary="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`.">
+      <option name="closed" value="true" />
+      <created>1762177091607</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1762177091607</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="UnknownFeatures">
     <option featureType="com.intellij.fileTypeFactory" implementationName="*.template" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`." />
+    <option name="LAST_COMMIT_MESSAGE" value="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`." />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

@@ -62,17 +62,22 @@ uint8_t USART1_BUFFER[USART_BUFFER_SIZE];
 void drivers_init()
 {
     // USART1 initialization
-    MX_USART1_UART_Init();;
+    MX_USART1_UART_Init();
 
     // USART1 initialization
-    HAL_UART_Receive_IT(&huart1, USART1_BUFFER, 1);;
+    HAL_UART_Receive_IT(&huart1, USART1_BUFFER, 1);
 
     // GPIO initialization
-    MX_GPIO_Init();;
+    MX_GPIO_Init();
 
     // LCD initialization
-    BSP_LCD_Init();;
-    BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);;
-    BSP_LCD_DisplayOff();;
+    BSP_LCD_Init();
+    BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
+    BSP_LCD_DisplayOff();
 
+}
+
+void USART1_it_handler()
+{
+    HAL_UART_IRQHandler(&huart1);
 }

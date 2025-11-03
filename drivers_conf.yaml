@@ -1,6 +1,10 @@
-target_file:
+target_c_file:
   name: drivers_alloc
   directory: drivers/Interface
+
+target_rust_file:
+  name: interrupts
+  directory: src
 
 includes_c:
   - "../Inc/drivers_alloc.h"

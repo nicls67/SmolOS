@@ -47,7 +47,7 @@
 /*********************/
 /* Private functions */
 /*********************/
-bool str_compare(const uint8_t* str1, const uint8_t* str2)
+bool str_compare(const uint8_t *str1, const uint8_t *str2)
 {
     uint8_t i = 0;
     while (str1[i] != '\0' && str2[i] != '\0')
@@ -94,7 +94,7 @@ void hal_init()
     drivers_init();
 }
 
-HAL_INTERFACE_RESULT get_interface_id(const uint8_t* name, uint8_t* id)
+HAL_INTERFACE_RESULT get_interface_id(const uint8_t *name, uint8_t *id)
 {
     for (uint8_t i = 0; i < DRIVERS_ALLOC_SIZE; i++)
     {
@@ -107,7 +107,7 @@ HAL_INTERFACE_RESULT get_interface_id(const uint8_t* name, uint8_t* id)
     return ERR_INTERFACE_NOT_FOUND;
 }
 
-HAL_INTERFACE_RESULT get_interface_name(const uint8_t id, uint8_t* name)
+HAL_INTERFACE_RESULT get_interface_name(const uint8_t id, uint8_t *name)
 {
     if (id >= DRIVERS_ALLOC_SIZE)
     {
@@ -141,18 +141,18 @@ HAL_INTERFACE_RESULT gpio_write(const uint8_t id, const GPIO_WRITE_ACTION action
         return ERR_INCOMPATIBLE_ACTION;
     }
 
-    const GPIO_ALLOC* gpio = DRIVERS_ALLOC[id].drv;
+    const GPIO_ALLOC *gpio = DRIVERS_ALLOC[id].drv;
     switch (action)
     {
-    case SET_PIN:
-        HAL_GPIO_WritePin(gpio->gpio, gpio->pin, GPIO_PIN_SET);
-        break;
-    case CLEAR_PIN:
-        HAL_GPIO_WritePin(gpio->gpio, gpio->pin, GPIO_PIN_RESET);
-        break;
-    case TOGGLE_PIN:
-        HAL_GPIO_TogglePin(gpio->gpio, gpio->pin);
-        break;
+        case SET_PIN:
+            HAL_GPIO_WritePin(gpio->gpio, gpio->pin, GPIO_PIN_SET);
+            break;
+        case CLEAR_PIN:
+            HAL_GPIO_WritePin(gpio->gpio, gpio->pin, GPIO_PIN_RESET);
+            break;
+        case TOGGLE_PIN:
+            HAL_GPIO_TogglePin(gpio->gpio, gpio->pin);
+            break;
     }
 
     return OK;
@@ -160,7 +160,7 @@ HAL_INTERFACE_RESULT gpio_write(const uint8_t id, const GPIO_WRITE_ACTION action
 #endif
 
 #ifdef DRIVER_ACTIVATE_USART
-HAL_INTERFACE_RESULT usart_write(const uint8_t id, const uint8_t* str, const uint16_t len)
+HAL_INTERFACE_RESULT usart_write(const uint8_t id, const uint8_t *str, const uint16_t len)
 {
     if (id >= DRIVERS_ALLOC_SIZE)
     {
@@ -239,7 +239,7 @@ HAL_INTERFACE_RESULT lcd_draw_pixel(const uint8_t id, const uint8_t layer, const
     return OK;
 }
 
-HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t* x, uint16_t* y)
+HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t *x, uint16_t *y)
 {
     const HAL_INTERFACE_RESULT result = lcd_id_check(id);
     if (result != OK)
@@ -247,13 +247,13 @@ HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t* x, uint16_t* y)
         return result;
     }
 
-    *x = (uint16_t)BSP_LCD_GetXSize();
-    *y = (uint16_t)BSP_LCD_GetYSize();
+    *x = (uint16_t) BSP_LCD_GetXSize();
+    *y = (uint16_t) BSP_LCD_GetYSize();
 
     return OK;
 }
 
-HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint32_t* addr)
+HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint32_t *addr)
 {
     const HAL_INTERFACE_RESULT result = lcd_id_check(id);
     if (result != OK)
@@ -263,11 +263,11 @@ HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint3
 
     switch (layer)
     {
-    case 1:
-        *addr = LCD_FB_START_ADDRESS;
-        break;
-    default:
-        break;
+        case 1:
+            *addr = LCD_FB_START_ADDRESS;
+            break;
+        default:
+            break;
     }
 
     return OK;
@@ -285,3 +285,12 @@ HAL_INTERFACE_RESULT set_fb_address(const uint8_t id, const uint8_t layer, const
     return OK;
 }
 #endif
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1)
+    {
+        HAL_UART_Receive_IT(&huart1, USART1_BUFFER, 1);
+        HAL_UART_Transmit(&huart1, USART1_BUFFER, 1, HAL_MAX_DELAY);
+    }
+}
