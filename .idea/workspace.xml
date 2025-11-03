@@ -41,15 +41,7 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c908a1ac-3b82-45bd-8aca-12e806aa9f2e" name="Changes" comment="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`.">
-      <change beforePath="$PROJECT_DIR$/.idea/editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/editor.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers_conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers_conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/interrupts.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interrupts.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" beforeDir="false" afterPath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" afterDir="false" />
-    </list>
+    <list default="true" id="c908a1ac-3b82-45bd-8aca-12e806aa9f2e" name="Changes" comment="Refactor `gen_drivers_alloc.py` and enhance driver code generation&#10;&#10;- Add modularized functions for generating C and Rust code, including interrupt handler support.&#10;- Improve driver initialization with better buffer and sequence handling.&#10;- Update templates with new markers for dynamic function generation.&#10;- Normalize code style and conventions across all files.&#10;- Update project configuration for enhanced output file management." />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -131,6 +123,8 @@
     <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///home/nicolas/Documents/Programmation/CLionProjects/SmolOS/drivers/Interface/Src/drivers_alloc.c" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///home/nicolas/Documents/Programmation/CLionProjects/SmolOS/drivers/Interface/Src/lib_interface.c" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="sRzfReeP" />
@@ -298,7 +292,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762177091607</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Refactor `gen_drivers_alloc.py` and enhance driver code generation&#10;&#10;- Add modularized functions for generating C and Rust code, including interrupt handler support.&#10;- Improve driver initialization with better buffer and sequence handling.&#10;- Update templates with new markers for dynamic function generation.&#10;- Normalize code style and conventions across all files.&#10;- Update project configuration for enhanced output file management.">
+      <option name="closed" value="true" />
+      <created>1762183847517</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1762183847517</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="UnknownFeatures">
@@ -306,7 +308,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`." />
-    <option name="LAST_COMMIT_MESSAGE" value="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`." />
+    <MESSAGE value="Refactor `gen_drivers_alloc.py` and enhance driver code generation&#10;&#10;- Add modularized functions for generating C and Rust code, including interrupt handler support.&#10;- Improve driver initialization with better buffer and sequence handling.&#10;- Update templates with new markers for dynamic function generation.&#10;- Normalize code style and conventions across all files.&#10;- Update project configuration for enhanced output file management." />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactor `gen_drivers_alloc.py` and enhance driver code generation&#10;&#10;- Add modularized functions for generating C and Rust code, including interrupt handler support.&#10;- Improve driver initialization with better buffer and sequence handling.&#10;- Update templates with new markers for dynamic function generation.&#10;- Normalize code style and conventions across all files.&#10;- Update project configuration for enhanced output file management." />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
