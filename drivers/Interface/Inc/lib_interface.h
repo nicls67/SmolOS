@@ -15,10 +15,6 @@
 /************/
 /* Includes */
 /************/
-#include <stdbool.h>
-
-#include "drivers_types.h"
-#include "stm32f769xx.h"
 
 /********************/
 /* Exported defines */

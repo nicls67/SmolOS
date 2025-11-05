@@ -28,13 +28,17 @@
 /******************/
 /* Exported types */
 /******************/
-
+typedef struct
+{
+    uint8_t buffer[USART_BUFFER_SIZE];
+    uint8_t size;
+} USART_RX_BUFFER;
 
 /**********************/
 /* Exported constants */
 /**********************/
 extern const DRIVER_ALLOC DRIVERS_ALLOC[];
-extern uint8_t USART1_BUFFER[USART_BUFFER_SIZE];
+extern USART_RX_BUFFER USART1_BUFFER;
 
 /**********************/
 /* Exported variables */

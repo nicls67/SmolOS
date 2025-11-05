@@ -9,13 +9,17 @@ mod lock;
 pub use interface_read::*;
 pub use interface_write::*;
 
-use crate::bindings::{HalInterfaceResult, get_core_clk, get_interface_id, gpio_write, hal_init};
+use crate::bindings::{
+    HalInterfaceResult, configure_callback, get_core_clk, get_interface_id, gpio_write, hal_init,
+};
 use crate::lock::Locker;
 pub use errors::*;
 
 pub struct Hal {
     locker: Option<Locker>,
 }
+
+pub type InterfaceCallback = extern "C" fn(u8);
 
 impl Hal {
     /// Creates a new instance of the struct.
@@ -316,6 +320,26 @@ impl Hal {
             Ok(_) => Ok(read_result),
             Err(e) => Err(e),
         }
+    }
+
+    pub fn configure_callback(
+        &mut self,
+        ressource_id: usize,
+        caller_id: u32,
+        callback: InterfaceCallback,
+    ) -> HalResult<()> {
+        // Check for lock on interface
+        if let Some(locker) = &mut self.locker {
+            locker.authorize_action(ressource_id, caller_id)?;
+        }
+
+        // Configure callback
+        unsafe { configure_callback(ressource_id as u8, callback) }.to_result(
+            Some(ressource_id),
+            None,
+            None,
+            None,
+        )
     }
 
     /// Retrieves the current core clock frequency.

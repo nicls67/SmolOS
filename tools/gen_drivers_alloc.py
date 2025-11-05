@@ -141,7 +141,8 @@ def gen_table(table_type: str, table_name: str, fields: list, is_const: bool = F
 
     c_code.append(f"{const} {table_type} {table_name}[] = {{")
     for field in fields:
-        c_code.append(f"    {{ (uint8_t*)\"{field[0]}\", {field[1]}, {field[2]}, (void*) {field[3]}, {field[4]} }},")
+        c_code.append(
+            f"    {{ (uint8_t*)\"{field[0]}\", {field[1]}, {field[2]}, (void*) {field[3]}, (void*) {field[4]}, {field[5]} }},")
     c_code.append("};")
     return c_code
 
@@ -181,7 +182,7 @@ def get_peripheral_handler(peripheral, handlers_init: list):
         return ""
 
 
-def gen_drivers_alloc(peri_config: dict):
+def gen_drivers_alloc(peri_config: dict, analysis: dict):
     """
     Generates driver allocation code and configuration table based on the given peripheral configuration.
 
@@ -190,6 +191,7 @@ def gen_drivers_alloc(peri_config: dict):
     It ensures proper handling of peripheral fields and their inclusion in the
     resulting generated code.
 
+    :param analysis: Pre-analysis result
     :param peri_config: Dictionary representing peripheral configuration. Each peripheral
         is expected to have fields such as 'name', 'type', 'direction', and additional
         details required for proper driver initialization.
@@ -203,12 +205,21 @@ def gen_drivers_alloc(peri_config: dict):
     struct_init_c_code = []
 
     # Parse config
+    peri_buffer = "0"
     for i, peripheral in enumerate(peri_config):
+        # Check if the peripheral needs a buffer
+        peri_buffer = "0"
+        for buffer in analysis['buffers']:
+            if peripheral['type'] == "USART" and peripheral["peripheral"] in buffer["name"]:
+                peri_buffer = f"&{buffer['name']}"
+
+        # Generate peripherals dictionary
         peri_fields = [
             peripheral["name"],
             peripheral["type"],
             peripheral["direction"],
             get_peripheral_handler(peripheral, struct_init_c_code),
+            peri_buffer,
             i,
         ]
         peri_list.append(peri_fields)
@@ -363,13 +374,13 @@ def gen_c_code(template: str, config: dict, analysis: dict, header: bool = False
 
                         # Generate buffers declaration
                         for buffer in analysis['buffers']:
-                            generated_lines.append(f"extern uint8_t {buffer['name']}[{buffer['size']}];")
+                            generated_lines.append(f"extern USART_RX_BUFFER {buffer['name']};")
                     else:
-                        generated_lines.extend(gen_drivers_alloc(config['drivers']))
-
                         # Generate buffers declaration
                         for buffer in analysis['buffers']:
-                            generated_lines.append(f"uint8_t {buffer['name']}[{buffer['size']}];")
+                            generated_lines.append(f"USART_RX_BUFFER {buffer['name']};")
+
+                        generated_lines.extend(gen_drivers_alloc(config['drivers'], analysis))
 
                 elif marker == IFNDEF_MARKER:
                     generated_lines.append(

@@ -42,7 +42,7 @@
 /*********************/
 /* Private variables */
 /*********************/
-
+HAL_INTERFACE_CALLBACK callbacks[DRIVERS_ALLOC_SIZE];
 
 /*********************/
 /* Private functions */
@@ -135,6 +135,12 @@ void hal_init()
     MX_FMC_Init();
 
     drivers_init();
+
+    // Initialize callbacks to null
+    for (uint8_t i = 0; i < DRIVERS_ALLOC_SIZE; i++)
+    {
+        callbacks[i] = NULL;
+    }
 }
 
 /**
@@ -210,6 +216,30 @@ HAL_INTERFACE_RESULT get_interface_name(const uint8_t id, uint8_t *name)
 uint32_t get_core_clk()
 {
     return HAL_RCC_GetSysClockFreq();
+}
+
+/**
+ * @brief Configures a callback function for a specified interface ID.
+ *
+ * This function associates a callback function with a given interface ID.
+ * The callback is stored and can be invoked when required by the specified interface.
+ * The ID must be within the valid range of allocated driver interfaces.
+ *
+ * @param id The ID of the interface to configure the callback for. Must be less than DRIVERS_ALLOC_SIZE.
+ * @param callback The callback function pointer to assign to the specified interface ID.
+ *
+ * @return OK if the callback is successfully configured;
+ *         ERR_WRONG_INTERFACE_ID if the provided interface ID is invalid.
+ */
+HAL_INTERFACE_RESULT configure_callback(const uint8_t id, const HAL_INTERFACE_CALLBACK callback)
+{
+    if (id >= DRIVERS_ALLOC_SIZE)
+    {
+        return ERR_WRONG_INTERFACE_ID;
+    }
+
+    callbacks[id] = callback;
+    return OK;
 }
 
 #ifdef DRIVER_ACTIVATE_GPIO
@@ -314,12 +344,80 @@ HAL_INTERFACE_RESULT usart_write(const uint8_t id, const uint8_t *str, const uin
     return OK;
 }
 
+/**
+ * @brief Callback function triggered upon UART receive complete interrupt.
+ *
+ * This function is executed when a UART receive operation is completed,
+ * specifically in interrupt mode. The function checks if the completed
+ * operation is associated with USART1 and reinitializes the interrupt
+ * mechanism for further data reception. Additionally, it identifies
+ * the corresponding driver and calls the associated callback function
+ * if it's configured.
+ *
+ * @param huart Pointer to the UART handle structure that contains
+ *              information about the UART instance.
+ */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+    // Re-initialize IT
     if (huart->Instance == USART1)
     {
-        HAL_UART_Receive_IT(&huart1, USART1_BUFFER, 1);
+        HAL_UART_Receive_IT(&huart1, USART1_BUFFER.buffer, 1);
     }
+
+    // Get the ID corresponding to the handler
+    for (uint8_t i = 0; i < DRIVERS_ALLOC_SIZE; i++)
+    {
+        if (DRIVERS_ALLOC[i].drv == huart)
+        {
+            // If a callback is configured
+            if (callbacks[i] != NULL)
+            {
+                // Call the callback
+                callbacks[i](i);
+            }
+            break;
+        }
+    }
+}
+
+/**
+ * @brief Retrieves the receive buffer and its size for a specified USART interface.
+ *
+ * This function checks if the provided interface ID corresponds to a valid
+ * USART interface with input direction. It retrieves the receive buffer and its size
+ * for the specified USART interface. If the interface ID is invalid, the interface
+ * direction is write-only, or the interface type is incompatible, appropriate error
+ * codes are returned.
+ *
+ * @param id The unique identifier of the USART interface.
+ * @param buffer Pointer to a location where the address of the receive buffer will be stored.
+ * @param size Pointer to a location where the size of the receive buffer will be stored.
+ *
+ * @return OK if successful, or an appropriate error code:
+ *         - ERR_WRONG_INTERFACE_ID if the ID is out of range.
+ *         - ERR_WRITE_ONLY_INTERFACE if the interface is write-only.
+ *         - ERR_INCOMPATIBLE_ACTION if the interface is not of USART type.
+ */
+HAL_INTERFACE_RESULT usart_get_buffer(const uint8_t id, uint8_t **buffer, uint8_t *size)
+{
+    if (id >= DRIVERS_ALLOC_SIZE)
+    {
+        return ERR_WRONG_INTERFACE_ID;
+    }
+    if (DRIVERS_ALLOC[id].drv_direction == OUT)
+    {
+        return ERR_WRITE_ONLY_INTERFACE;
+    }
+    if (DRIVERS_ALLOC[id].drv_type != USART)
+    {
+        return ERR_INCOMPATIBLE_ACTION;
+    }
+
+    *buffer = ((USART_RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->buffer;
+    *size = ((USART_RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size;
+
+    return OK;
 }
 #endif
 
@@ -444,22 +542,19 @@ HAL_INTERFACE_RESULT lcd_draw_pixel(const uint8_t id, const uint8_t layer, const
 }
 
 /**
- * @brief Retrieves the size (width and height) of the specified LCD panel.
+ * @brief Retrieves the size of an LCD interface specified by its ID.
  *
- * This function checks the validity of the given LCD interface ID and ensures
- * it is configured for proper use as an output-type LCD device. If the interface
- * is valid, it retrieves the screen dimensions (width and height) in pixels.
+ * This function checks the validity of the given LCD ID and fetches
+ * the horizontal and vertical dimensions of the LCD screen in pixels.
+ * It populates the provided pointers with the retrieved dimensions.
  *
- * @param id The ID of the LCD interface to query. Must be within the valid range
- *           and correspond to an output-type LCD interface.
- * @param size Pointer to a PIXEL_COORD structure where the LCD dimensions will
- *             be stored. The `x` member will store the width, and the `y` member
- *             will store the height of the LCD.
- * @return A HAL_INTERFACE_RESULT indicating the result of the operation:
- *         - OK: The operation was successful, and the size has been retrieved.
- *         - ERR_WRONG_INTERFACE_ID: The provided ID is out of range.
- *         - ERR_READ_ONLY_INTERFACE: The interface is read-only and cannot be queried.
- *         - ERR_INCOMPATIBLE_ACTION: The ID does not correspond to an LCD device.
+ * @param id The ID of the LCD interface to query.
+ * @param x Pointer to a variable where the horizontal size (width) of the LCD will be stored.
+ * @param y Pointer to a variable where the vertical size (height) of the LCD will be stored.
+ *
+ * @return OK if the operation is successful.
+ *         ERR_WRONG_INTERFACE_ID if the ID is invalid or out of bounds.
+ *         ERR_INCOMPATIBLE_ACTION if the ID does not correspond to an LCD interface.
  */
 HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t *x, uint16_t *y)
 {
@@ -544,5 +639,3 @@ HAL_INTERFACE_RESULT set_fb_address(const uint8_t id, const uint8_t layer, const
     return OK;
 }
 #endif
-
-

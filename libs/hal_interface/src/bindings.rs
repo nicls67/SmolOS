@@ -2,7 +2,7 @@ use crate::HalError::{
     IncompatibleAction, InterfaceNotFound, ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::interface_read::InterfaceReadAction;
-use crate::{GpioWriteAction, HalResult, InterfaceWriteActions, LcdLayer};
+use crate::{GpioWriteAction, HalResult, InterfaceCallback, InterfaceWriteActions, LcdLayer};
 
 #[repr(u8)]
 #[allow(dead_code)]
@@ -92,9 +92,13 @@ unsafe extern "C" {
 
     pub fn get_interface_name(id: u8, name: *mut u8) -> HalInterfaceResult;
 
+    pub fn configure_callback(id: u8, callback: InterfaceCallback) -> HalInterfaceResult;
+
     pub fn gpio_write(id: u8, action: GpioWriteAction) -> HalInterfaceResult;
 
     pub fn usart_write(id: u8, str: *const u8, len: u16) -> HalInterfaceResult;
+
+    pub fn usart_get_buffer(id: u8, buffer: &mut *mut u8, size: &mut u8) -> HalInterfaceResult;
 
     pub fn get_core_clk() -> u32;
 

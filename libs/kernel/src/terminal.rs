@@ -5,7 +5,7 @@ use crate::{
     KernelResult, SysCallDisplayArgs, SysCallHalActions, SysCallHalArgs, Syscall, syscall,
 };
 use display::Colors;
-use hal_interface::{InterfaceWriteActions, UartWriteActions};
+use hal_interface::{InterfaceCallback, InterfaceWriteActions, UartWriteActions};
 use heapless::{String, Vec};
 
 /// Represents different kinds of terminal text formatting or operations.
@@ -157,6 +157,15 @@ impl Terminal {
                         KERNEL_MASTER_ID,
                     )?;
                 }
+
+                // Configure callback for user prompt data
+                syscall(
+                    Syscall::Hal(SysCallHalArgs {
+                        id: self.interface_id[i],
+                        action: SysCallHalActions::ConfigureCallback(terminal_prompt_callback),
+                    }),
+                    KERNEL_MASTER_ID,
+                )?;
 
                 // Set mode to prompt
                 if self.mode[i] != Prompt {
@@ -473,4 +482,8 @@ impl Terminal {
 
         Ok(())
     }
+}
+
+pub extern "C" fn terminal_prompt_callback(id: u8) {
+    panic!("Callback not implemented");
 }
