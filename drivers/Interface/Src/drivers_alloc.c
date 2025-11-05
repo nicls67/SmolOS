@@ -72,7 +72,7 @@ void drivers_init()
 
     // LCD initialization
     BSP_LCD_Init();
-    BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
+    BSP_LCD_LayerDefaultInit(1, LCD_FB_START_ADDRESS);
     BSP_LCD_DisplayOff();
 
 }

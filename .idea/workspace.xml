@@ -42,19 +42,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c908a1ac-3b82-45bd-8aca-12e806aa9f2e" name="Changes" comment="Refactor `lib_interface` and enhance LCD and GPIO functionalities&#10;&#10;- Reintroduce complete documentation for public and private `lib_interface` functions.&#10;- Add new function `str_compare` for string comparisons within the interface.&#10;- Update `lcd_enable`, `lcd_clear`, `lcd_draw_pixel`, and `gpio_write` with detailed descriptions and improved comments.&#10;- Restore previously removed functions like `hal_init` and `get_interface_id` to align with the updated driver structure.&#10;- Cleanup redundant code sections and standardize coding style across the files.">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_alloc.h" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_alloc.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_types.h" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Inc/drivers_types.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/Interface/Inc/lib_interface.h" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Inc/lib_interface.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/drivers_alloc.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/Interface/Src/lib_interface.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers_conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/drivers_conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/hal_interface/src/bindings.rs" beforeDir="false" afterPath="$PROJECT_DIR$/libs/hal_interface/src/bindings.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/hal_interface/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/libs/hal_interface/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/kernel/src/syscall.rs" beforeDir="false" afterPath="$PROJECT_DIR$/libs/kernel/src/syscall.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/kernel/src/terminal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/libs/kernel/src/terminal.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" beforeDir="false" afterPath="$PROJECT_DIR$/tools/gen_drivers_alloc.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/h_file.template" beforeDir="false" afterPath="$PROJECT_DIR$/tools/h_file.template" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,6 +73,11 @@
     <option name="myRunOnSave" value="true" />
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="cc07bd5f6ce0fe0f4d24a5a2e0751943ed3dc13b" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitLabMergeRequestFiltersHistory">{
@@ -140,6 +133,27 @@
     <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///dummy.cpp" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///home/nicolas/Documents/Programmation/CLionProjects/SmolOS/drivers/Interface/Inc/drivers_alloc.h" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///home/nicolas/Documents/Programmation/CLionProjects/SmolOS/drivers/Interface/Inc/drivers_types.h" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///home/nicolas/Documents/Programmation/CLionProjects/SmolOS/drivers/Interface/Inc/lib_interface.h" root0="SKIP_HIGHLIGHTING" />
@@ -159,32 +173,32 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Cargo.Build Release.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "OpenOCD Download & Run.Cargo Release.executor": "Run",
-    "Python.gen_drivers_alloc.executor": "Run",
-    "RunOnceActivity.RadMigrateCodeStyle": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "cf.first.check.clang-format": "false",
-    "cidr.known.project.marker": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "!5 on 5-terminal-prompt",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "/home/nicolas/Documents/Programmation/CLionProjects/SmolOS",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.first.attach.projects": "true",
-    "settings.editor.selected.configurable": "preferences.keymap",
-    "to.speed.mode.migration.done": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Cargo.Build Release.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;OpenOCD Download &amp; Run.Cargo Release.executor&quot;: &quot;Run&quot;,
+    &quot;Python.gen_drivers_alloc.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.RadMigrateCodeStyle&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;!5 on 5-terminal-prompt&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/nicolas/Documents/Programmation/CLionProjects/SmolOS&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.keymap&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
       <console-settings module-name="SmolOS" sdk-home="/usr/bin/python3">
@@ -335,11 +349,34 @@
   <component name="UnknownFeatures">
     <option featureType="com.intellij.fileTypeFactory" implementationName="*.template" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Update project metadata and refactor driver allocation&#10;&#10;- Remove obsolete `.idea` project files and regenerate updated metadata (`workspace.xml`, `misc.xml`, `iml`).&#10;- Enhance driver allocation generation with support for `functions` marker and buffer initialization.&#10;- Refactor `gen_drivers_alloc.py` with improved modularity, analysis pre-processing, and robust buffer management.&#10;- Update templates (`h_file.template`, `c_file.template`) with a new `functions` marker for dynamic function generation.&#10;- Upgrade Python environment configuration to version `3.13`." />
     <MESSAGE value="Refactor `gen_drivers_alloc.py` and enhance driver code generation&#10;&#10;- Add modularized functions for generating C and Rust code, including interrupt handler support.&#10;- Improve driver initialization with better buffer and sequence handling.&#10;- Update templates with new markers for dynamic function generation.&#10;- Normalize code style and conventions across all files.&#10;- Update project configuration for enhanced output file management." />
     <MESSAGE value="Refactor `lib_interface` and enhance LCD and GPIO functionalities&#10;&#10;- Reintroduce complete documentation for public and private `lib_interface` functions.&#10;- Add new function `str_compare` for string comparisons within the interface.&#10;- Update `lcd_enable`, `lcd_clear`, `lcd_draw_pixel`, and `gpio_write` with detailed descriptions and improved comments.&#10;- Restore previously removed functions like `hal_init` and `get_interface_id` to align with the updated driver structure.&#10;- Cleanup redundant code sections and standardize coding style across the files." />
     <option name="LAST_COMMIT_MESSAGE" value="Refactor `lib_interface` and enhance LCD and GPIO functionalities&#10;&#10;- Reintroduce complete documentation for public and private `lib_interface` functions.&#10;- Add new function `str_compare` for string comparisons within the interface.&#10;- Update `lcd_enable`, `lcd_clear`, `lcd_draw_pixel`, and `gpio_write` with detailed descriptions and improved comments.&#10;- Restore previously removed functions like `hal_init` and `get_interface_id` to align with the updated driver structure.&#10;- Cleanup redundant code sections and standardize coding style across the files." />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <breakpoint enabled="true" type="RiderSymbolicBreakpointType">
+          <properties>
+            <option name="symbolPattern" value="lcd_clear" />
+          </properties>
+          <option name="timeStamp" value="3" />
+        </breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
