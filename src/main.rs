@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+mod interrupts;
+
 use cortex_m_rt::entry;
 use hal_interface::Hal;
 use heapless::Vec;
@@ -33,8 +35,6 @@ fn main() -> ! {
         err_led_name: Some("ERR_LED"),
         display_name: Some("LCD"),
     });
-
-    kernel::start_scheduler();
 
     #[allow(clippy::empty_loop)]
     loop {}

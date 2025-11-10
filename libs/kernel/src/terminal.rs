@@ -1,12 +1,16 @@
-use crate::data::Kernel as KernelData;
+use crate::KernelError::TerminalError;
+use crate::KernelErrorLevel::Error;
+use crate::TerminalType::Usart;
+use crate::data::Kernel;
 use crate::ident::KERNEL_MASTER_ID;
-use crate::terminal::TerminalState::Kernel;
+use crate::terminal::TerminalState::{Display, Prompt, Stopped};
 use crate::{
-    KernelError, KernelResult, SysCallDisplayArgs, SysCallHalActions, SysCallHalArgs, Syscall,
-    syscall,
+    KernelResult, SysCallDisplayArgs, SysCallHalActions, SysCallHalArgs, Syscall, syscall,
 };
 use display::Colors;
-use hal_interface::{InterfaceWriteActions, UartWriteActions};
+use hal_interface::{
+    BUFFER_SIZE, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions, UartWriteActions,
+};
 use heapless::{String, Vec};
 
 /// Represents different kinds of terminal text formatting or operations.
@@ -60,23 +64,14 @@ pub enum TerminalType {
 /// The `TerminalState` enum defines various operational states
 /// that a terminal can be in, providing control over its interaction
 /// with users and kernel processes.
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 enum TerminalState {
     /// Terminal is stopped
     Stopped,
-    /// Terminal is started, waiting for user input, kernel writes are disabled
-    User,
-    /// Terminal is started, open to kernel writes
-    Kernel,
-}
-
-/// Escape sequence
-#[derive(PartialEq)]
-enum EscapeSeqState {
-    NotInEcsSeq,
-    FirstRcv,
-    SecRcv,
-    ThirdRcv,
+    /// Terminal is in prompt mode
+    Prompt,
+    /// Terminal is in display-only mode
+    Display,
 }
 
 const MAX_TERMINALS: usize = 8;
@@ -84,9 +79,8 @@ const MAX_TERMINALS: usize = 8;
 pub struct Terminal {
     interface_id: Vec<usize, MAX_TERMINALS>,
     terminals: Vec<TerminalType, MAX_TERMINALS>,
-    line_buffer: String<256>,
-    state: TerminalState,
-    escape_seq: EscapeSeqState,
+    line_buffer: Vec<String<256>, MAX_TERMINALS>,
+    mode: Vec<TerminalState, MAX_TERMINALS>,
     cursor_pos: usize,
     current_color: Colors,
 }
@@ -106,86 +100,230 @@ impl Terminal {
     /// - `interface_id`: Initialized with a vector containing `MAX_TERMINALS` zeroes.
     /// - `line_buffer`: Starts as an empty string.
     /// - `state`: Set to `TerminalState::Stopped`.
-    /// - `escape_seq`: Defaults to `EscapeSeqState::NotInEcsSeq`.
     /// - `cursor_pos`: Initialized to `0`.
     /// - `current_color`: Set to `Colors::White`.
     ///
     /// # Panics
-    /// This function will panic if the creation of `interface_id` vector fails, which is unlikely
+    /// This function will panic if the creation of the ` interface_id ` vector fails, which is unlikely
     /// unless system memory constraints are exceeded.
     ///
     pub fn new(terminals: Vec<TerminalType, 8>) -> Terminal {
         Terminal {
             interface_id: Vec::from_slice(&[0; MAX_TERMINALS]).unwrap(),
             terminals,
-            line_buffer: String::new(),
-            state: TerminalState::Stopped,
-            escape_seq: EscapeSeqState::NotInEcsSeq,
+            line_buffer: Vec::from_slice(&[const { String::new() }; MAX_TERMINALS]).unwrap(),
+            mode: Vec::from_slice(&[Stopped; MAX_TERMINALS]).unwrap(),
             cursor_pos: 0,
             current_color: Colors::White,
         }
     }
 
-    pub fn start(&mut self) -> KernelResult<()> {
-        if self.state != TerminalState::User {
-            self.set_user_mode()?;
-        }
-        Ok(())
-    }
-
-    pub fn set_user_mode(&mut self) -> KernelResult<()> {
-        if self.state != TerminalState::User {
-            self.state = TerminalState::User;
-            self.escape_seq = EscapeSeqState::NotInEcsSeq;
-            self.cursor_pos = 0;
-            self.new_line()?;
-            self.write_char('>')?;
-        }
-        Ok(())
-    }
-
-    /// Updates the kernel state and retrieves interface IDs for all terminals.
+    /// Retrieves the name of a terminal based on its index.
     ///
-    /// # Description
-    /// This function performs the following tasks:
-    /// 1. Iterates over all terminals in the `self.terminals` list.
-    /// 2. For each terminal of type `TerminalType::Usart`, it invokes a syscall to retrieve
-    ///    the interface ID and updates the corresponding entry in `self.interface_id`.
-    /// 3. Sets the state of the kernel to `Kernel` if it is not already set.
-    /// 4. Returns a `KernelResult` to indicate success or failure.
+    /// # Arguments
     ///
-    /// # Return
-    /// Returns `KernelResult<()>` to indicate success (`Ok(())`) or an error.
+    /// * `term_idx` - The index of the terminal in the `terminals` vector.
     ///
-    /// # Errors
-    /// This function may return an error if the syscall fails during the process of retrieving
-    /// the interface ID.
+    /// # Returns
     ///
-    /// # Assumptions
-    /// - `self.interface_id` has entries that correspond to each terminal in `self.terminals`.
-    /// - The syscall effectively updates the interface ID for USART terminals.
+    /// A string slice (`&str`) representing the name of the terminal.
+    /// If the terminal is of type `Usart`, the corresponding name is returned.
+    /// If the terminal is of type `Display`, the string "Display" is returned.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if `term_idx` is out of bounds for the `terminals` vector.
     ///
     /// # Note
-    /// Ensure proper error handling for the `syscall` function to detect potential failures
-    /// when retrieving interface IDs.
-    pub fn set_kernel_state(&mut self) -> KernelResult<()> {
-        // Retrieve interface id for all terminals
+    ///
+    /// Ensure that `term_idx` is within the valid range of terminal indices to avoid
+    /// runtime panics.
+    fn name(&self, term_idx: usize) -> &'static str {
+        match self.terminals[term_idx] {
+            Usart(n) => n,
+            TerminalType::Display => "Display",
+        }
+    }
+
+    /// Configures terminal interfaces to operate in prompt mode, enabling user input capabilities.
+    ///
+    /// # Description
+    /// This function iterates over all terminal interfaces managed by the object.
+    /// It ensures that only USART terminals are set to prompt mode, as these are suited for user interaction.
+    /// If a terminal is in the `Stopped` state, the function attempts to retrieve or update the interface ID
+    /// by performing a system call. Once the required interface IDs are resolved, the function transitions
+    /// those terminals not already in `Prompt` mode into that mode. Prompt mode setups involve resetting the escape
+    /// sequence state, positioning the cursor, starting a new line, and displaying a `>` prompt character.
+    ///
+    /// # Behavior
+    /// - Only terminals of type `Usart` are processed.
+    /// - Any terminal in the `Stopped` state will trigger a system call to retrieve the interface ID.
+    /// - Terminals already in `Prompt` mode are left unchanged.
+    /// - For terminals transitioning to `Prompt` mode:
+    ///   * Resets escape sequence state.
+    ///   * Resets the cursor position to the start.
+    ///   * Outputs a new line and writes the `>` character as a prompt
+    pub fn set_prompt_mode(&mut self) -> KernelResult<()> {
         for (i, terminal) in self.terminals.iter().enumerate() {
-            if let TerminalType::Usart(name) = terminal {
+            // Only USART terminals are supported in prompt mode
+            if let Usart(name) = terminal {
+                // Retrieve interface id if the terminal is stopped
+                if self.mode[i] == Stopped {
+                    syscall(
+                        Syscall::Hal(SysCallHalArgs {
+                            id: self.interface_id[i],
+                            action: SysCallHalActions::GetID(name, &mut self.interface_id[i]),
+                        }),
+                        KERNEL_MASTER_ID,
+                    )?;
+                }
+
+                // Configure callback for user prompt data
                 syscall(
                     Syscall::Hal(SysCallHalArgs {
                         id: self.interface_id[i],
-                        action: SysCallHalActions::GetID(name, &mut self.interface_id[i]),
+                        action: SysCallHalActions::ConfigureCallback(terminal_prompt_callback),
                     }),
                     KERNEL_MASTER_ID,
                 )?;
+
+                // Set mode to prompt
+                if self.mode[i] != Prompt {
+                    self.mode[i] = Prompt;
+                    self.cursor_pos = 0;
+                    self.new_line(i)?;
+                    self.write_char('>', i)?;
+                }
             }
         }
 
-        // Set state to kernel
-        if self.state != Kernel {
-            self.state = Kernel
+        Ok(())
+    }
+
+    /// Sets the display mode for all terminals managed by the system.
+    ///
+    /// This method iterates through each terminal, identifies terminals that are currently
+    /// in the `Stopped` state, and performs the necessary actions to transition them to the
+    /// `Display` mode. If a terminal is of type `Usart`, it retrieves its interface ID
+    /// by making a system call using the `Syscall::Hal` API.
+    ///
+    /// # Behavior
+    /// - For each terminal that is in the `Stopped` state:
+    ///   1. If the terminal is of type `Usart`, the interface ID is queried and updated.
+    ///   2. The terminal's mode is set to `Display`.
+    /// - Terminals that are not in the `Stopped` state are ignored.
+    ///
+    /// # Errors
+    /// This function can return a `KernelResult::Err` if the system call invoked to
+    /// retrieve the interface ID fails. In such a case, the error will propagate to the caller.
+    ///
+    /// # Parameters
+    /// - `&mut self`: A mutable reference to the instance of the containing structure. This
+    ///   is required to modify the terminal modes and interface IDs.
+    ///
+    /// # Returns
+    /// - `KernelResult<()>`: Indicates whether the display mode update operation was successful.
+    ///   Returns `Ok(())` if successful, or the appropriate error if an issue occurs.
+    ///
+    /// # System Calls
+    /// - Invokes `syscall` with `Syscall::Hal` whenever an `Usart` terminal in the `Stopped`
+    ///   state requires its interface ID to be retrieved.
+    ///
+    pub fn set_display_mode(&mut self) -> KernelResult<()> {
+        for (i, terminal) in self.terminals.iter().enumerate() {
+            // Retrieve interface id if the terminal is stopped
+            if self.mode[i] == Stopped {
+                // We need interface ID only for USART terminals
+                if let TerminalType::Usart(name) = terminal {
+                    syscall(
+                        Syscall::Hal(SysCallHalArgs {
+                            id: self.interface_id[i],
+                            action: SysCallHalActions::GetID(name, &mut self.interface_id[i]),
+                        }),
+                        KERNEL_MASTER_ID,
+                    )?;
+                }
+            }
+
+            // Set mode to display
+            if self.mode[i] != Display {
+                self.mode[i] = Display;
+            }
         }
+        Ok(())
+    }
+
+    ///
+    /// Writes data to terminals based on the specified formatting.
+    ///
+    /// This function iterates through all terminals managed by the current instance and writes
+    /// formatted content to terminals that are in the `Display` mode. The formatting can include raw text,
+    /// text with newlines before or after, single characters, clearing the terminal, and others.
+    ///
+    /// # Arguments
+    ///
+    /// * `format` - A reference to a `TerminalFormatting` enum that specifies the type of content or
+    ///   action to be processed and displayed on the terminal(s).
+    ///
+    /// # Terminal Formatting Variants
+    ///
+    /// - `TerminalFormatting::StrNoFormatting(text)`:
+    ///     Writes the provided string (`text`) to the terminal directly without additional newlines.
+    /// - `TerminalFormatting::StrNewLineAfter(text)`:
+    ///     Writes the string `text` followed by a new line.
+    /// - `TerminalFormatting::StrNewLineBefore(text)`:
+    ///     Writes a new line first, then writes the string `text`.
+    /// - `TerminalFormatting::StrNewLineBoth(text)`:
+    ///     Writes a new line, then the string `text`, and then another new line.
+    /// - `TerminalFormatting::Newline`:
+    ///     Writes a new line to the terminal.
+    /// - `TerminalFormatting::Char(c)`:
+    ///     Writes a single character (`c`) to the terminal.
+    /// - `TerminalFormatting::Clear`:
+    ///     Clears the contents of the terminal.
+    ///
+    /// # Modes
+    ///
+    /// The function only processes terminals that are in `Display` mode. Terminals in other modes are skipped.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `KernelResult` indicating success (`Ok(())`) or failure. A failure might occur due to
+    /// I/O errors, system constraints, or other kernel-related issues during terminal operations.
+    ///
+    /// The above example writes "Hello, world!" to all terminals in `Display` mode, with a newline
+    /// before and after the string.
+    ///
+    /// # Notes
+    ///
+    /// - This function is designed for multi-terminal systems, allowing content to be written to
+    ///   multiple terminals based on their index and mode.
+    /// - Ensure proper error handling for the returned `KernelResult`, as terminal operations may fail.
+    pub fn write(&self, format: &TerminalFormatting) -> KernelResult<()> {
+        for term_idx in 0..self.terminals.len() {
+            if self.mode[term_idx] == Display {
+                match format {
+                    TerminalFormatting::StrNoFormatting(text) => self.write_str(text, term_idx)?,
+                    TerminalFormatting::StrNewLineAfter(text) => {
+                        self.write_str(text, term_idx)?;
+                        self.new_line(term_idx)?;
+                    }
+                    TerminalFormatting::StrNewLineBefore(text) => {
+                        self.new_line(term_idx)?;
+                        self.write_str(text, term_idx)?;
+                    }
+                    TerminalFormatting::StrNewLineBoth(text) => {
+                        self.new_line(term_idx)?;
+                        self.write_str(text, term_idx)?;
+                        self.new_line(term_idx)?;
+                    }
+                    TerminalFormatting::Newline => self.new_line(term_idx)?,
+                    TerminalFormatting::Char(c) => self.write_char(*c, term_idx)?,
+                    TerminalFormatting::Clear => self.clear_terminal(term_idx)?,
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -199,250 +337,271 @@ impl Terminal {
     /// This method updates the `current_color` property of the object
     /// to the specified `color`.
     #[inline(always)]
-    pub fn set_color(&mut self, color: display::Colors) {
+    pub fn set_color(&mut self, color: Colors) {
         self.current_color = color;
     }
 
-    /// Outputs a new line character sequence.
-    ///
-    /// This method writes the carriage return (`'\r'`) followed
-    /// by the newline character (`'\n'`) to represent a new line.
-    ///
-    /// # Returns
-    ///
-    /// * `KernelResult<()>` - Returns `Ok(())` if both characters are
-    /// successfully written. Returns an error if the write operation fails.
-    ///
-    /// # Errors
-    ///
-    /// This function propagates any errors encountered during the `write_char`
-    /// operations for either the `'\r'` or `'\n'` character.
-    ///
-    /// # Inline
-    ///
-    /// This function is marked as `#[inline(always)]` to suggest
-    /// the compiler always inlines it for performance reasons, as it
-    /// is a frequently executed short function.
-    ///
-    #[inline(always)]
-    fn new_line(&self) -> KernelResult<()> {
-        self.write_char('\r')?;
-        self.write_char('\n')
-    }
-
-    /// Writes formatted output to the terminal based on the specified formatting style.
+    /// Inserts a new line in the specified terminal by writing a carriage return (`\r`)
+    /// followed by a line feed (`\n`) character.
     ///
     /// # Parameters
-    /// - `format`: A reference to a `TerminalFormatting` enum that specifies the formatting
-    ///   details for the output. The possible variants of `TerminalFormatting` are:
-    ///     - `StrNoFormatting(text)`: Writes the provided `text` without any additional formatting.
-    ///     - `StrNewLineAfter(text)`: Writes the provided `text` and appends a new line after it.
-    ///     - `StrNewLineBefore(text)`: Writes a new line before the provided `text` and then writes the text.
-    ///     - `StrNewLineBoth(text)`: Writes a new line before the provided `text`, writes the text,
-    ///       and then adds a new line after it.
-    ///     - `Newline`: Writes a single new line to the terminal.
-    ///     - `Char(c)`: Writes the specified character `c` to the terminal.
-    ///     - `Clear`: Clears the entire terminal display.
+    /// - `term_idx`: The index
+    #[inline(always)]
+    fn new_line(&self, term_idx: usize) -> KernelResult<()> {
+        self.write_char('\r', term_idx)?;
+        self.write_char('\n', term_idx)
+    }
+
+    /// Writes a character to a terminal specified by the `term_idx`.
+    ///
+    /// This function sends the given character (`data`) to the appropriate terminal device,
+    /// identified by its index (`term_idx`). The terminals could represent different types
+    /// of output devices, such as a USART or display. The behavior of the function depends on
+    /// the type of terminal being interacted with.
+    ///
+    /// # Parameters
+    /// - `data`: The character to write to the terminal.
+    /// - `term_idx`: The index of the terminal in the `terminals` array to which the character is written.
     ///
     /// # Returns
-    /// - `KernelResult<()>`: Returns `Ok(())` if the operation is successful; otherwise, returns
-    ///   an error wrapped in a `KernelResult`.
+    /// - `KernelResult<()>`: Returns `Ok(())` if the character is successfully written. Returns an error
+    ///   if the operation fails.
     ///
-    /// # Conditions
-    /// - This function executes only if the `self.state` is `Kernel`. If the state is not `Kernel`,
-    ///   the function does nothing.
+    /// # Behavior
+    /// - If the terminal type is `Usart`, the function utilizes a HAL system call to send the character
+    ///   as a UART signal.
+    /// - If the terminal type is `Display`, the function uses a display system call to write the character
+    ///   at the cursor position with an optional color (`current_color`).
     ///
     /// # Errors
-    /// - Propagates any errors that occur during writing actions, such as `write_str`, `write_char`,
-    ///   `new_line`, or `clear_terminal`.
+    /// Returns an error wrapped in `KernelResult` if the system call fails or if an invalid terminal index
+    /// is accessed.
     ///
-    pub fn write(&self, format: &TerminalFormatting) -> KernelResult<()> {
-        if self.state == Kernel {
-            match format {
-                TerminalFormatting::StrNoFormatting(text) => self.write_str(text)?,
-                TerminalFormatting::StrNewLineAfter(text) => {
-                    self.write_str(text)?;
-                    self.new_line()?;
-                }
-                TerminalFormatting::StrNewLineBefore(text) => {
-                    self.new_line()?;
-                    self.write_str(text)?;
-                }
-                TerminalFormatting::StrNewLineBoth(text) => {
-                    self.new_line()?;
-                    self.write_str(text)?;
-                    self.new_line()?;
-                }
-                TerminalFormatting::Newline => self.new_line()?,
-                TerminalFormatting::Char(c) => self.write_char(*c)?,
-                TerminalFormatting::Clear => self.clear_terminal()?,
-            }
-        }
-        Ok(())
-    }
-
-    /// Writes a character to all configured terminal devices.
-    ///
-    /// This function iterates through the list of terminals specified in the
-    /// `self.terminals` vector. Depending on the terminal type, it performs
-    /// the appropriate write action:
-    ///
-    /// - **`TerminalType::Usart`**: Sends the provided character as a `u8` via UART.
-    /// - **`TerminalType::Display`**: Writes the character to the display at the current
-    ///   cursor position with the optional current color.
-    ///
-    /// The function uses system calls (`syscall`) to interact with hardware interfaces,
-    /// passing the appropriate arguments for each terminal type.
-    ///
-    /// ### Parameters:
-    /// - `data`: The character (`char`) to be written to all terminal devices.
-    ///
-    /// ### Returns:
-    /// - `KernelResult<()>`: A result indicating success (`Ok(())`) or an error if the
-    ///   operation fails. Errors encountered during system calls for any terminal type
-    ///   are propagated directly.
-    ///
-    /// ### System Calls:
-    /// - For `TerminalType::Usart`: Sends a system call to the HAL layer with the
-    ///   `SysCallHalActions::Write` action containing `Uart
-    fn write_char(&self, data: char) -> KernelResult<()> {
-        for (i, terminal) in self.terminals.iter().enumerate() {
-            match terminal {
-                TerminalType::Usart(_) => syscall(
-                    Syscall::Hal(SysCallHalArgs {
-                        id: self.interface_id[i],
-                        action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
-                            UartWriteActions::SendChar(data as u8),
-                        )),
-                    }),
-                    KERNEL_MASTER_ID,
-                )?,
-                TerminalType::Display => syscall(
-                    Syscall::Display(SysCallDisplayArgs::WriteCharAtCursor(
-                        data,
-                        Some(self.current_color),
+    /// # Notes
+    /// - Ensure that `term_idx` corresponds to a valid terminal in the `terminals` array.
+    /// - The implementation assumes that `self.terminals` and `self.interface_id` are properly
+    ///   initialized before calling this function.
+    fn write_char(&self, data: char, term_idx: usize) -> KernelResult<()> {
+        match self.terminals[term_idx] {
+            Usart(_) => syscall(
+                Syscall::Hal(SysCallHalArgs {
+                    id: self.interface_id[term_idx],
+                    action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
+                        UartWriteActions::SendChar(data as u8),
                     )),
-                    KERNEL_MASTER_ID,
-                )?,
-            }
+                }),
+                KERNEL_MASTER_ID,
+            )?,
+            TerminalType::Display => syscall(
+                Syscall::Display(SysCallDisplayArgs::WriteCharAtCursor(
+                    data,
+                    Some(self.current_color),
+                )),
+                KERNEL_MASTER_ID,
+            )?,
         }
 
         Ok(())
     }
 
-    /// Writes a string to all available terminal interfaces associated with this object.
+    /// Writes a string to the specified terminal interface.
     ///
-    /// This method iterates over all the terminals managed by the current instance
-    /// and sends the provided string data to each terminal. The type of terminal
-    /// determines how the string is processed and displayed:
+    /// Depending on the terminal type, this function performs the appropriate
+    /// system call to write the string. It supports writing to both USART (UART)
+    /// and Display terminal interfaces.
     ///
-    /// - **`TerminalType::Usart`**: For UART-based terminals, it sends the string
-    ///   using a hardware abstraction layer (HAL) interface.
-    /// - **`TerminalType::Display`**: For display terminals, it draws the string
-    ///   at the current cursor position using the provided color settings.
+    /// # Parameters
+    /// - `&self`: The current context or instance containing terminal configurations.
+    /// - `data: &str`: The string slice to be written to the terminal.
+    /// - `term_idx: usize`: The zero-based index of the terminal to which the string
+    ///   will be written. `term_idx` should correspond to an entry in `self.terminals`.
     ///
-    /// # Parameters:
-    /// - `data`: A reference to the string slice (`&str`) that needs to be written
-    ///   to the terminals.
+    /// # Returns
+    /// - `KernelResult<()>`: Returns `Ok(())` if the operation completes successfully,
+    ///   otherwise returns an error encapsulated within `KernelResult`.
     ///
-    /// # Returns:
-    /// - `Ok(())` on success, indicating that the string was written to all terminals
-    ///   without issues.
-    /// - `Err(KernelError)`: If an error occurs while writing to one of the
-    ///   terminals. Errors can be:
-    ///     - `KernelError::HalError`: If there are issues with writing to a UART
-    ///       terminal via the HAL interface.
-    ///     - `KernelError::DisplayError`: If there are issues with drawing the
-    ///       string on the display.
+    /// # Behavior
+    /// - If the terminal at the given index is of type `Usart`, the function invokes
+    ///   a system call for UART write action using the provided string.
+    /// - If the terminal is of type `Display`, the function makes a system call to
+    ///   write the string at the current cursor position with the specified color.
     ///
-    /// # Error Handling:
-    /// Any write failure to a terminal will immediately stop further writes to
-    /// subsequent terminals, and this method will propagate the error using the
-    /// `Result` type.
+    /// # Errors
+    /// - Returns an error if the system call fails during the write operation, which
+    ///   will be propagated as part of the `KernelResult`.
     ///
-    /// # Notes:
-    /// - The `interface_id` vector is used to map each terminal to its corresponding
-    ///   HAL communication interface.
-    /// - The method applies the `current_color` field when writing strings to
-    ///   display terminals.
-    /// - This function assumes that `self.terminals` and `self.interface_id` are synchronized,
-    ///   meaning their indices align correctly to map the terminals to their respective communication interfaces.
-    ///
-    /// # Panics:
-    /// - This method does not panic, provided that the internal state (e.g.,
-    ///   `self.terminals` and `self.interface_id`) is consistent and valid.
-    ///
-    /// # Preconditions:
-    /// - `self.terminals` must contain valid terminal instances.
-    /// - `self.interface_id` must have corresponding entries for each terminal.
-    ///
-    fn write_str(&self, data: &str) -> KernelResult<()> {
-        for (i, terminal) in self.terminals.iter().enumerate() {
-            match terminal {
-                TerminalType::Usart(_) => syscall(
-                    Syscall::Hal(SysCallHalArgs {
-                        id: self.interface_id[i],
-                        action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
-                            UartWriteActions::SendString(data),
-                        )),
-                    }),
-                    KERNEL_MASTER_ID,
-                )?,
-                TerminalType::Display => syscall(
-                    Syscall::Display(SysCallDisplayArgs::WriteStrAtCursor(
-                        data,
-                        Some(self.current_color),
+    fn write_str(&self, data: &str, term_idx: usize) -> KernelResult<()> {
+        match self.terminals[term_idx] {
+            Usart(_) => syscall(
+                Syscall::Hal(SysCallHalArgs {
+                    id: self.interface_id[term_idx],
+                    action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
+                        UartWriteActions::SendString(data),
                     )),
-                    KERNEL_MASTER_ID,
-                )?,
-            }
+                }),
+                KERNEL_MASTER_ID,
+            )?,
+            TerminalType::Display => syscall(
+                Syscall::Display(SysCallDisplayArgs::WriteStrAtCursor(
+                    data,
+                    Some(self.current_color),
+                )),
+                KERNEL_MASTER_ID,
+            )?,
         }
 
         Ok(())
     }
 
-    /// Clears the content of all terminals managed by the kernel.
+    /// Clears the terminal display for a given terminal index.
     ///
-    /// This function iterates through all terminals registered in the kernel and performs the
-    /// appropriate "clear" action based on the terminal type:
+    /// This function sends a clear screen command to the specified terminal,
+    /// either a USART-based terminal or a display-based terminal. It resets
+    /// the terminal to a clean state.
     ///
-    /// - For `TerminalType::Usart`, it sends the ANSI escape sequence `\x1B[2J\x1B[H`
-    ///   to clear the screen and reset the cursor to the home position.
-    /// - For `TerminalType::Display`, it utilizes the display's `clear` method to fill
-    ///   the screen with a specified background color (in this case, `Colors::Black`).
+    /// # Arguments
     ///
-    /// ### Errors
-    /// If the function fails to send the clear command to any terminal:
-    /// - Returns a `KernelError::HalError` if there was an issue with the hardware abstraction layer (HAL) when working with USART terminals.
-    /// - Returns a `KernelError::DisplayError` if clearing a display terminal fails.
+    /// * `term_idx` - The index of the terminal to be cleared. This index should
+    ///   correspond to an entry in the `self.terminals` array.
     ///
-    /// ### Returns
-    /// - `Ok(())` if all terminals are successfully cleared without error.
-    /// - `Err(KernelError)` if there is a failure in clearing one or more terminals.
+    /// # Behavior
     ///
-    /// ### Notes
-    /// This function relies on the `KernelData::hal()` and `KernelData::display()` implementations
-    /// to interact with hardware-specific interfaces. Ensure these components are properly initialized
-    /// and accessible before invoking this method.
-    pub fn clear_terminal(&self) -> KernelResult<()> {
-        for (i, terminal) in self.terminals.iter().enumerate() {
-            match terminal {
-                TerminalType::Usart(_) => syscall(
-                    Syscall::Hal(SysCallHalArgs {
-                        id: self.interface_id[i],
-                        action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
-                            UartWriteActions::SendString("\x1B[2J\x1B[H"),
-                        )),
-                    }),
-                    KERNEL_MASTER_ID,
-                )?,
-                TerminalType::Display => syscall(
-                    Syscall::Display(SysCallDisplayArgs::Clear(Colors::Black)),
-                    KERNEL_MASTER_ID,
-                )?,
+    /// - For `Usart` terminals, it sends the ANSI escape sequence `\x1B[2J\x1B[H`,
+    ///   which clears the screen and moves the cursor to the home position.
+    /// - For `Display` terminals, it issues a display clear command and sets the
+    ///   background to black.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - On successful execution of the terminal clear command.
+    /// * `Err(KernelError)` - If an error occurs during the system call, it will
+    ///   bubble up to the caller.
+    ///
+    /// # Errors
+    ///
+    /// If the syscall fails for any reason, this function will return a
+    /// `KernelResult` error variant indicating the failure.
+    ///
+    pub fn clear_terminal(&self, term_idx: usize) -> KernelResult<()> {
+        match self.terminals[term_idx] {
+            Usart(_) => syscall(
+                Syscall::Hal(SysCallHalArgs {
+                    id: self.interface_id[term_idx],
+                    action: SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
+                        UartWriteActions::SendString("\x1B[2J\x1B[H"),
+                    )),
+                }),
+                KERNEL_MASTER_ID,
+            )?,
+            TerminalType::Display => syscall(
+                Syscall::Display(SysCallDisplayArgs::Clear(Colors::Black)),
+                KERNEL_MASTER_ID,
+            )?,
+        }
+
+        Ok(())
+    }
+
+    /// Processes input received for a terminal and handles it based on the mode and input buffer.
+    ///
+    /// # Parameters
+    /// - `buffer`: A `Vec<u8, BUFFER_SIZE>` containing the input data to be processed. This typically
+    ///   represents a single character or multiple characters received.
+    /// - `id`: A `usize` that represents the unique identifier of the terminal to which the input belongs.
+    ///
+    /// # Returns
+    /// - A `KernelResult<()>`, indicating success or failure of the operation. In case of errors, a
+    ///   relevant terminal error is returned.
+    ///
+    /// # Functionality
+    /// - Locates the terminal corresponding to the given `id` from the list of `interface_id`s.
+    /// - If the terminal is in the `Prompt` mode:
+    ///   - Checks the contents of the `buffer`.
+    ///   - If the input is a carriage return (`\r`), it clears the terminal's line buffer, resets the
+    ///     cursor position, moves to a new line, and writes a new prompt (`>`).
+    ///   - If the input is any other character, echoes the character back to the terminal, appends it
+    ///     to the terminal's line buffer, and updates the cursor position.
+    ///   - Handles potential errors during line buffer updates, such as buffer overflow.
+    ///
+    /// # Errors
+    /// - If the `line_buffer` overflows (exceeds its capacity), a `TerminalError` is returned with the
+    ///   following context:
+    ///   - Error Type: `Error`
+    ///   - Terminal name or identifier
+    ///   - Description: `"Line buffer overflow"`
+    ///
+    pub fn process_input(&mut self, buffer: Vec<u8, BUFFER_SIZE>, id: usize) -> KernelResult<()> {
+        // Find the terminal corresponding to the given ID
+        let terminal_idx = self.interface_id.iter().position(|&x| x == id).unwrap();
+
+        // If the terminal is in prompt mode
+        if self.mode[terminal_idx] == Prompt {
+            // If the received character is a return character, process the line
+            if buffer[0] == '\r' as u8 {
+                // Currently we only empty the line buffer and go to a new line
+                self.line_buffer[terminal_idx].clear();
+                self.cursor_pos = 0;
+                self.new_line(terminal_idx)?;
+                self.write_char('>', terminal_idx)?;
+            } else {
+                // Echo the received character
+                self.write_char(buffer[0] as char, terminal_idx)?;
+
+                // Store it into the line buffer
+                let term_name = self.name(terminal_idx);
+                self.line_buffer[terminal_idx]
+                    .push(buffer[0] as char)
+                    .map_err(|_| TerminalError(Error, term_name, "Line buffer overflow"))?;
+                self.cursor_pos += 1;
             }
         }
 
         Ok(())
+    }
+}
+
+/// A callback function for terminal prompts that reads input data from a specified interface and processes it.
+///
+/// # Parameters
+/// - `id: u8`: The identifier for the specific hardware interface to read input from.
+///
+/// # Description
+/// This function performs the following operations:
+/// 1. Initializes an ` InterfaceReadResult ` to store the result of a read operation.
+/// 2. Executes a syscall to the kernel to read data from the hardware interface identified by `id`.
+/// 3. If the syscall is successful and the read result contains a buffer, the data in the buffer
+///    is passed to the terminal module for processing.
+/// 4. Handles any errors that occur during the syscall or terminal input processing by invoking
+///    the kernel's error handler.
+///
+/// # Error Handling
+/// - If the syscall to read input data fails, the kernel's error handler is invoked with the error.
+/// - If the terminal input processing fails, the kernel's error handler is invoked with the error.
+///
+/// # Notes
+/// - The function uses the `Kernel::terminal()` API to access the terminal for input processing.
+/// - The `Kernel::errors()` API is used to handle any errors that occur.
+///
+/// # Safety
+/// This function interacts with external systems (e.g., hardware and kernel components)
+/// and relies on the validity and stability of the provided `id` and kernel subsystems.
+pub extern "C" fn terminal_prompt_callback(id: u8) {
+    let mut result = InterfaceReadResult::BufferRead(Vec::new());
+    match syscall(
+        Syscall::Hal(SysCallHalArgs {
+            id: id as usize,
+            action: SysCallHalActions::Read(InterfaceReadAction::BufferRead, &mut result),
+        }),
+        KERNEL_MASTER_ID,
+    ) {
+        Ok(()) => {
+            if let InterfaceReadResult::BufferRead(buffer) = result {
+                match Kernel::terminal().process_input(buffer, id as usize) {
+                    Ok(_) => {}
+                    Err(e) => Kernel::errors().error_handler(&e),
+                }
+            }
+        }
+        Err(e) => Kernel::errors().error_handler(&e),
     }
 }

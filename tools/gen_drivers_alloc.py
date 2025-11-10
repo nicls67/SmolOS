@@ -15,9 +15,16 @@ INCLUDE_MARKER = "include"
 CONST_MARKER = "constants"
 IFNDEF_MARKER = "ifndef"
 DEFINE_MARKER = "define"
+FUNCTIONS_MARKER = "functions"
 
 DRIVER_ALLOC_TYPE = "DRIVER_ALLOC"
 DRIVER_ALLOC_TABLE_NAME = "DRIVERS_ALLOC"
+
+USART_DRIVER_NAME = "USART"
+GPIO_DRIVER_NAME = "GPIO"
+
+BUFFER_NAME_SUFFIX = "_BUFFER"
+BUFFER_SIZE_SUFFIX = "_BUFFER_SIZE"
 
 
 def extract_marker(text):
@@ -99,9 +106,9 @@ def gen_struct_init(struct_type: str, struct_name: str, fields: list, is_const: 
         initialization.
     """
     c_code = []
-    const = "const" if is_const else ""
+    const = "const " if is_const else ""
 
-    c_code.append(f"{const} {struct_type} {struct_name} = {{")
+    c_code.append(f"{const}{struct_type} {struct_name} = {{")
     for field in fields:
         c_code.append(f"    .{field[0]} = {field[1]},")
     c_code.append("};")
@@ -134,7 +141,8 @@ def gen_table(table_type: str, table_name: str, fields: list, is_const: bool = F
 
     c_code.append(f"{const} {table_type} {table_name}[] = {{")
     for field in fields:
-        c_code.append(f"    {{ (uint8_t*)\"{field[0]}\", {field[1]}, {field[2]}, (void*) {field[3]}, {field[4]} }},")
+        c_code.append(
+            f"    {{ (uint8_t*)\"{field[0]}\", {field[1]}, {field[2]}, (void*) {field[3]}, (void*) {field[4]}, {field[5]} }},")
     c_code.append("};")
     return c_code
 
@@ -155,9 +163,9 @@ def get_peripheral_handler(peripheral, handlers_init: list):
         the peripheral type is unsupported.
     :rtype: str
     """
-    if peripheral["type"] == "USART":
-        return f"&huart{peripheral["peripheral"].removeprefix('USART')}"
-    elif peripheral["type"] == "GPIO":
+    if peripheral["type"] == USART_DRIVER_NAME:
+        return f"&huart{peripheral["peripheral"].removeprefix(USART_DRIVER_NAME)}"
+    elif peripheral["type"] == GPIO_DRIVER_NAME:
         gpio_strict_name = f"GPIO_P{peripheral["peripheral"]["port"]}{peripheral["peripheral"]["pin"]}"
         handlers_init.extend(
             gen_struct_init("GPIO_ALLOC", gpio_strict_name,
@@ -174,7 +182,7 @@ def get_peripheral_handler(peripheral, handlers_init: list):
         return ""
 
 
-def gen_drivers_alloc(peri_config: dict):
+def gen_drivers_alloc(peri_config: dict, analysis: dict):
     """
     Generates driver allocation code and configuration table based on the given peripheral configuration.
 
@@ -183,6 +191,7 @@ def gen_drivers_alloc(peri_config: dict):
     It ensures proper handling of peripheral fields and their inclusion in the
     resulting generated code.
 
+    :param analysis: Pre-analysis result
     :param peri_config: Dictionary representing peripheral configuration. Each peripheral
         is expected to have fields such as 'name', 'type', 'direction', and additional
         details required for proper driver initialization.
@@ -197,11 +206,19 @@ def gen_drivers_alloc(peri_config: dict):
 
     # Parse config
     for i, peripheral in enumerate(peri_config):
+        # Check if the peripheral needs a buffer
+        peri_buffer = "0"
+        for buffer in analysis['buffers']:
+            if peripheral['type'] == "USART" and peripheral["peripheral"] in buffer["name"]:
+                peri_buffer = f"&{buffer['name']}"
+
+        # Generate peripherals dictionary
         peri_fields = [
             peripheral["name"],
             peripheral["type"],
             peripheral["direction"],
             get_peripheral_handler(peripheral, struct_init_c_code),
+            peri_buffer,
             i,
         ]
         peri_list.append(peri_fields)
@@ -212,24 +229,113 @@ def gen_drivers_alloc(peri_config: dict):
     return struct_init_c_code
 
 
-def gen_code(template: str, config: dict, header: bool = False):
+def gen_init_func(config: dict, analysis: dict):
     """
-    Generate code using a template file and a configuration dictionary. This function
-    reads the provided template file, processes specific markers within the template,
-    and outputs a generated file based on the configuration and the provided header
-    flag. This is useful for automating the creation of source or header files in C
-    or other programming environments.
+    Generates initialization code for drivers based on the provided configuration and analysis data.
 
-    :param template: Path to the template file
-    :type template: str
-    :param config: Configuration dictionary containing various attributes needed
-                   for generation such as target file name, directory, includes,
-                   drivers, etc.
+    This function processes a dictionary configuration (`config`) that includes driver details,
+    initialization sequences, and optional IT (Interrupt) enabled sequences for drivers. It also
+    considers the analyzed `analysis` dictionary, which contains a list of drivers to initialize
+    (`init_list`). The resulting initialization code is returned as a list of strings.
+
+    :param config: Dictionary containing the drivers, their types, initialization sequences, and
+        other configuration details.
     :type config: dict
-    :param header: Flag to specify whether to generate a header (.h) file or a
-                   source (.c) file. Defaults to False, indicating source file
-                   generation.
-    :type header: bool
+    :param analysis: Dictionary containing details such as the list of drivers to initialize.
+    :type analysis: dict
+    :return: A list of strings forming the C code for the driver initialization function.
+    :rtype: list
+    """
+    func_code = ["void drivers_init()"]
+    func_code.extend("{")
+
+    for driver_init in analysis['init_list']:
+        # Get init sequence from config
+        init_sequence = None
+        init_sequence_it = None
+        for seq in config['init_sequence']:
+            if seq['driver'] == driver_init:
+                init_sequence = seq['sequence']
+                init_sequence_it = seq['it_enabled_sequence'] if 'it_enabled_sequence' in seq else None
+                break
+
+        for sequence in [init_sequence, init_sequence_it]:
+            if sequence is not None:
+                # Perform driver-specific actions
+                if driver_init == USART_DRIVER_NAME:
+                    for driver_to_init in config['drivers']:
+                        if driver_to_init['type'] == USART_DRIVER_NAME:
+                            func_code.append(f"    // {driver_to_init['peripheral']} initialization")
+                            for init_call in sequence:
+                                init_call = init_call.replace("<drv_name>", driver_to_init['peripheral'])
+                                init_call = init_call.replace("<handler>", get_peripheral_handler(driver_to_init, []))
+                                init_call = init_call.replace("<buffer>",
+                                                              f"{driver_to_init['peripheral']}{BUFFER_NAME_SUFFIX}")
+                                func_code.append(f"    {init_call}")
+                            func_code.append("")
+
+                else:
+                    func_code.append(f"    // {driver_init} initialization")
+                    for init_call in sequence:
+                        func_code.append(f"    {init_call}")
+                    func_code.append("")
+
+    func_code.append("}")
+    return func_code
+
+
+def gen_handlers_func(config: dict):
+    """
+    Generates handler functions for interrupt-enabled drivers in the configuration.
+
+    This function iterates through the configuration dictionary's list of drivers,
+    and for each driver that has interrupt handling enabled, generates code for its
+    corresponding interrupt handler function. It appends the generated function
+    code to a list and returns it.
+
+    :param config: Dictionary containing driver configuration. The dictionary should
+        include a key 'drivers', where each driver item is a dictionary specifying
+        details such as 'it_enabled' (whether the interrupt is enabled),
+        'peripheral' (name of the peripheral), and 'type' (type of the driver).
+    :type config: dict
+    :return: List of strings, each representing lines of generated code for
+        the interrupt handlers of enabled drivers.
+    :rtype: list
+    """
+    func_code = []
+
+    # For each driver with IT enabled
+    for drv in config['drivers']:
+        if 'it_enabled' in drv and drv['it_enabled']:
+            func_code.append("")
+            func_code.append(f"void {drv['peripheral']}_it_handler()")
+            func_code.append("{")
+
+            if drv['type'] == USART_DRIVER_NAME:
+                func_code.append(f"    HAL_UART_IRQHandler({get_peripheral_handler(drv, [])});")
+            func_code.append("}")
+
+    return func_code
+
+
+def gen_c_code(template: str, config: dict, analysis: dict, header: bool = False):
+    """
+    Generate source or header file based on a template and configuration parameters.
+
+    This function processes a provided template file, replacing specific markers within
+    the template with data from the configuration dictionary or analysis results. The
+    output file may be generated as either a header or source file, depending on the
+    value of the `header` parameter. The function ensures that appropriate includes,
+    constants, and other data are added dynamically according to markers within the
+    template.
+
+    :param template: Path to the template file.
+    :param config: Dictionary containing configuration data such as target file
+                   information, include lists, and driver details.
+    :param analysis: Dictionary with additional analysis data, like extra includes
+                     to be added for source files.
+    :param header: Boolean indicating whether to generate a header file (.h) or
+                   source file (.c). Defaults to False for source file generation.
     :return: None
     """
     # Load template file
@@ -247,7 +353,7 @@ def gen_code(template: str, config: dict, header: bool = False):
         else:
             for marker in markers:
                 if marker == FILENAME_MARKER:
-                    generated_lines.append(line.replace(MARKER + marker, config['target_file']['name'] + file_ext))
+                    generated_lines.append(line.replace(MARKER + marker, config['target_c_file']['name'] + file_ext))
                 elif marker == DATE_MARKER:
                     generated_lines.append(line.replace(MARKER + marker, datetime.now().strftime("%d-%m-%Y")))
                 elif marker == AUTHOR_MARKER:
@@ -258,47 +364,172 @@ def gen_code(template: str, config: dict, header: bool = False):
                     if header:
                         generated_lines.extend(gen_includes(config['includes_h']))
                     else:
-                        generated_lines.extend(gen_includes(config['includes_c']))
+                        includes_list = config['includes_c']
+                        includes_list.extend(analysis['includes_c'])
+                        generated_lines.extend(gen_includes(includes_list))
                 elif marker == CONST_MARKER:
                     if header:
                         generated_lines.append(f"extern const {DRIVER_ALLOC_TYPE} {DRIVER_ALLOC_TABLE_NAME}[];")
+
+                        # Generate buffers declaration
+                        for buffer in analysis['buffers']:
+                            generated_lines.append(f"extern RX_BUFFER {buffer['name']};")
                     else:
-                        generated_lines.extend(gen_drivers_alloc(config['drivers']))
+                        # Generate buffers declaration
+                        for buffer in analysis['buffers']:
+                            generated_lines.append(f"uint8_t {buffer['name']}_BUF[{buffer['size']}];")
+                            generated_lines.extend(gen_struct_init("RX_BUFFER", buffer['name'],
+                                                                   [
+                                                                       ["buffer",
+                                                                        f"{buffer['name']}_BUF"],
+                                                                       ["size",
+                                                                        "0"],
+                                                                   ],
+                                                                   False))
+
+                        generated_lines.extend(gen_drivers_alloc(config['drivers'], analysis))
+
                 elif marker == IFNDEF_MARKER:
                     generated_lines.append(
-                        f"#ifndef {config['target_file']['name'].upper()}_{file_ext.removeprefix('.').upper()}")
+                        f"#ifndef {config['target_c_file']['name'].upper()}_{file_ext.removeprefix('.').upper()}")
                     generated_lines.append(
-                        f"#define {config['target_file']['name'].upper()}_{file_ext.removeprefix('.').upper()}")
+                        f"#define {config['target_c_file']['name'].upper()}_{file_ext.removeprefix('.').upper()}")
                 elif marker == DEFINE_MARKER:
                     generated_lines.extend(gen_defines([[
                         "DRIVERS_ALLOC_SIZE",
                         str(len(config['drivers'])),
                     ]]))
+                    for act in analysis['activations']:
+                        generated_lines.append(f"#define {act}")
+                    for buffer_size in analysis['buffers_size']:
+                        generated_lines.append(f"#define {buffer_size} {analysis['buffers_size'][buffer_size]}")
+                elif marker == FUNCTIONS_MARKER:
+                    if header:
+                        generated_lines.append(f"void drivers_init();")
+                    else:
+                        generated_lines.extend(gen_init_func(config, analysis))
+                        generated_lines.extend(gen_handlers_func(config))
                 else:
                     print(f"Unknown marker: {MARKER}{marker}")
 
     # Write the target file
-    with open(os.path.join(config['target_file']['directory'], "Inc" if header else "Src",
-                           config['target_file']['name'] + file_ext), 'w') as f:
+    with open(os.path.join(config['target_c_file']['directory'], "Inc" if header else "Src",
+                           config['target_c_file']['name'] + file_ext), 'w') as f:
         f.writelines([line + "\n" if not line.endswith("\n") else line for line in generated_lines])
-    print(f"File {config['target_file']['name']}{file_ext} generated")
+    print(f"File {config['target_c_file']['name']}{file_ext} generated")
+
+
+def gen_rust_code(config: dict):
+    """
+    Generates a Rust source file with interrupt bindings and handler functions for specified drivers.
+
+    This function creates a Rust file containing interrupt handler bindings and
+    functions based on the provided configuration. If a driver specifies the
+    'enabled IT' (`it_enabled`), the function writes corresponding interrupt
+    bindings and function definitions into the output file. The output file path
+    and name are customized by the provided configuration.
+
+    :param config: A dictionary containing the configuration for code generation.
+        The expected keys include:
+            - drivers: A list of dictionaries, where each dictionary represents a
+              driver configuration. Each driver dictionary can include:
+                  - it_enabled: A boolean indicating if the interrupt is enabled
+                    for this driver.
+                  - peripheral: A string denoting the peripheral's name.
+            - target_rust_file: A dictionary specifying the target output file with
+              keys:
+                  - directory: The directory where the file will be saved.
+                  - name: The name of the output file (without extension).
+    :return: None
+    """
+    generated_lines = []
+
+    file_ext = ".rs"
+
+    generated_lines.append("use stm32f7::stm32f769::interrupt;")
+    generated_lines.append("")
+    generated_lines.append("unsafe extern \"C\" {")
+
+    # Generate bindings
+    bindings = []
+
+    # For each driver
+    for drv in config['drivers']:
+        # If the driver has an IT enabled
+        if 'it_enabled' in drv and drv['it_enabled']:
+            binding = f"{drv['peripheral']}_it_handler"
+            generated_lines.append(f"    pub fn {binding}();")
+            bindings.append(binding)
+
+    generated_lines.append("}")
+    generated_lines.append("")
+
+    # For each driver
+    for drv in config['drivers']:
+        # If the driver has an IT enabled
+        if 'it_enabled' in drv and drv['it_enabled']:
+            generated_lines.append("#[allow(non_snake_case)]")
+            generated_lines.append("#[interrupt]")
+            generated_lines.append(f"fn {drv['peripheral']}() {{")
+            generated_lines.append(f"    unsafe {{ {drv['peripheral']}_it_handler(); }}")
+            generated_lines.append("}")
+
+    # Write the target file
+    with open(os.path.join(config['target_rust_file']['directory'],
+                           config['target_rust_file']['name'] + file_ext), 'w') as f:
+        f.writelines([line + "\n" if not line.endswith("\n") else line for line in generated_lines])
+    print(f"File {config['target_rust_file']['name']}{file_ext} generated")
 
 
 #################
 # Script begins #
 #################
-if len(sys.argv) != 2:
-    print("Usage: python gen_drivers_alloc.py <input_file>")
-    exit(1)
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python gen_drivers_alloc.py <input_file>")
+        exit(1)
 
-# Load YAML configuration file
-input_file = sys.argv[1]
-gen_config = yaml.load(open(input_file), Loader=yaml.FullLoader)
+    # Load YAML configuration file
+    input_file = sys.argv[1]
+    gen_config = yaml.load(open(input_file), Loader=yaml.FullLoader)
 
-print("Generating drivers allocation...")
+    print("Generating drivers allocation...")
 
-# Generate C file
-gen_code(os.path.join(Path(__file__).resolve().parent, C_TEMPLATE_FILE), gen_config)
+    # Pre-analysis
+    pre_analysis = {'includes_c': [], 'activations': [], 'init_list': [], 'buffers': [], 'buffers_size': {}}
 
-# Generate H file
-gen_code(os.path.join(Path(__file__).resolve().parent, H_TEMPLATE_FILE), gen_config, True)
+    for driver in gen_config['drivers']:
+        # Add specific includes for drivers
+        if driver['type'] == USART_DRIVER_NAME and "usart.h" not in pre_analysis['includes_c']:
+            pre_analysis['includes_c'].append("usart.h")
+        # Add activation for each driver
+        activation = f"DRIVER_ACTIVATE_{driver['type']}"
+        if activation not in pre_analysis['activations']:
+            pre_analysis['activations'].append(activation)
+        # Add driver init list
+        if driver['type'] not in pre_analysis['init_list']:
+            pre_analysis['init_list'].append(driver['type'])
+
+            # Add init includes and buffers in the list
+            for init in gen_config['init_sequence']:
+                if init['driver'] == driver['type']:
+                    for include in init['includes']:
+                        if include not in pre_analysis['includes_c']:
+                            pre_analysis['includes_c'].append(include)
+
+        # Add driver buffer
+        for init in gen_config['init_sequence']:
+            if init['driver'] == driver['type'] and 'it_enabled' in driver and driver['it_enabled']:
+                pre_analysis['buffers'].append(
+                    {'name': driver['peripheral'] + BUFFER_NAME_SUFFIX, 'size': init['driver'] + BUFFER_SIZE_SUFFIX})
+                if init['driver'] + BUFFER_SIZE_SUFFIX not in pre_analysis['buffers_size']:
+                    pre_analysis['buffers_size'][init['driver'] + BUFFER_SIZE_SUFFIX] = init['buffer_size']
+
+    # Generate C file
+    gen_c_code(os.path.join(Path(__file__).resolve().parent, C_TEMPLATE_FILE), gen_config, pre_analysis)
+
+    # Generate H file
+    gen_c_code(os.path.join(Path(__file__).resolve().parent, H_TEMPLATE_FILE), gen_config, pre_analysis, True)
+
+    # Generate Rust file
+    gen_rust_code(gen_config)

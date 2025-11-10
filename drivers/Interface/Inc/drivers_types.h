@@ -45,6 +45,7 @@ typedef struct
     INTERFACE_TYPE drv_type;
     INTERFACE_DIRECTION drv_direction;
     void *drv;
+    void *buffer;
     uint8_t drv_id;
 } DRIVER_ALLOC;
 
@@ -54,6 +55,8 @@ typedef struct
     GPIO_TypeDef *gpio;
     uint16_t pin;
 } GPIO_ALLOC;
+
+typedef void (*HAL_INTERFACE_CALLBACK)(uint8_t);
 
 /**********************/
 /* Exported constants */

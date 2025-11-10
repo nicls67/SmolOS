@@ -23,7 +23,11 @@
 /******************/
 /* Exported types */
 /******************/
-
+typedef struct
+{
+    uint8_t* buffer;
+    uint8_t size;
+} RX_BUFFER;
 
 /**********************/
 /* Exported constants */
@@ -41,6 +45,6 @@
 /**********************/
 /* Exported functions */
 /**********************/
-
+@@marker:functions
 
 #endif

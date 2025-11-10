@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="CLionExternalBuildManager">
-    <target id="65f75111-ed59-4981-a3bd-0fa09404ea58" name="Cargo Debug" defaultType="TOOL">
-      <configuration id="cc37d13a-5da3-423f-a3b7-4cb33fccedef" name="Cargo Debug" toolchainName="Rust Embedded STM32F7">
+    <target id="f02028ce-be2f-4b5d-b69a-96303c4beeed" name="Cargo Debug" defaultType="TOOL">
+      <configuration id="7c9a8adc-09c2-4615-a000-3c678a29fc97" name="Cargo Debug" toolchainName="Rust Embedded STM32F7">
         <build type="TOOL">
           <tool actionId="Tool_External Tools_BuildDebug" />
         </build>
@@ -11,8 +11,8 @@
         </clean>
       </configuration>
     </target>
-    <target id="b04ec195-2747-4668-98ce-1f75859d421a" name="Cargo Release" defaultType="TOOL">
-      <configuration id="bc78ae04-9316-4ac2-a17a-5be91f49944f" name="Cargo Release" toolchainName="Rust Embedded STM32F7">
+    <target id="801dd238-fb63-4bf0-a200-38e415010609" name="Cargo Release" defaultType="TOOL">
+      <configuration id="0c40de9d-2a24-4aa2-be27-75ce7dd865fb" name="Cargo Release" toolchainName="Rust Embedded STM32F7">
         <build type="TOOL">
           <tool actionId="Tool_External Tools_BuildRelease" />
         </build>

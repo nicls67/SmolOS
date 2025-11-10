@@ -90,7 +90,7 @@ pub fn boot(config: BootConfig) {
     // Terminal start
     ////////////////////////////
     let terminal = Kernel::terminal();
-    terminal.set_kernel_state().unwrap();
+    terminal.set_display_mode().unwrap();
     terminal.write(&TerminalFormatting::Clear).unwrap();
     terminal
         .write(&TerminalFormatting::StrNewLineAfter("Booting..."))
@@ -123,21 +123,12 @@ pub fn boot(config: BootConfig) {
 
     // Start kernel apps
     kernel_apps::initialize_kernel_apps().unwrap_or(());
-}
 
-/// Starts the system scheduler.
-///
-/// This function initializes and starts the kernel's scheduler. It retrieves the scheduler
-/// instance from the `Kernel`, and then attempts to start it. The `unwrap()` is used on the result
-/// of the `start()` method, meaning that this function will panic if the scheduler fails to start.
-///
-/// # Panics
-///
-/// This function will panic if the `start()` method of the scheduler returns an error.
-///
-/// Ensure that the system is properly set up and ready for scheduling before calling this function.
-pub fn start_scheduler() {
+    // Start scheduler
     Kernel::scheduler()
         .start(Kernel::time_data().clone().systick_period)
         .unwrap();
+
+    // Set terminal in prompt mode
+    terminal.set_prompt_mode().unwrap();
 }

@@ -2,7 +2,9 @@ use crate::data::Kernel;
 use crate::scheduler::{App, AppCall};
 use crate::{KernelError, KernelResult, Milliseconds};
 use display::Colors;
-use hal_interface::InterfaceWriteActions;
+use hal_interface::{
+    InterfaceCallback, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions,
+};
 
 pub struct SysCallHalArgs<'a> {
     pub id: usize,
@@ -11,9 +13,11 @@ pub struct SysCallHalArgs<'a> {
 
 pub enum SysCallHalActions<'a> {
     Write(InterfaceWriteActions<'a>),
+    Read(InterfaceReadAction, &'a mut InterfaceReadResult),
     Lock,
     Unlock,
     GetID(&'static str, &'a mut usize),
+    ConfigureCallback(InterfaceCallback),
 }
 
 pub enum SysCallDisplayArgs<'a> {
@@ -108,6 +112,12 @@ pub fn syscall(syscall_type: Syscall, caller_id: u32) -> KernelResult<()> {
             SysCallHalActions::Write(act) => Kernel::hal()
                 .interface_write(args.id, caller_id, act)
                 .map_err(KernelError::HalError),
+            SysCallHalActions::Read(act, res) => {
+                *res = Kernel::hal()
+                    .interface_read(args.id, caller_id, act)
+                    .map_err(KernelError::HalError)?;
+                Ok(())
+            }
             SysCallHalActions::Lock => Kernel::hal()
                 .lock_interface(args.id, caller_id)
                 .map_err(KernelError::HalError),
@@ -121,6 +131,9 @@ pub fn syscall(syscall_type: Syscall, caller_id: u32) -> KernelResult<()> {
                 }
                 Err(e) => Err(KernelError::HalError(e)),
             },
+            SysCallHalActions::ConfigureCallback(callback) => Kernel::hal()
+                .configure_callback(args.id, caller_id, callback)
+                .map_err(KernelError::HalError),
         },
         Syscall::AddPeriodicTask(name, app, init, period, ends_in, id) => {
             match Kernel::scheduler().add_periodic_app(name, app, init, period, ends_in) {

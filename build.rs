@@ -40,7 +40,7 @@ fn main() {
         .arg("--target")
         .arg("drivers")
         .arg("--preset")
-        .arg("Debug")
+        .arg("Release")
         .output()
         .expect("Failed to build drivers");
     if !build_status.status.success() {
@@ -75,6 +75,6 @@ fn main() {
     // Set the linker script to the one provided by cortex-m-rt.
     println!("cargo:rustc-link-arg=-Tlink.x");
 
-    println!("cargo:rustc-link-search=native=drivers/build/Debug");
+    println!("cargo:rustc-link-search=native=drivers/build/Release/");
     println!("cargo:rustc-link-lib=static=drivers");
 }

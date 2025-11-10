@@ -2,7 +2,10 @@ use crate::HalError::{
     IncompatibleAction, InterfaceNotFound, ReadOnlyInterface, WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::interface_read::InterfaceReadAction;
-use crate::{GpioWriteAction, HalResult, InterfaceWriteActions, LcdLayer};
+use crate::{
+    GpioWriteAction, HalError, HalResult, InterfaceCallback, InterfaceWriteActions, LcdLayer,
+    RxBuffer,
+};
 
 #[repr(u8)]
 #[allow(dead_code)]
@@ -13,6 +16,8 @@ pub enum HalInterfaceResult {
     ErrReadOnlyInterface = 3,
     ErrWriteOnlyInterface = 4,
     ErrIncompatibleAction = 5,
+    ErrWriteError = 6,
+    ErrNoBuffer = 7,
 }
 
 impl HalInterfaceResult {
@@ -69,6 +74,7 @@ impl HalInterfaceResult {
             HalInterfaceResult::ErrWriteOnlyInterface => {
                 Err(WriteOnlyInterface(interface_name(id.unwrap())?))
             }
+
             HalInterfaceResult::ErrIncompatibleAction => Err(IncompatibleAction(
                 {
                     if let Some(action) = action_write {
@@ -81,6 +87,13 @@ impl HalInterfaceResult {
                 },
                 interface_name(id.unwrap())?,
             )),
+            HalInterfaceResult::ErrWriteError => {
+                Err(HalError::WriteError(interface_name(id.unwrap())?))
+            }
+            HalInterfaceResult::ErrNoBuffer => Err(HalError::InterfaceBadConfig(
+                interface_name(id.unwrap())?,
+                "No buffer provided for read operation",
+            )),
         }
     }
 }
@@ -92,9 +105,13 @@ unsafe extern "C" {
 
     pub fn get_interface_name(id: u8, name: *mut u8) -> HalInterfaceResult;
 
+    pub fn configure_callback(id: u8, callback: InterfaceCallback) -> HalInterfaceResult;
+
     pub fn gpio_write(id: u8, action: GpioWriteAction) -> HalInterfaceResult;
 
     pub fn usart_write(id: u8, str: *const u8, len: u16) -> HalInterfaceResult;
+
+    pub fn get_read_buffer(id: u8, buffer: &mut &mut RxBuffer) -> HalInterfaceResult;
 
     pub fn get_core_clk() -> u32;
 

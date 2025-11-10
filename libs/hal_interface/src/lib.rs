@@ -6,16 +6,24 @@ mod interface_read;
 mod interface_write;
 mod lock;
 
+use heapless::Vec;
 pub use interface_read::*;
 pub use interface_write::*;
 
-use crate::bindings::{HalInterfaceResult, get_core_clk, get_interface_id, gpio_write, hal_init};
+use crate::bindings::{
+    HalInterfaceResult, configure_callback, get_core_clk, get_interface_id, get_read_buffer,
+    gpio_write, hal_init,
+};
 use crate::lock::Locker;
 pub use errors::*;
+
+pub const BUFFER_SIZE: usize = 32;
 
 pub struct Hal {
     locker: Option<Locker>,
 }
+
+pub type InterfaceCallback = extern "C" fn(u8);
 
 impl Hal {
     /// Creates a new instance of the struct.
@@ -311,11 +319,81 @@ impl Hal {
                 interface_res = act.read(ressource_id, &mut lcd_result);
                 read_result = InterfaceReadResult::LcdRead(lcd_result);
             }
+            InterfaceReadAction::BufferRead => {
+                // Initialize the buffer pointer
+                let mut buffer: &mut RxBuffer = &mut RxBuffer {
+                    buffer: core::ptr::null_mut(),
+                    size: 0,
+                };
+
+                // Get buffer address
+                unsafe {
+                    interface_res = get_read_buffer(ressource_id as u8, &mut buffer);
+                }
+                // Copy buffer content into Vec
+                let mut vec: Vec<u8, BUFFER_SIZE> = Vec::new();
+                for i in 0..buffer.size {
+                    unsafe {
+                        vec.push(*buffer.buffer.wrapping_add(i as usize)).unwrap();
+                    }
+                }
+                read_result = InterfaceReadResult::BufferRead(vec);
+                // Re-initialize buffer
+                buffer.size = 0;
+            }
         };
         match interface_res.to_result(Some(ressource_id), None, None, Some(read_action)) {
             Ok(_) => Ok(read_result),
             Err(e) => Err(e),
         }
+    }
+
+    /// Configures a callback interface with the given parameters.
+    ///
+    /// # Parameters
+    /// - `ressource_id`: An identifier for the resource (of type `usize`) that the callback is associated with.
+    /// - `caller_id`: The unique identifier (of type `u32`) for the caller or entity requesting the configuration.
+    /// - `callback`: The callback function or interface (of type `InterfaceCallback`) to be associated with the resource.
+    ///
+    /// # Returns
+    /// - `HalResult<()>`: Returns a `HalResult` indicating success (`Ok`) or an error (`Err`) in case of failure during the configuration process.
+    ///
+    /// # Behavior
+    /// 1. Ensures that the caller is authorized to perform the action using the `locker` mechanism, if it is present.
+    ///    - If the `self.locker` field is set and contains a locker, the `authorize_action` method is invoked with the provided `ressource_id` and `caller_id`.
+    ///    - If authorization fails, it propagates the error returned by `authorize_action`.
+    /// 2. Configures the callback by calling the `configure_callback` method in an unsafe block.
+    ///    - Converts the `ressource_id` from `usize` to `u8` as required by the low-level `configure_callback` implementation.
+    ///    - Wraps the result of `configure_callback` in a `HalResult` using the `to_result` method, with `ressource_id` as additional context in case of associated errors.
+    ///
+    /// # Safety
+    /// - The function contains an `unsafe` block while invoking the external `configure_callback` function. The caller must ensure that:
+    ///   - The provided `ressource_id` and `callback` adhere to expected invariants and constraints.
+    ///   - The conversion of `ressource_id` to a smaller type (`u8`) does not lead to truncation or incorrect resource mapping.
+    ///
+    /// # Errors
+    /// - Returns an error in the following situations:
+    ///   - If the authorization check via the `locker.authorize_action` method fails.
+    ///   - If the underlying `configure_callback` invocation fails due to invalid parameters or other reasons.
+    ///
+    pub fn configure_callback(
+        &mut self,
+        ressource_id: usize,
+        caller_id: u32,
+        callback: InterfaceCallback,
+    ) -> HalResult<()> {
+        // Check for lock on interface
+        if let Some(locker) = &mut self.locker {
+            locker.authorize_action(ressource_id, caller_id)?;
+        }
+
+        // Configure callback
+        unsafe { configure_callback(ressource_id as u8, callback) }.to_result(
+            Some(ressource_id),
+            None,
+            None,
+            None,
+        )
     }
 
     /// Retrieves the current core clock frequency.
