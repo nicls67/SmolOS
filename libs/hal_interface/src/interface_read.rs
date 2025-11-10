@@ -1,21 +1,26 @@
+use crate::BUFFER_SIZE;
 use crate::LcdLayer;
 use crate::bindings::{HalInterfaceResult, get_fb_address, get_lcd_size};
+use heapless::Vec;
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceReadAction {
     LcdRead(LcdReadAction),
+    BufferRead,
 }
 
 impl InterfaceReadAction {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             InterfaceReadAction::LcdRead(_) => "LCD Read",
+            InterfaceReadAction::BufferRead => "Buffer Read",
         }
     }
 }
 
 pub enum InterfaceReadResult {
     LcdRead(LcdRead),
+    BufferRead(usize, Vec<u8, BUFFER_SIZE>),
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -3,9 +3,9 @@
 //! related errors with different severity levels and format
 
 use crate::HalError::{
-    IncompatibleAction, InterfaceAlreadyLocked, InterfaceNotFound, LockedInterface,
-    LockerAlreadyConfigured, ReadError, ReadOnlyInterface, UnknownError, WriteError,
-    WriteOnlyInterface, WrongInterfaceId,
+    IncompatibleAction, InterfaceAlreadyLocked, InterfaceBadConfig, InterfaceNotFound,
+    LockedInterface, LockerAlreadyConfigured, ReadError, ReadOnlyInterface, UnknownError,
+    WriteError, WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::HalErrorLevel::{Critical, Error, Fatal};
 use heapless::{String, format};
@@ -67,11 +67,12 @@ pub enum HalError {
     ReadOnlyInterface(&'static str),
     WriteOnlyInterface(&'static str),
     IncompatibleAction(&'static str, &'static str),
-    WriteError(HalErrorLevel, &'static str),
-    ReadError(HalErrorLevel, &'static str),
+    WriteError(&'static str),
+    ReadError(&'static str),
     LockedInterface(&'static str),
     InterfaceAlreadyLocked(&'static str),
     LockerAlreadyConfigured,
+    InterfaceBadConfig(&'static str, &'static str),
     UnknownError,
 }
 
@@ -145,7 +146,7 @@ impl HalError {
                 )
                 .unwrap();
             }
-            WriteError(_, ift) => {
+            WriteError(ift) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(256; "Error during write on interface {} ", ift)
@@ -154,7 +155,7 @@ impl HalError {
                 )
                 .unwrap();
             }
-            ReadError(_, ift) => {
+            ReadError(ift) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(256; "Error during read on interface {}", ift)
@@ -195,6 +196,15 @@ impl HalError {
                 )
                 .unwrap();
             }
+            InterfaceBadConfig(ift, err) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(256; "Wrong configuration for interface {}: {}", ift, err)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
         }
         msg
     }
@@ -203,16 +213,7 @@ impl HalError {
     ///
     /// This method analyzes the type of the `HalError` and maps it to a corresponding
     /// `HalErrorLevel`, which represents how critical the error is. The mapping for
-    /// each specific error variant to its respective severity level is defined as follows:
-    ///
-    /// - `InterfaceNotFound(_)`: Returns `Critical`
-    /// - `WrongInterfaceId(_)`: Returns `Critical`
-    /// - `ReadOnlyInterface(_)`: Returns `Error`
-    /// - `WriteOnlyInterface(_)`: Returns `Error`
-    /// - `IncompatibleAction(_, _)`: Returns `Error`
-    /// - `WriteError(lvl, _)`: Returns the level specified in `lvl`
-    /// - `ReadError(lvl, _)`: Returns the level specified in `lvl`
-    /// - `UnknownError`: Returns `Error`
+    /// each specific error variant to its respective severity level is defined.
     ///
     /// # Returns
     ///
@@ -225,12 +226,13 @@ impl HalError {
             ReadOnlyInterface(_) => Error,
             WriteOnlyInterface(_) => Error,
             IncompatibleAction(_, _) => Error,
-            WriteError(lvl, _) => *lvl,
-            ReadError(lvl, _) => *lvl,
+            WriteError(_) => Error,
+            ReadError(_) => Error,
             UnknownError => Error,
             LockedInterface(_) => Critical,
             InterfaceAlreadyLocked(_) => Critical,
             LockerAlreadyConfigured => Error,
+            InterfaceBadConfig(_, _) => Critical,
         }
     }
 }

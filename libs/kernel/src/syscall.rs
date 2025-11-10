@@ -2,7 +2,9 @@ use crate::data::Kernel;
 use crate::scheduler::{App, AppCall};
 use crate::{KernelError, KernelResult, Milliseconds};
 use display::Colors;
-use hal_interface::{InterfaceCallback, InterfaceWriteActions};
+use hal_interface::{
+    InterfaceCallback, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions,
+};
 
 pub struct SysCallHalArgs<'a> {
     pub id: usize,
@@ -11,6 +13,7 @@ pub struct SysCallHalArgs<'a> {
 
 pub enum SysCallHalActions<'a> {
     Write(InterfaceWriteActions<'a>),
+    Read(InterfaceReadAction, &'a mut InterfaceReadResult),
     Lock,
     Unlock,
     GetID(&'static str, &'a mut usize),
@@ -109,6 +112,12 @@ pub fn syscall(syscall_type: Syscall, caller_id: u32) -> KernelResult<()> {
             SysCallHalActions::Write(act) => Kernel::hal()
                 .interface_write(args.id, caller_id, act)
                 .map_err(KernelError::HalError),
+            SysCallHalActions::Read(act, res) => {
+                *res = Kernel::hal()
+                    .interface_read(args.id, caller_id, act)
+                    .map_err(KernelError::HalError)?;
+                Ok(())
+            }
             SysCallHalActions::Lock => Kernel::hal()
                 .lock_interface(args.id, caller_id)
                 .map_err(KernelError::HalError),

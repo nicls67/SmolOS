@@ -1,11 +1,14 @@
 use crate::TerminalType::Usart;
+use crate::data::Kernel;
 use crate::ident::KERNEL_MASTER_ID;
 use crate::terminal::TerminalState::{Display, Prompt, Stopped};
 use crate::{
     KernelResult, SysCallDisplayArgs, SysCallHalActions, SysCallHalArgs, Syscall, syscall,
 };
 use display::Colors;
-use hal_interface::{InterfaceCallback, InterfaceWriteActions, UartWriteActions};
+use hal_interface::{
+    BUFFER_SIZE, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions, UartWriteActions,
+};
 use heapless::{String, Vec};
 
 /// Represents different kinds of terminal text formatting or operations.
@@ -482,8 +485,26 @@ impl Terminal {
 
         Ok(())
     }
+
+    pub fn process_input(&self, buffer: Vec<u8, BUFFER_SIZE>, size: usize) {
+        self.write(&TerminalFormatting::Char(buffer[0] as char));
+    }
 }
 
 pub extern "C" fn terminal_prompt_callback(id: u8) {
-    panic!("Callback not implemented");
+    let mut result = InterfaceReadResult::BufferRead(0, Vec::new());
+    match syscall(
+        Syscall::Hal(SysCallHalArgs {
+            id: id as usize,
+            action: SysCallHalActions::Read(InterfaceReadAction::BufferRead, &mut result),
+        }),
+        KERNEL_MASTER_ID,
+    ) {
+        Ok(()) => {
+            if let InterfaceReadResult::BufferRead(size, buffer) = result {
+                Kernel::terminal().process_input(buffer, size);
+            }
+        }
+        Err(_) => {}
+    }
 }

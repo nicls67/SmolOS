@@ -30,15 +30,15 @@
 /******************/
 typedef struct
 {
-    uint8_t buffer[USART_BUFFER_SIZE];
+    uint8_t* buffer;
     uint8_t size;
-} USART_RX_BUFFER;
+} RX_BUFFER;
 
 /**********************/
 /* Exported constants */
 /**********************/
 extern const DRIVER_ALLOC DRIVERS_ALLOC[];
-extern USART_RX_BUFFER USART1_BUFFER;
+extern RX_BUFFER USART1_BUFFER;
 
 /**********************/
 /* Exported variables */

@@ -28,7 +28,11 @@
 /*********************/
 /* Private constants */
 /*********************/
-USART_RX_BUFFER USART1_BUFFER;
+uint8_t USART1_BUFFER_BUF[USART_BUFFER_SIZE];
+RX_BUFFER USART1_BUFFER = {
+    .buffer = USART1_BUFFER_BUF,
+    .size = 0,
+};
 const GPIO_ALLOC GPIO_PJ5 = {
     .gpio = GPIOJ,
     .pin = GPIO_PIN_5,

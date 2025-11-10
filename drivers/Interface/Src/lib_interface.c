@@ -242,6 +242,50 @@ HAL_INTERFACE_RESULT configure_callback(const uint8_t id, const HAL_INTERFACE_CA
     return OK;
 }
 
+/**
+ * @brief Retrieves the read buffer associated with a specific interface ID.
+ *
+ * This function fetches the read buffer for an interface identified by its ID. If the
+ * specified ID is invalid, the interface is write-only, or no buffer is allocated,
+ * appropriate error codes are returned. The contents of the buffer are copied to the
+ * provided destination buffer, and the size of the copied data is updated in the provided
+ * variable. The buffer is reset after the read operation.
+ *
+ * @param id The ID of the interface to retrieve the buffer from.
+ * @param buffer Pointer to the destination buffer where the read data will be copied.
+ * @param size Pointer to a variable where the size of the copied data will be stored.
+ *
+ * @return OK if the operation is successful. Returns an error code, such as
+ * ERR_WRONG_INTERFACE_ID, ERR_WRITE_ONLY_INTERFACE, or ERR_NO_BUFFER, if the operation fails.
+ */
+HAL_INTERFACE_RESULT get_read_buffer(const uint8_t id, uint8_t *buffer, uint8_t *size)
+{
+    if (id >= DRIVERS_ALLOC_SIZE)
+    {
+        return ERR_WRONG_INTERFACE_ID;
+    }
+    if (DRIVERS_ALLOC[id].drv_direction == OUT)
+    {
+        return ERR_WRITE_ONLY_INTERFACE;
+    }
+    if (DRIVERS_ALLOC[id].buffer == NULL)
+    {
+        return ERR_NO_BUFFER;
+    }
+
+    // Copy buffer to destination
+    for (uint8_t i = 0; i < ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size; i++)
+    {
+        buffer[i] = ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->buffer[i];
+    }
+    *size = ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size;
+
+    // Reset buffer
+    ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size = 0;
+
+    return OK;
+}
+
 #ifdef DRIVER_ACTIVATE_GPIO
 /**
  * @brief Writes a specified action to a GPIO pin, identified by its interface ID.
@@ -363,6 +407,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     if (huart->Instance == USART1)
     {
         HAL_UART_Receive_IT(&huart1, USART1_BUFFER.buffer, 1);
+        USART1_BUFFER.size++;
     }
 
     // Get the ID corresponding to the handler
@@ -379,45 +424,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
             break;
         }
     }
-}
-
-/**
- * @brief Retrieves the receive buffer and its size for a specified USART interface.
- *
- * This function checks if the provided interface ID corresponds to a valid
- * USART interface with input direction. It retrieves the receive buffer and its size
- * for the specified USART interface. If the interface ID is invalid, the interface
- * direction is write-only, or the interface type is incompatible, appropriate error
- * codes are returned.
- *
- * @param id The unique identifier of the USART interface.
- * @param buffer Pointer to a location where the address of the receive buffer will be stored.
- * @param size Pointer to a location where the size of the receive buffer will be stored.
- *
- * @return OK if successful, or an appropriate error code:
- *         - ERR_WRONG_INTERFACE_ID if the ID is out of range.
- *         - ERR_WRITE_ONLY_INTERFACE if the interface is write-only.
- *         - ERR_INCOMPATIBLE_ACTION if the interface is not of USART type.
- */
-HAL_INTERFACE_RESULT usart_get_buffer(const uint8_t id, uint8_t **buffer, uint8_t *size)
-{
-    if (id >= DRIVERS_ALLOC_SIZE)
-    {
-        return ERR_WRONG_INTERFACE_ID;
-    }
-    if (DRIVERS_ALLOC[id].drv_direction == OUT)
-    {
-        return ERR_WRITE_ONLY_INTERFACE;
-    }
-    if (DRIVERS_ALLOC[id].drv_type != USART)
-    {
-        return ERR_INCOMPATIBLE_ACTION;
-    }
-
-    *buffer = ((USART_RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->buffer;
-    *size = ((USART_RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size;
-
-    return OK;
 }
 #endif
 

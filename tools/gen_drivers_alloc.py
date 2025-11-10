@@ -106,9 +106,9 @@ def gen_struct_init(struct_type: str, struct_name: str, fields: list, is_const: 
         initialization.
     """
     c_code = []
-    const = "const" if is_const else ""
+    const = "const " if is_const else ""
 
-    c_code.append(f"{const} {struct_type} {struct_name} = {{")
+    c_code.append(f"{const}{struct_type} {struct_name} = {{")
     for field in fields:
         c_code.append(f"    .{field[0]} = {field[1]},")
     c_code.append("};")
@@ -205,7 +205,6 @@ def gen_drivers_alloc(peri_config: dict, analysis: dict):
     struct_init_c_code = []
 
     # Parse config
-    peri_buffer = "0"
     for i, peripheral in enumerate(peri_config):
         # Check if the peripheral needs a buffer
         peri_buffer = "0"
@@ -374,11 +373,19 @@ def gen_c_code(template: str, config: dict, analysis: dict, header: bool = False
 
                         # Generate buffers declaration
                         for buffer in analysis['buffers']:
-                            generated_lines.append(f"extern USART_RX_BUFFER {buffer['name']};")
+                            generated_lines.append(f"extern RX_BUFFER {buffer['name']};")
                     else:
                         # Generate buffers declaration
                         for buffer in analysis['buffers']:
-                            generated_lines.append(f"USART_RX_BUFFER {buffer['name']};")
+                            generated_lines.append(f"uint8_t {buffer['name']}_BUF[{buffer['size']}];")
+                            generated_lines.extend(gen_struct_init("RX_BUFFER", buffer['name'],
+                                                                   [
+                                                                       ["buffer",
+                                                                        f"{buffer['name']}_BUF"],
+                                                                       ["size",
+                                                                        "0"],
+                                                                   ],
+                                                                   False))
 
                         generated_lines.extend(gen_drivers_alloc(config['drivers'], analysis))
 
