@@ -4,7 +4,7 @@ use crate::HalError::{
 use crate::interface_read::InterfaceReadAction;
 use crate::{
     GpioWriteAction, HalError, HalErrorLevel, HalResult, InterfaceCallback, InterfaceWriteActions,
-    LcdLayer,
+    LcdLayer, RxBuffer,
 };
 
 #[repr(u8)]
@@ -111,7 +111,7 @@ unsafe extern "C" {
 
     pub fn usart_write(id: u8, str: *const u8, len: u16) -> HalInterfaceResult;
 
-    pub fn get_read_buffer(id: u8, buffer: *mut u8, size: &mut u8) -> HalInterfaceResult;
+    pub fn get_read_buffer(id: u8, buffer: &mut &mut RxBuffer) -> HalInterfaceResult;
 
     pub fn get_core_clk() -> u32;
 

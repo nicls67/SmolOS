@@ -486,13 +486,43 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn process_input(&self, buffer: Vec<u8, BUFFER_SIZE>, size: usize) {
-        self.write(&TerminalFormatting::Char(buffer[0] as char));
+    pub fn process_input(&self, buffer: Vec<u8, BUFFER_SIZE>, id: usize) {
+        // Find the terminal corresponding to the given ID
+        let terminal_idx = self.interface_id.iter().position(|&x| x == id).unwrap();
+
+        // Write the received data to the terminal
+        match self.write_char(buffer[0] as char, terminal_idx) {
+            Ok(_) => {}
+            Err(err) => Kernel::errors().error_handler(&err),
+        }
     }
 }
 
+/// This function acts as a callback for terminal prompt events, allowing the system
+/// to handle user input when interacting with the terminal.
+///
+/// # Parameters
+/// - `id`: A `u8` identifier corresponding to the terminal or interface for which
+///         the input is being handled.
+///
+/// # Behavior
+/// The function performs a system call to read data from the terminal interface, passing
+/// the specified `id` to identify the terminal or device. If the system call succeeds,
+/// the data read from the terminal buffer is processed using the kernel's terminal logic.
+/// In case of an error during the system call, the error is ignored silently.
+///
+/// # Implementation Details
+/// - A `Syscall` is invoked with `SysCallHalArgs`, where:
+///   - `id` is converted from `u8` to `usize`.
+///   - `action` specifies a read operation (`SysCallHalActions::Read`) on an interface buffer.
+/// - The read result is captured in `result` (an `InterfaceReadResult::BufferRead`).
+/// - Upon successful read:
+///   - Checks that the result is of the expected variant (`BufferRead`).
+///   - The retrieved buffer is passed to the `Kernel::terminal().process_input()`
+///     method for further processing.
+/// - Errors are currently ignored without additional handling
 pub extern "C" fn terminal_prompt_callback(id: u8) {
-    let mut result = InterfaceReadResult::BufferRead(0, Vec::new());
+    let mut result = InterfaceReadResult::BufferRead(Vec::new());
     match syscall(
         Syscall::Hal(SysCallHalArgs {
             id: id as usize,
@@ -501,8 +531,8 @@ pub extern "C" fn terminal_prompt_callback(id: u8) {
         KERNEL_MASTER_ID,
     ) {
         Ok(()) => {
-            if let InterfaceReadResult::BufferRead(size, buffer) = result {
-                Kernel::terminal().process_input(buffer, size);
+            if let InterfaceReadResult::BufferRead(buffer) = result {
+                Kernel::terminal().process_input(buffer, id as usize);
             }
         }
         Err(_) => {}

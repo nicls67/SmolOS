@@ -320,13 +320,26 @@ impl Hal {
                 read_result = InterfaceReadResult::LcdRead(lcd_result);
             }
             InterfaceReadAction::BufferRead => {
-                let mut size = 0;
-                let mut buffer = [0; BUFFER_SIZE];
+                // Initialize the buffer pointer
+                let mut buffer: &mut RxBuffer = &mut RxBuffer {
+                    buffer: core::ptr::null_mut(),
+                    size: 0,
+                };
+
+                // Get buffer address
                 unsafe {
-                    interface_res =
-                        get_read_buffer(ressource_id as u8, buffer.as_mut_ptr(), &mut size);
+                    interface_res = get_read_buffer(ressource_id as u8, &mut buffer);
                 }
-                read_result = InterfaceReadResult::BufferRead(size as usize, Vec::from(buffer));
+                // Copy buffer content into Vec
+                let mut vec: Vec<u8, BUFFER_SIZE> = Vec::new();
+                for i in 0..buffer.size {
+                    unsafe {
+                        vec.push(*buffer.buffer.wrapping_add(i as usize)).unwrap();
+                    }
+                }
+                read_result = InterfaceReadResult::BufferRead(vec);
+                // Re-initialize buffer
+                buffer.size = 0;
             }
         };
         match interface_res.to_result(Some(ressource_id), None, None, Some(read_action)) {

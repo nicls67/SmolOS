@@ -243,22 +243,22 @@ HAL_INTERFACE_RESULT configure_callback(const uint8_t id, const HAL_INTERFACE_CA
 }
 
 /**
- * @brief Retrieves the read buffer associated with a specific interface ID.
+ * @brief Retrieves a read buffer for a specified interface ID.
  *
- * This function fetches the read buffer for an interface identified by its ID. If the
- * specified ID is invalid, the interface is write-only, or no buffer is allocated,
- * appropriate error codes are returned. The contents of the buffer are copied to the
- * provided destination buffer, and the size of the copied data is updated in the provided
- * variable. The buffer is reset after the read operation.
+ * This function checks the validity of the given interface ID and retrieves
+ * the associated read buffer if it is available and properly configured for
+ * read operations. The buffer is returned through the provided pointer
+ * parameter if all checks pass successfully.
  *
- * @param id The ID of the interface to retrieve the buffer from.
- * @param buffer Pointer to the destination buffer where the read data will be copied.
- * @param size Pointer to a variable where the size of the copied data will be stored.
+ * @param id The ID of the interface for which the read buffer is being requested.
+ * @param buffer Pointer to a pointer variable where the read buffer will be stored.
  *
- * @return OK if the operation is successful. Returns an error code, such as
- * ERR_WRONG_INTERFACE_ID, ERR_WRITE_ONLY_INTERFACE, or ERR_NO_BUFFER, if the operation fails.
+ * @return - OK: The read buffer was successfully retrieved.
+ *         - ERR_WRONG_INTERFACE_ID: The provided interface ID is invalid or out of bounds.
+ *         - ERR_WRITE_ONLY_INTERFACE: The interface is configured as write-only.
+ *         - ERR_NO_BUFFER: No buffer is associated with the specified interface.
  */
-HAL_INTERFACE_RESULT get_read_buffer(const uint8_t id, uint8_t *buffer, uint8_t *size)
+HAL_INTERFACE_RESULT get_read_buffer(const uint8_t id, RX_BUFFER **buffer)
 {
     if (id >= DRIVERS_ALLOC_SIZE)
     {
@@ -273,15 +273,7 @@ HAL_INTERFACE_RESULT get_read_buffer(const uint8_t id, uint8_t *buffer, uint8_t 
         return ERR_NO_BUFFER;
     }
 
-    // Copy buffer to destination
-    for (uint8_t i = 0; i < ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size; i++)
-    {
-        buffer[i] = ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->buffer[i];
-    }
-    *size = ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size;
-
-    // Reset buffer
-    ((RX_BUFFER *) DRIVERS_ALLOC[id].buffer)->size = 0;
+    *buffer = DRIVERS_ALLOC[id].buffer;
 
     return OK;
 }

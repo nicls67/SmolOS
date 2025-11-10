@@ -3,6 +3,13 @@ use crate::LcdLayer;
 use crate::bindings::{HalInterfaceResult, get_fb_address, get_lcd_size};
 use heapless::Vec;
 
+#[repr(C)]
+#[derive(Clone)]
+pub(crate) struct RxBuffer {
+    pub buffer: *mut u8,
+    pub size: u8,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceReadAction {
     LcdRead(LcdReadAction),
@@ -20,7 +27,7 @@ impl InterfaceReadAction {
 
 pub enum InterfaceReadResult {
     LcdRead(LcdRead),
-    BufferRead(usize, Vec<u8, BUFFER_SIZE>),
+    BufferRead(Vec<u8, BUFFER_SIZE>),
 }
 
 #[derive(Debug, Clone, Copy)]
