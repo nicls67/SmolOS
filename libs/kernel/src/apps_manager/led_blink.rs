@@ -6,11 +6,8 @@ use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::InterfaceWriteActions;
 
 const LED_NAME: &str = "ACT_LED";
-pub const LED_BLINK_NAME: &str = "LED Blink";
-pub const LED_BLINK_PERIOD: Milliseconds = Milliseconds(1000);
-
+static LED_APP_ID: AtomicU32 = AtomicU32::new(0);
 static LED_ID: AtomicUsize = AtomicUsize::new(0);
-pub static LED_APP_ID: AtomicU32 = AtomicU32::new(0);
 static DOT_COUNTER: AtomicU8 = AtomicU8::new(0);
 
 pub fn led_blink() -> KernelResult<()> {
@@ -78,4 +75,8 @@ pub fn init_led_blink() -> KernelResult<()> {
         }),
         LED_APP_ID.load(Ordering::Relaxed),
     )
+}
+
+pub fn led_blink_id_storage(id: u32) {
+    LED_APP_ID.store(id, Ordering::Relaxed);
 }

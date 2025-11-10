@@ -1,3 +1,4 @@
+use crate::apps_manager::AppsManager;
 use crate::errors_mgt::ErrorsManager;
 use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
@@ -14,6 +15,7 @@ pub static mut KERNEL_DATA: Kernel = Kernel {
     scheduler: None,
     errors: None,
     display: None,
+    apps: None,
 };
 
 /// A data structure representing timing-related configuration for the system kernel.
@@ -88,6 +90,7 @@ pub struct Kernel {
     scheduler: Option<Scheduler>,
     errors: Option<ErrorsManager>,
     display: Option<Display>,
+    apps: Option<AppsManager>,
 }
 
 impl Kernel {
@@ -101,6 +104,7 @@ impl Kernel {
     /// * `terminal` - A `Terminal` instance to handle terminal input/output interactions.
     /// * `scheduler` - A `Scheduler` instance responsible for managing task scheduling.
     /// * `errors` - An `ErrorsManager` instance for managing and reporting errors throughout the kernel.
+    /// * `apps_manager` - An `AppsManager` instance for managing kernel applications.
     ///
     /// # Safety
     ///
@@ -122,6 +126,7 @@ impl Kernel {
         terminal: Terminal,
         scheduler: Scheduler,
         errors: ErrorsManager,
+        apps_manager: AppsManager,
     ) {
         unsafe {
             KERNEL_DATA.hal = Some(hal);
@@ -130,6 +135,7 @@ impl Kernel {
             KERNEL_DATA.terminal = Some(terminal);
             KERNEL_DATA.scheduler = Some(scheduler);
             KERNEL_DATA.errors = Some(errors);
+            KERNEL_DATA.apps = Some(apps_manager);
         }
     }
 
@@ -332,6 +338,37 @@ impl Kernel {
                 KERNEL_DATA.errors.as_mut().unwrap()
             } else {
                 panic!("Errors manager is not initialized");
+            }
+        }
+    }
+
+    /// Provides mutable access to the global `AppsManager` instance.
+    ///
+    /// This function retrieves a mutable reference to the global instance of the
+    /// `AppsManager` by accessing the `KERNEL_DATA.apps` field. If the `apps`
+    /// field is not initialized (i.e., it contains `None`), the function will panic.
+    ///
+    /// # Safety
+    /// This function uses `unsafe` code to dereference and return a mutable reference
+    /// to a static variable. Since it allows mutable access to a static reference,
+    /// this can lead to undefined behavior if multiple mutable references are created
+    /// and used simultaneously. Use this function with caution and ensure that
+    /// no data races or aliasing occur.
+    ///
+    /// # Panics
+    /// This function will panic if the `KERNEL_DATA.apps` field is not initialized
+    /// (i.e., contains `None`).
+    ///
+    /// # Returns
+    /// A mutable reference to the global `AppsManager` instance.
+    ///
+    #[allow(static_mut_refs)]
+    pub fn apps() -> &'static mut AppsManager {
+        unsafe {
+            if KERNEL_DATA.apps.is_some() {
+                KERNEL_DATA.apps.as_mut().unwrap()
+            } else {
+                panic!("Apps manager is not initialized");
             }
         }
     }

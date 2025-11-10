@@ -138,7 +138,7 @@ struct AppWrapper {
 /// * `next_id` - A unique identifier (`u32`) for assigning to newly added tasks within the scheduler.
 ///
 pub struct Scheduler {
-    tasks: Vec<AppWrapper, 128>,
+    tasks: Vec<AppWrapper, 32>,
     cycle_counter: u32,
     sched_period: Milliseconds,
     pub started: bool,
@@ -571,5 +571,19 @@ impl Scheduler {
         } else {
             Err(KernelError::AppNotFound(name))
         }
+    }
+
+    /// Returns the scheduling period of the current object.
+    ///
+    /// This method retrieves the value of `sched_period`, which represents
+    /// the time interval (in milliseconds) associated with this object. The
+    /// scheduling period could reflect a timing configuration or be used
+    /// to specify execution intervals for scheduling tasks.
+    ///
+    /// # Returns
+    /// A `Milliseconds` value representing the scheduling period.
+    ///
+    pub fn get_period(&self) -> Milliseconds {
+        self.sched_period
     }
 }

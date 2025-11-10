@@ -1,14 +1,15 @@
 #![no_std]
+mod apps_manager;
 mod data;
 mod errors_mgt;
 mod ident;
-mod kernel_apps;
 mod scheduler;
 mod syscall;
 mod systick;
 mod terminal;
 mod types;
 
+use crate::apps_manager::AppsManager;
 use crate::data::Kernel;
 pub use crate::data::KernelTimeData;
 use crate::errors_mgt::ErrorsManager;
@@ -68,6 +69,7 @@ pub fn boot(config: BootConfig) {
         Terminal::new(config.system_terminals),
         sched,
         ErrorsManager::new(),
+        AppsManager::new(),
     );
     Kernel::hal().configure_locker(KERNEL_MASTER_ID).unwrap();
 
@@ -121,8 +123,8 @@ pub fn boot(config: BootConfig) {
         .write(&TerminalFormatting::StrNewLineBoth("Kernel ready !"))
         .unwrap();
 
-    // Start kernel apps
-    kernel_apps::initialize_kernel_apps().unwrap_or(());
+    // Initialize default apps
+    Kernel::apps().init_default_apps().unwrap();
 
     // Start scheduler
     Kernel::scheduler()
