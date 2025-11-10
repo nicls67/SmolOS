@@ -74,15 +74,6 @@ enum TerminalState {
     Display,
 }
 
-/// Escape sequence
-#[derive(PartialEq)]
-enum EscapeSeqState {
-    NotInEcsSeq,
-    FirstRcv,
-    SecRcv,
-    ThirdRcv,
-}
-
 const MAX_TERMINALS: usize = 8;
 
 pub struct Terminal {
@@ -90,7 +81,6 @@ pub struct Terminal {
     terminals: Vec<TerminalType, MAX_TERMINALS>,
     line_buffer: Vec<String<256>, MAX_TERMINALS>,
     mode: Vec<TerminalState, MAX_TERMINALS>,
-    escape_seq: EscapeSeqState,
     cursor_pos: usize,
     current_color: Colors,
 }
@@ -110,7 +100,6 @@ impl Terminal {
     /// - `interface_id`: Initialized with a vector containing `MAX_TERMINALS` zeroes.
     /// - `line_buffer`: Starts as an empty string.
     /// - `state`: Set to `TerminalState::Stopped`.
-    /// - `escape_seq`: Defaults to `EscapeSeqState::NotInEcsSeq`.
     /// - `cursor_pos`: Initialized to `0`.
     /// - `current_color`: Set to `Colors::White`.
     ///
@@ -123,8 +112,7 @@ impl Terminal {
             interface_id: Vec::from_slice(&[0; MAX_TERMINALS]).unwrap(),
             terminals,
             line_buffer: Vec::from_slice(&[const { String::new() }; MAX_TERMINALS]).unwrap(),
-            mode: Vec::from_slice(&[TerminalState::Stopped; MAX_TERMINALS]).unwrap(),
-            escape_seq: EscapeSeqState::NotInEcsSeq,
+            mode: Vec::from_slice(&[Stopped; MAX_TERMINALS]).unwrap(),
             cursor_pos: 0,
             current_color: Colors::White,
         }
@@ -202,7 +190,6 @@ impl Terminal {
                 // Set mode to prompt
                 if self.mode[i] != Prompt {
                     self.mode[i] = Prompt;
-                    self.escape_seq = EscapeSeqState::NotInEcsSeq;
                     self.cursor_pos = 0;
                     self.new_line(i)?;
                     self.write_char('>', i)?;
@@ -515,56 +502,89 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn process_input(&mut self, buffer: Vec<u8, BUFFER_SIZE>, id: usize) {
+    /// Processes input received for a terminal and handles it based on the mode and input buffer.
+    ///
+    /// # Parameters
+    /// - `buffer`: A `Vec<u8, BUFFER_SIZE>` containing the input data to be processed. This typically
+    ///   represents a single character or multiple characters received.
+    /// - `id`: A `usize` that represents the unique identifier of the terminal to which the input belongs.
+    ///
+    /// # Returns
+    /// - A `KernelResult<()>`, indicating success or failure of the operation. In case of errors, a
+    ///   relevant terminal error is returned.
+    ///
+    /// # Functionality
+    /// - Locates the terminal corresponding to the given `id` from the list of `interface_id`s.
+    /// - If the terminal is in the `Prompt` mode:
+    ///   - Checks the contents of the `buffer`.
+    ///   - If the input is a carriage return (`\r`), it clears the terminal's line buffer, resets the
+    ///     cursor position, moves to a new line, and writes a new prompt (`>`).
+    ///   - If the input is any other character, echoes the character back to the terminal, appends it
+    ///     to the terminal's line buffer, and updates the cursor position.
+    ///   - Handles potential errors during line buffer updates, such as buffer overflow.
+    ///
+    /// # Errors
+    /// - If the `line_buffer` overflows (exceeds its capacity), a `TerminalError` is returned with the
+    ///   following context:
+    ///   - Error Type: `Error`
+    ///   - Terminal name or identifier
+    ///   - Description: `"Line buffer overflow"`
+    ///
+    pub fn process_input(&mut self, buffer: Vec<u8, BUFFER_SIZE>, id: usize) -> KernelResult<()> {
         // Find the terminal corresponding to the given ID
         let terminal_idx = self.interface_id.iter().position(|&x| x == id).unwrap();
 
         // If the terminal is in prompt mode
         if self.mode[terminal_idx] == Prompt {
-            // Echo the received character
-            match self.write_char(buffer[0] as char, terminal_idx) {
-                Ok(_) => {}
-                Err(err) => Kernel::errors().error_handler(&err),
-            }
+            // If the received character is a return character, process the line
+            if buffer[0] == '\r' as u8 {
+                // Currently we only empty the line buffer and go to a new line
+                self.line_buffer[terminal_idx].clear();
+                self.cursor_pos = 0;
+                self.new_line(terminal_idx)?;
+                self.write_char('>', terminal_idx)?;
+            } else {
+                // Echo the received character
+                self.write_char(buffer[0] as char, terminal_idx)?;
 
-            // Store it into the line buffer
-            let term_name = self.name(terminal_idx);
-            match self.line_buffer[terminal_idx].push(buffer[0] as char) {
-                Ok(_) => {}
-                Err(_) => Kernel::errors().error_handler(&TerminalError(
-                    Error,
-                    term_name,
-                    "Line buffer overflow",
-                )),
+                // Store it into the line buffer
+                let term_name = self.name(terminal_idx);
+                self.line_buffer[terminal_idx]
+                    .push(buffer[0] as char)
+                    .map_err(|_| TerminalError(Error, term_name, "Line buffer overflow"))?;
+                self.cursor_pos += 1;
             }
-            self.cursor_pos += 1;
         }
+
+        Ok(())
     }
 }
 
-/// This function acts as a callback for terminal prompt events, allowing the system
-/// to handle user input when interacting with the terminal.
+/// A callback function for terminal prompts that reads input data from a specified interface and processes it.
 ///
 /// # Parameters
-/// - `id`: A `u8` identifier corresponding to the terminal or interface for which
-///         the input is being handled.
+/// - `id: u8`: The identifier for the specific hardware interface to read input from.
 ///
-/// # Behavior
-/// The function performs a system call to read data from the terminal interface, passing
-/// the specified `id` to identify the terminal or device. If the system call succeeds,
-/// the data read from the terminal buffer is processed using the kernel's terminal logic.
-/// In case of an error during the system call, the error is ignored silently.
+/// # Description
+/// This function performs the following operations:
+/// 1. Initializes an ` InterfaceReadResult ` to store the result of a read operation.
+/// 2. Executes a syscall to the kernel to read data from the hardware interface identified by `id`.
+/// 3. If the syscall is successful and the read result contains a buffer, the data in the buffer
+///    is passed to the terminal module for processing.
+/// 4. Handles any errors that occur during the syscall or terminal input processing by invoking
+///    the kernel's error handler.
 ///
-/// # Implementation Details
-/// - A `Syscall` is invoked with `SysCallHalArgs`, where:
-///   - `id` is converted from `u8` to `usize`.
-///   - `action` specifies a read operation (`SysCallHalActions::Read`) on an interface buffer.
-/// - The read result is captured in `result` (an `InterfaceReadResult::BufferRead`).
-/// - Upon successful read:
-///   - Checks that the result is of the expected variant (`BufferRead`).
-///   - The retrieved buffer is passed to the `Kernel::terminal().process_input()`
-///     method for further processing.
-/// - Errors are currently ignored without additional handling
+/// # Error Handling
+/// - If the syscall to read input data fails, the kernel's error handler is invoked with the error.
+/// - If the terminal input processing fails, the kernel's error handler is invoked with the error.
+///
+/// # Notes
+/// - The function uses the `Kernel::terminal()` API to access the terminal for input processing.
+/// - The `Kernel::errors()` API is used to handle any errors that occur.
+///
+/// # Safety
+/// This function interacts with external systems (e.g., hardware and kernel components)
+/// and relies on the validity and stability of the provided `id` and kernel subsystems.
 pub extern "C" fn terminal_prompt_callback(id: u8) {
     let mut result = InterfaceReadResult::BufferRead(Vec::new());
     match syscall(
@@ -576,9 +596,12 @@ pub extern "C" fn terminal_prompt_callback(id: u8) {
     ) {
         Ok(()) => {
             if let InterfaceReadResult::BufferRead(buffer) = result {
-                Kernel::terminal().process_input(buffer, id as usize);
+                match Kernel::terminal().process_input(buffer, id as usize) {
+                    Ok(_) => {}
+                    Err(e) => Kernel::errors().error_handler(&e),
+                }
             }
         }
-        Err(_) => {}
+        Err(e) => Kernel::errors().error_handler(&e),
     }
 }
