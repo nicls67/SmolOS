@@ -1,3 +1,5 @@
+use crate::KernelError::TerminalError;
+use crate::KernelErrorLevel::Error;
 use crate::TerminalType::Usart;
 use crate::data::Kernel;
 use crate::ident::KERNEL_MASTER_ID;
@@ -86,7 +88,7 @@ const MAX_TERMINALS: usize = 8;
 pub struct Terminal {
     interface_id: Vec<usize, MAX_TERMINALS>,
     terminals: Vec<TerminalType, MAX_TERMINALS>,
-    line_buffer: String<256>,
+    line_buffer: Vec<String<256>, MAX_TERMINALS>,
     mode: Vec<TerminalState, MAX_TERMINALS>,
     escape_seq: EscapeSeqState,
     cursor_pos: usize,
@@ -120,11 +122,38 @@ impl Terminal {
         Terminal {
             interface_id: Vec::from_slice(&[0; MAX_TERMINALS]).unwrap(),
             terminals,
-            line_buffer: String::new(),
+            line_buffer: Vec::from_slice(&[const { String::new() }; MAX_TERMINALS]).unwrap(),
             mode: Vec::from_slice(&[TerminalState::Stopped; MAX_TERMINALS]).unwrap(),
             escape_seq: EscapeSeqState::NotInEcsSeq,
             cursor_pos: 0,
             current_color: Colors::White,
+        }
+    }
+
+    /// Retrieves the name of a terminal based on its index.
+    ///
+    /// # Arguments
+    ///
+    /// * `term_idx` - The index of the terminal in the `terminals` vector.
+    ///
+    /// # Returns
+    ///
+    /// A string slice (`&str`) representing the name of the terminal.
+    /// If the terminal is of type `Usart`, the corresponding name is returned.
+    /// If the terminal is of type `Display`, the string "Display" is returned.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if `term_idx` is out of bounds for the `terminals` vector.
+    ///
+    /// # Note
+    ///
+    /// Ensure that `term_idx` is within the valid range of terminal indices to avoid
+    /// runtime panics.
+    fn name(&self, term_idx: usize) -> &'static str {
+        match self.terminals[term_idx] {
+            Usart(n) => n,
+            TerminalType::Display => "Display",
         }
     }
 
@@ -486,14 +515,29 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn process_input(&self, buffer: Vec<u8, BUFFER_SIZE>, id: usize) {
+    pub fn process_input(&mut self, buffer: Vec<u8, BUFFER_SIZE>, id: usize) {
         // Find the terminal corresponding to the given ID
         let terminal_idx = self.interface_id.iter().position(|&x| x == id).unwrap();
 
-        // Write the received data to the terminal
-        match self.write_char(buffer[0] as char, terminal_idx) {
-            Ok(_) => {}
-            Err(err) => Kernel::errors().error_handler(&err),
+        // If the terminal is in prompt mode
+        if self.mode[terminal_idx] == Prompt {
+            // Echo the received character
+            match self.write_char(buffer[0] as char, terminal_idx) {
+                Ok(_) => {}
+                Err(err) => Kernel::errors().error_handler(&err),
+            }
+
+            // Store it into the line buffer
+            let term_name = self.name(terminal_idx);
+            match self.line_buffer[terminal_idx].push(buffer[0] as char) {
+                Ok(_) => {}
+                Err(_) => Kernel::errors().error_handler(&TerminalError(
+                    Error,
+                    term_name,
+                    "Line buffer overflow",
+                )),
+            }
+            self.cursor_pos += 1;
         }
     }
 }

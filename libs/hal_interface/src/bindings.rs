@@ -3,8 +3,8 @@ use crate::HalError::{
 };
 use crate::interface_read::InterfaceReadAction;
 use crate::{
-    GpioWriteAction, HalError, HalErrorLevel, HalResult, InterfaceCallback, InterfaceWriteActions,
-    LcdLayer, RxBuffer,
+    GpioWriteAction, HalError, HalResult, InterfaceCallback, InterfaceWriteActions, LcdLayer,
+    RxBuffer,
 };
 
 #[repr(u8)]
