@@ -7,11 +7,12 @@ use crate::terminal::TerminalState::{Display, Prompt, Stopped};
 use crate::{
     KernelResult, SysCallDisplayArgs, SysCallHalActions, SysCallHalArgs, Syscall, syscall,
 };
+
 use display::Colors;
 use hal_interface::{
     BUFFER_SIZE, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions, UartWriteActions,
 };
-use heapless::{String, Vec};
+use heapless::{String, Vec, format};
 
 /// Represents different kinds of terminal text formatting or operations.
 ///
@@ -540,8 +541,11 @@ impl Terminal {
                 // Start the requested command
                 match Kernel::apps().start_app(&self.line_buffer[terminal_idx]) {
                     Ok(_) => {}
-                    Err(_) => self.write_str("\n\rError: Command not found", terminal_idx)?,
-                }
+                    Err(err) => self.write_str(
+                        format!(256;"\r\n{}",err.to_string()).unwrap().as_str(),
+                        terminal_idx,
+                    )?,
+                };
 
                 // Empty the line buffer and go to a new line
                 self.line_buffer[terminal_idx].clear();

@@ -1,7 +1,7 @@
 use crate::KernelResult;
 use crate::Milliseconds;
 use crate::apps_manager::app_config::{AppConfig, AppStatus, CallMethod, CallPeriodicity};
-use heapless::{String, Vec};
+use heapless::Vec;
 
 mod app_config;
 mod led_blink;
@@ -10,7 +10,7 @@ mod shell_cmd;
 const MAX_APPS: usize = 32;
 const DEFAULT_APPS: [AppConfig; 2] = [
     AppConfig {
-        name: "LED Blink",
+        name: "led_blink",
         periodicity: CallPeriodicity::Periodic(Milliseconds(1000)),
         app_fn: CallMethod::Call(led_blink::led_blink),
         init_fn: Some(led_blink::init_led_blink),
@@ -31,7 +31,7 @@ const DEFAULT_APPS: [AppConfig; 2] = [
     },
 ];
 
-const DEFAULT_APPS_START_LIST: [&str; 1] = ["LED Blink"];
+const DEFAULT_APPS_START_LIST: [&str; 1] = ["led_blink"];
 
 pub struct AppsManager {
     apps: Vec<AppConfig, MAX_APPS>,
@@ -51,7 +51,7 @@ impl AppsManager {
             }
 
             // Push it into the vector
-            match self.apps.push(*app) {
+            match self.apps.push(app_tmp) {
                 Ok(_) => {}
                 Err(_) => return Err(crate::KernelError::CannotAddNewPeriodicApp(app.name)),
             }

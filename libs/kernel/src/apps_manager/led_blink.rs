@@ -1,6 +1,6 @@
 use crate::SysCallDisplayArgs::WriteCharAtCursor;
-use crate::{KernelResult, Milliseconds, SysCallHalActions, SysCallHalArgs, Syscall, syscall};
-use core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering};
+use crate::{syscall, KernelResult, SysCallHalActions, SysCallHalArgs, Syscall};
+use core::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use display::Colors;
 use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::InterfaceWriteActions;

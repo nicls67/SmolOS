@@ -1,7 +1,7 @@
 use crate::apps_manager::app_config::AppStatus::{Running, Stopped};
 use crate::data::Kernel;
 use crate::scheduler::{App, AppCall, AppParam};
-use crate::{KernelResult, Milliseconds, Syscall, syscall};
+use crate::{KernelError, KernelResult, Milliseconds, Syscall, syscall};
 
 #[derive(Copy, Clone)]
 pub enum CallPeriodicity {
@@ -63,23 +63,17 @@ impl AppConfig {
                 }
             }
 
-            let mut app_id: u32 = 0;
-
-            syscall(
-                Syscall::AddPeriodicTask(
-                    self.name,
-                    match self.app_fn {
-                        CallMethod::Call(app) => AppCall::AppNoParam(app, self.end_fn),
-                        CallMethod::CallWithParam(app, param) => {
-                            AppCall::AppParam(app, param, self.end_fn)
-                        }
-                    },
-                    self.init_fn,
-                    period,
-                    ends_in,
-                    &mut app_id,
-                ),
-                0,
+            let app_id = Kernel::scheduler().add_periodic_app(
+                self.name,
+                match self.app_fn {
+                    CallMethod::Call(app) => AppCall::AppNoParam(app, self.end_fn),
+                    CallMethod::CallWithParam(app, param) => {
+                        AppCall::AppParam(app, param, self.end_fn)
+                    }
+                },
+                self.init_fn,
+                period,
+                ends_in,
             )?;
             self.id = Some(app_id);
             self.app_status = Running;
@@ -87,8 +81,10 @@ impl AppConfig {
             if let Some(app_id_storage) = self.app_id_storage {
                 app_id_storage(app_id);
             }
+            Ok(())
+        } else {
+            Err(KernelError::AppAlreadyScheduled(self.name))
         }
-        Ok(())
     }
 
     pub fn stop(&mut self) -> KernelResult<()> {
