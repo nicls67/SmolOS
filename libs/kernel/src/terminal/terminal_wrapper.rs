@@ -1,3 +1,5 @@
+use crate::KernelError::TerminalError;
+use crate::KernelErrorLevel::Error;
 use crate::TerminalType::Usart;
 use crate::ident::KERNEL_MASTER_ID;
 use crate::terminal::TerminalState;
@@ -17,9 +19,46 @@ pub struct TerminalWrapper {
     pub mode: TerminalState,
     pub cursor_pos: usize,
     pub current_color: Colors,
+    pub owner: Option<u32>,
 }
 
 impl TerminalWrapper {
+    /// Checks if the given caller ID has the correct rights to access or perform operations
+    /// on the kernel object. This method verifies ownership or privileged access.
+    ///
+    /// ### Parameters:
+    /// - `caller_id` (`u32`): The ID of the entity attempting to access the resource.
+    ///
+    /// ### Returns:
+    /// - `KernelResult<()>`:
+    ///   - `Ok(())` if the `caller_id` has the required rights.
+    ///   - `Err(TerminalError)`: If the `caller_id` does not have the necessary rights.
+    ///
+    /// ### Ownership Rules:
+    /// - Access is granted if:
+    ///   1. The caller ID matches the owner of the resource.
+    ///   2. The caller ID matches the predefined `KERNEL_MASTER_ID` which represents
+    ///      a superuser or privileged access level.
+    /// - If the resource does not have an owner (`self.owner` is `None`), access is universally granted.
+    ///
+    /// ### Errors:
+    /// - Returns a `TerminalError` with a message of "Permission denied" if:
+    ///   - The `caller_id` doesn't match the owner ID, and
+    ///   - The `caller_id` is not equal to `KERNEL_MASTER_ID`.
+    ///
+    fn check_rights(&self, caller_id: u32) -> KernelResult<()> {
+        match self.owner {
+            Some(owner) => {
+                if owner == caller_id || caller_id == KERNEL_MASTER_ID {
+                    Ok(())
+                } else {
+                    Err(TerminalError(Error, self.name(), "Permission denied"))
+                }
+            }
+            None => Ok(()),
+        }
+    }
+
     /// Writes a new line to the output by sequentially writing a carriage return (`'\r'`)
     /// and a newline (`'\n'`).
     ///

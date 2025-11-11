@@ -99,6 +99,7 @@ impl Terminal {
     ///   - `mode`: Set to `Stopped` (assumes the terminal starts in the stopped state).
     ///   - `cursor_pos`: Set to `0` (initial cursor position).
     ///   - `current_color`: Set to `Colors::White` as the default.
+    ///   - `owner`: Set to `None` (no owner initially).
     /// - Pushes the created `TerminalWrapper` into the `terms` vector.
     ///
     /// # Panics
@@ -115,6 +116,7 @@ impl Terminal {
                 mode: Stopped,
                 cursor_pos: 0,
                 current_color: Colors::White,
+                owner: None,
             };
             terms.push(term_wrapper).unwrap();
         }
