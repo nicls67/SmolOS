@@ -235,7 +235,7 @@ impl Terminal {
             // Retrieve interface id if the terminal is stopped
             if self.mode[i] == Stopped {
                 // We need interface ID only for USART terminals
-                if let TerminalType::Usart(name) = terminal {
+                if let Usart(name) = terminal {
                     syscall(
                         Syscall::Hal(SysCallHalArgs {
                             id: self.interface_id[i],

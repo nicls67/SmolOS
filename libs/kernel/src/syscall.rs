@@ -1,5 +1,6 @@
 use crate::data::Kernel;
 use crate::scheduler::{App, AppCall};
+use crate::terminal::TerminalFormatting;
 use crate::{KernelError, KernelResult, Milliseconds};
 use display::Colors;
 use hal_interface::{
@@ -44,6 +45,7 @@ pub enum Syscall<'a> {
     RemovePeriodicTask(&'static str, Option<u32>),
     NewTaskDuration(&'static str, Option<u32>, Milliseconds),
     Display(SysCallDisplayArgs<'a>),
+    TerminalWrite(TerminalFormatting<'a>),
 }
 
 /// Executes a system call operation based on the specified `syscall_type` and `caller_id`.
@@ -132,6 +134,7 @@ pub fn syscall(syscall_type: Syscall, caller_id: u32) -> KernelResult<()> {
             }
         }
         .map_err(KernelError::DisplayError),
+        Syscall::TerminalWrite(formatting) => Kernel::terminal().write(&formatting),
     };
 
     match result {

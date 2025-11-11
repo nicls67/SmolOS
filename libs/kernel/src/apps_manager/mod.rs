@@ -1,6 +1,7 @@
 use crate::KernelResult;
 use crate::Milliseconds;
 use crate::apps_manager::app_config::{AppConfig, AppStatus, CallMethod, CallPeriodicity};
+use crate::apps_manager::shell_cmd::REBOOT_DELAY;
 use heapless::Vec;
 
 mod app_config;
@@ -21,10 +22,13 @@ const DEFAULT_APPS: [AppConfig; 2] = [
     },
     AppConfig {
         name: "reboot",
-        periodicity: CallPeriodicity::Once,
-        app_fn: CallMethod::Call(shell_cmd::reboot),
+        periodicity: CallPeriodicity::PeriodicUntil(
+            Milliseconds(1000),
+            Milliseconds((REBOOT_DELAY + 1) as u32 * 1000),
+        ),
+        app_fn: CallMethod::Call(shell_cmd::reboot_periodic),
         init_fn: None,
-        end_fn: None,
+        end_fn: Some(shell_cmd::reboot_end),
         app_status: AppStatus::Stopped,
         id: None,
         app_id_storage: Some(shell_cmd::cmd_app_id_storage),
