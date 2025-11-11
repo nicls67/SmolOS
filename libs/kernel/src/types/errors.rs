@@ -1,6 +1,6 @@
 use crate::KernelError::{
-    AppAlreadyExists, AppInitError, AppNotFound, CannotAddNewPeriodicApp, DisplayError, HalError,
-    TerminalError, WrongSyscallArgs,
+    AppAlreadyScheduled, AppInitError, AppNotFound, AppNotScheduled, CannotAddNewPeriodicApp,
+    DisplayError, HalError, TerminalError, WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use display::{DisplayError as DisplayErrorDef, DisplayErrorLevel};
@@ -34,8 +34,9 @@ pub enum KernelError {
     CannotAddNewPeriodicApp(&'static str),
     AppInitError(&'static str),
     WrongSyscallArgs(&'static str),
-    AppNotFound(&'static str),
-    AppAlreadyExists(&'static str),
+    AppNotScheduled(&'static str),
+    AppAlreadyScheduled(&'static str),
+    AppNotFound,
 }
 
 impl KernelError {
@@ -80,7 +81,7 @@ impl KernelError {
                 )
                 .unwrap();
             }
-            AppNotFound(app_name) => {
+            AppNotScheduled(app_name) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(200; "Could not find app {} in scheduler", app_name)
@@ -89,7 +90,7 @@ impl KernelError {
                 )
                 .unwrap();
             }
-            AppAlreadyExists(app_name) => {
+            AppAlreadyScheduled(app_name) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
                     format!(200; "App {} already exists in scheduler", app_name)
@@ -97,6 +98,11 @@ impl KernelError {
                         .as_str(),
                 )
                 .unwrap();
+            }
+            AppNotFound => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(format!(200; "App does not exist").unwrap().as_str())
+                    .unwrap();
             }
         }
         msg
@@ -125,8 +131,9 @@ impl KernelError {
             CannotAddNewPeriodicApp(_) => Critical,
             AppInitError(_) => Critical,
             WrongSyscallArgs(_) => Error,
-            AppNotFound(_) => Error,
-            AppAlreadyExists(_) => Error,
+            AppNotScheduled(_) => Error,
+            AppAlreadyScheduled(_) => Error,
+            AppNotFound => Error,
         }
     }
 }

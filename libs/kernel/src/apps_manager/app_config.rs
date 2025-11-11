@@ -22,6 +22,15 @@ pub enum AppStatus {
     Stopped,
 }
 
+impl AppStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Running => "Running",
+            Stopped => "Stopped",
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub struct AppConfig {
     pub name: &'static str,

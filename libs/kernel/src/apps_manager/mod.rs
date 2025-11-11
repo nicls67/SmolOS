@@ -1,22 +1,35 @@
 use crate::KernelResult;
 use crate::Milliseconds;
 use crate::apps_manager::app_config::{AppConfig, AppStatus, CallMethod, CallPeriodicity};
-use heapless::Vec;
+use heapless::{String, Vec};
 
 mod app_config;
 mod led_blink;
+mod shell_cmd;
 
 const MAX_APPS: usize = 32;
-const DEFAULT_APPS: [AppConfig; 1] = [AppConfig {
-    name: "LED Blink",
-    periodicity: CallPeriodicity::Periodic(Milliseconds(1000)),
-    app_fn: CallMethod::Call(led_blink::led_blink),
-    init_fn: Some(led_blink::init_led_blink),
-    end_fn: None,
-    app_status: AppStatus::Stopped,
-    id: None,
-    app_id_storage: Some(led_blink::led_blink_id_storage),
-}];
+const DEFAULT_APPS: [AppConfig; 2] = [
+    AppConfig {
+        name: "LED Blink",
+        periodicity: CallPeriodicity::Periodic(Milliseconds(1000)),
+        app_fn: CallMethod::Call(led_blink::led_blink),
+        init_fn: Some(led_blink::init_led_blink),
+        end_fn: None,
+        app_status: AppStatus::Stopped,
+        id: None,
+        app_id_storage: Some(led_blink::led_blink_id_storage),
+    },
+    AppConfig {
+        name: "reboot",
+        periodicity: CallPeriodicity::Once,
+        app_fn: CallMethod::Call(shell_cmd::reboot),
+        init_fn: None,
+        end_fn: None,
+        app_status: AppStatus::Stopped,
+        id: None,
+        app_id_storage: Some(shell_cmd::cmd_app_id_storage),
+    },
+];
 
 const DEFAULT_APPS_START_LIST: [&str; 1] = ["LED Blink"];
 
@@ -57,11 +70,11 @@ impl AppsManager {
         }
     }
 
-    pub fn start_app(&mut self, app_name: &'static str) -> KernelResult<()> {
+    pub fn start_app(&mut self, app_name: &str) -> KernelResult<()> {
         self.apps
             .iter_mut()
             .find(|app| app.name == app_name)
-            .ok_or(crate::KernelError::AppNotFound(app_name))?
+            .ok_or(crate::KernelError::AppNotFound)?
             .start()
     }
 }

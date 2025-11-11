@@ -60,46 +60,6 @@ pub enum Syscall<'a> {
 /// - `Err(KernelError)` if an error occurs during the execution of the system call. The error is
 ///   logged via the kernel's error handler.
 ///
-/// # Supported System Calls
-///
-/// ## `Syscall::Hal`:
-/// Handles hardware abstraction layer (HAL) operations, specified in `SysCallHalActions`.
-/// - `Write`: Writes data to the hardware interface associated with the provided ID.
-/// - `Lock`: Locks the hardware interface for the caller.
-/// - `Unlock`: Unlocks the hardware interface for the caller.
-/// - `GetID`: Retrieves the hardware interface ID by name and updates the provided pointer with this ID.
-///
-/// ## `Syscall::AddPeriodicTask`:
-/// Registers a new periodic task in the kernel's scheduler.
-/// - Parameters:
-///     - `name`: Name of the task.
-///     - `app`: Function pointer or closure defining the task's logic.
-///     - `init`: Initial delay before the first execution of the task.
-///     - `period`: Interval period for recurring task execution.
-///     - `ends_in`: Optional duration to stop task execution after.
-///     - `id`: Pointer to store the new task's unique ID.
-///
-/// ## `Syscall::RemovePeriodicTask`:
-/// Removes an existing periodic task by its name and optional parameters.
-///
-/// ## `Syscall::NewTaskDuration`:
-/// Updates the execution duration of a task.
-/// - Parameters:
-///     - `name`: The name of the task.
-///     - `param`: Additional parameters for task selection.
-///     - `time`: New execution duration for the task.
-///
-/// ## `Syscall::Display`:
-/// Provides various display operations for rendering and graphics, specified by `SysCallDisplayArgs`.
-/// - `Clear`: Clears the display with the specified `color`.
-/// - `SetColor`: Sets the drawing color for graphics or text.
-/// - `SetFont`: Sets the font used for displaying text.
-/// - `SetCursorPos`: Sets the cursor position on the display.
-/// - `WriteCharAtCursor`: Writes a character at the current cursor position with a specified color.
-/// - `WriteChar`: Writes a character at a specific `(x, y)` position with a specified color.
-/// - `WriteStrAtCursor`: Writes a string starting from the current cursor position with a specified color.
-/// - `WriteStr`: Writes a string at a specific `(x, y)` position with a specified color.
-///
 /// # Error Handling
 ///
 /// If an error occurs during the execution of the system call:

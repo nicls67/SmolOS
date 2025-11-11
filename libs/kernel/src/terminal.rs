@@ -502,33 +502,32 @@ impl Terminal {
         Ok(())
     }
 
-    /// Processes input received for a terminal and handles it based on the mode and input buffer.
+    /// Processes input received from the terminal and handles user commands or interactions.
     ///
     /// # Parameters
-    /// - `buffer`: A `Vec<u8, BUFFER_SIZE>` containing the input data to be processed. This typically
-    ///   represents a single character or multiple characters received.
-    /// - `id`: A `usize` that represents the unique identifier of the terminal to which the input belongs.
+    /// - `buffer`: A fixed-size buffer (`Vec<u8, BUFFER_SIZE>`) containing input data, where the first byte represents the character entered by the user.
+    /// - `id`: A `usize` representing the identifier of the terminal receiving the input.
     ///
     /// # Returns
-    /// - A `KernelResult<()>`, indicating success or failure of the operation. In case of errors, a
-    ///   relevant terminal error is returned.
+    /// - `KernelResult<()>`: Returns `Ok(())` on successful processing or an appropriate error if an issue occurs.
     ///
-    /// # Functionality
-    /// - Locates the terminal corresponding to the given `id` from the list of `interface_id`s.
-    /// - If the terminal is in the `Prompt` mode:
-    ///   - Checks the contents of the `buffer`.
-    ///   - If the input is a carriage return (`\r`), it clears the terminal's line buffer, resets the
-    ///     cursor position, moves to a new line, and writes a new prompt (`>`).
-    ///   - If the input is any other character, echoes the character back to the terminal, appends it
-    ///     to the terminal's line buffer, and updates the cursor position.
-    ///   - Handles potential errors during line buffer updates, such as buffer overflow.
+    /// # Behavior
+    /// - The function identifies the terminal associated with the given `id`.
+    /// - If the terminal is in prompt mode (`Prompt`):
+    ///   - If the first character in the buffer is a return character (`\r`):
+    ///     - Attempts to execute the command stored in the terminal's line buffer via `Kernel::apps().start_app`.
+    ///         - If the command execution succeeds, it proceeds to the next step.
+    ///         - If the command execution fails, writes an error message (`"Error: Command not found"`) to the terminal.
+    ///     - Clears the terminal's line buffer, resets the cursor's position, and moves to a new line.
+    ///     - Finally, writes a prompt character (`>`) to indicate readiness for a new user command.
+    ///   - If the first character is not a return character:
+    ///     - Echoes the received character back to the terminal.
+    ///     - Appends the echoed character to the terminal's line buffer. If the buffer overflows, it returns an error of type `TerminalError` with a specific error message ("Line buffer overflow").
+    ///     - Updates the cursor position by incrementing it by one.
     ///
     /// # Errors
-    /// - If the `line_buffer` overflows (exceeds its capacity), a `TerminalError` is returned with the
-    ///   following context:
-    ///   - Error Type: `Error`
-    ///   - Terminal name or identifier
-    ///   - Description: `"Line buffer overflow"`
+    /// - Returns an error if the line buffer overflows while appending a character.
+    /// - Returns any other error encountered while writing to the terminal.
     ///
     pub fn process_input(&mut self, buffer: Vec<u8, BUFFER_SIZE>, id: usize) -> KernelResult<()> {
         // Find the terminal corresponding to the given ID
@@ -538,7 +537,13 @@ impl Terminal {
         if self.mode[terminal_idx] == Prompt {
             // If the received character is a return character, process the line
             if buffer[0] == '\r' as u8 {
-                // Currently we only empty the line buffer and go to a new line
+                // Start the requested command
+                match Kernel::apps().start_app(&self.line_buffer[terminal_idx]) {
+                    Ok(_) => {}
+                    Err(_) => self.write_str("\n\rError: Command not found", terminal_idx)?,
+                }
+
+                // Empty the line buffer and go to a new line
                 self.line_buffer[terminal_idx].clear();
                 self.cursor_pos = 0;
                 self.new_line(terminal_idx)?;

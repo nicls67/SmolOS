@@ -275,7 +275,7 @@ impl Scheduler {
         })
         .is_some()
         {
-            return Err(KernelError::AppAlreadyExists(name));
+            return Err(KernelError::AppAlreadyScheduled(name));
         }
 
         // Register app in the scheduler
@@ -332,7 +332,7 @@ impl Scheduler {
             self.tasks.swap_remove(index);
             Ok(())
         } else {
-            Err(KernelError::AppNotFound(name))
+            Err(KernelError::AppNotScheduled(name))
         }
     }
 
@@ -569,7 +569,7 @@ impl Scheduler {
                 Some(time.to_u32() / self.sched_period.to_u32() / self.tasks[index].app_period);
             Ok(())
         } else {
-            Err(KernelError::AppNotFound(name))
+            Err(KernelError::AppNotScheduled(name))
         }
     }
 
