@@ -1,0 +1,6 @@
+[
+  {
+    "label": "Build and Run",
+    "command": "cargo run --release"
+  }
+]

@@ -8,3 +8,4 @@
 /drivers/STM32F769XX_FLASH.ld
 /libs/display/target/
 /.idea/workspace.xml
+/.cache/

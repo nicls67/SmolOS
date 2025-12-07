@@ -11,11 +11,11 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
-
+include("${CMAKE_SOURCE_DIR}/cmake/gcc-arm-none-eabi.cmake")
 
 # Define the build type
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Debug")
+    set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
 # Set the project name
@@ -61,6 +61,14 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
         Drivers/BSP/STM32F769I-Discovery
 )
+
+# chemin relatif ou absolu vers ton header
+set(RUST_EXPORTS_HEADER "${CMAKE_SOURCE_DIR}/Interface/Inc/lib_interface.h")
+
+target_compile_options(drivers PRIVATE
+    -include ${RUST_EXPORTS_HEADER}
+)
+
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE

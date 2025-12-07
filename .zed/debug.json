@@ -1,0 +1,38 @@
+[
+  {
+    "label": "Debug SmolOS (Launch)",
+    "adapter": "probe-rs",
+    "request": "launch",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "server": "127.0.0.1:50000",
+    "chip": "STM32F769NI",
+    "coreConfigs": [
+      {
+        "coreIndex": 0,
+        "programBinary": "target/thumbv7em-none-eabihf/release/SmolOS"
+      }
+    ],
+    "flashingConfig": {
+      "flashingEnabled": true,
+      "haltAfterReset": true,
+      "fullChipErase": false,
+      "restoreUnwrittenBytes": false
+    },
+    "consoleLogLevel": "Info"
+  },
+  {
+    "label": "Debug SmolOS (Attach)",
+    "adapter": "probe-rs",
+    "request": "attach",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "server": "127.0.0.1:50000",
+    "chip": "STM32F769NI",
+    "coreConfigs": [
+      {
+        "coreIndex": 0,
+        "programBinary": "target/thumbv7em-none-eabihf/release/SmolOS"
+      }
+    ],
+    "consoleLogLevel": "Info"
+  }
+]
