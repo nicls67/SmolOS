@@ -1,24 +1,81 @@
+use crate::console_output::ConsoleFormatting;
 use crate::data::Kernel;
 use crate::scheduler::{App, AppCall};
-use crate::terminal::TerminalFormatting;
-use crate::{KernelError, KernelResult, Milliseconds};
+use crate::{DeviceType, KernelError, KernelResult, Milliseconds};
 use display::Colors;
 use hal_interface::{
     InterfaceCallback, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions,
 };
 
-pub struct SysCallHalArgs<'a> {
-    pub id: usize,
-    pub action: SysCallHalActions<'a>,
-}
-
 pub enum SysCallHalActions<'a> {
     Write(InterfaceWriteActions<'a>),
     Read(InterfaceReadAction, &'a mut InterfaceReadResult),
-    Lock,
-    Unlock,
     GetID(&'static str, &'a mut usize),
     ConfigureCallback(InterfaceCallback),
+}
+
+/// Dispatches a HAL-related syscall to the currently configured HAL implementation.
+///
+/// This function wraps HAL operations and normalizes error handling by:
+/// - Mapping HAL errors into [`KernelError::HalError`]
+/// - Invoking the kernel-wide error handler on failure
+///
+/// # Parameters
+/// - `interface_id`: The numeric identifier of the HAL interface to operate on.
+/// - `action`: The action to perform against the interface (read/write/lookup/configure).
+/// - `caller_id`: The ID of the calling process/app, used for access control/auditing by the HAL.
+///
+/// # Returns
+/// - `Ok(())` if the action succeeds.
+/// - `Err(KernelError)` if the HAL operation fails (after the error handler is invoked).
+///
+/// # Errors
+/// - Returns `Err(KernelError::HalError(_))` when:
+///   - `interface_write` fails
+///   - `interface_read` fails
+///   - `get_interface_id` fails
+///   - `configure_callback` fails
+///
+/// In all error cases, `Kernel::errors().error_handler(&err)` is called before returning the error.
+///
+/// # Side effects
+/// - For [`SysCallHalActions::Read`], writes the read result into the provided
+///   [`InterfaceReadResult`] via the mutable reference parameter.
+/// - For [`SysCallHalActions::GetID`], writes the resolved interface id into the provided `usize`.
+pub fn syscall_hal(
+    interface_id: usize,
+    action: SysCallHalActions,
+    caller_id: u32,
+) -> KernelResult<()> {
+    let result = match action {
+        SysCallHalActions::Write(act) => Kernel::hal()
+            .interface_write(interface_id, caller_id, act)
+            .map_err(KernelError::HalError),
+        SysCallHalActions::Read(act, res) => {
+            *res = Kernel::hal()
+                .interface_read(interface_id, caller_id, act)
+                .map_err(KernelError::HalError)?;
+            Ok(())
+        }
+        SysCallHalActions::GetID(name, id) => match Kernel::hal().get_interface_id(name) {
+            Ok(hal_id) => {
+                *id = hal_id;
+                Ok(())
+            }
+            Err(e) => Err(KernelError::HalError(e)),
+        },
+        SysCallHalActions::ConfigureCallback(callback) => Kernel::hal()
+            .configure_callback(interface_id, caller_id, callback)
+            .map_err(KernelError::HalError),
+    };
+
+    match result {
+        Ok(..) => Ok(()),
+        Err(err) => {
+            Kernel::errors().error_handler(&err);
+            Err(err)
+        }
+    }
 }
 
 pub enum SysCallDisplayArgs<'a> {
@@ -32,8 +89,64 @@ pub enum SysCallDisplayArgs<'a> {
     WriteStr(&'a str, u16, u16, Option<Colors>),
 }
 
-pub enum Syscall<'a> {
-    Hal(SysCallHalArgs<'a>),
+/// Dispatches a display-related syscall to the kernel display driver.
+///
+/// This function enforces that the caller is authorized to use the display device before
+/// performing the requested operation. Errors are mapped into [`KernelError::DisplayError`]
+/// and routed through the kernel error handler.
+///
+/// # Parameters
+/// - `args`: The display operation to perform (clear, set color/font, set cursor, draw text).
+/// - `caller_id`: The ID of the calling process/app. Used to authorize access to the display.
+///
+/// # Returns
+/// - `Ok(())` if authorization and the display operation succeed.
+/// - `Err(KernelError)` if authorization fails or the display operation fails.
+///
+/// # Errors
+/// - Returns any error produced by `Kernel::devices().authorize(DeviceType::Display, caller_id)`.
+/// - Returns `Err(KernelError::DisplayError(_))` if the underlying display operation fails.
+///
+/// In all error cases occurring after the match is evaluated, `Kernel::errors().error_handler(&err)`
+/// is called before returning the error.
+///
+/// # Side effects
+/// - Writes to the display framebuffer/hardware through `Kernel::display()`.
+pub fn syscall_display(args: SysCallDisplayArgs, caller_id: u32) -> KernelResult<()> {
+    // Check for device authorization
+    Kernel::devices().authorize(DeviceType::Display, caller_id)?;
+
+    let result = match args {
+        SysCallDisplayArgs::Clear(color) => Kernel::display().clear(color),
+        SysCallDisplayArgs::SetColor(color) => Kernel::display().set_color(color),
+        SysCallDisplayArgs::SetFont(font) => Kernel::display().set_font(font),
+        SysCallDisplayArgs::SetCursorPos(x, y) => Kernel::display().set_cursor_pos(x, y),
+        SysCallDisplayArgs::WriteCharAtCursor(c, color) => {
+            Kernel::display().draw_char_at_cursor(c as u8, color)
+        }
+
+        SysCallDisplayArgs::WriteChar(c, x, y, color) => {
+            Kernel::display().draw_char(c as u8, x, y, color)
+        }
+        SysCallDisplayArgs::WriteStrAtCursor(str, color) => {
+            Kernel::display().draw_string_at_cursor(str, color)
+        }
+        SysCallDisplayArgs::WriteStr(str, x, y, color) => {
+            Kernel::display().draw_string(str, x, y, color)
+        }
+    }
+    .map_err(KernelError::DisplayError);
+
+    match result {
+        Ok(..) => Ok(()),
+        Err(err) => {
+            Kernel::errors().error_handler(&err);
+            Err(err)
+        }
+    }
+}
+
+pub enum SysCallSchedulerArgs<'a> {
     AddPeriodicTask(
         &'static str,
         AppCall,
@@ -44,60 +157,47 @@ pub enum Syscall<'a> {
     ),
     RemovePeriodicTask(&'static str, Option<u32>),
     NewTaskDuration(&'static str, Option<u32>, Milliseconds),
-    Display(SysCallDisplayArgs<'a>),
-    TerminalWrite(TerminalFormatting<'a>),
 }
 
-/// Executes a system call operation based on the specified `syscall_type` and `caller_id`.
+/// Dispatches scheduler-related syscalls (periodic task creation/removal/configuration).
+///
+/// This is a thin wrapper around [`Kernel::scheduler()`] methods, and ensures any error
+/// is passed through the kernel error handler before being returned.
 ///
 /// # Parameters
-///
-/// - `syscall_type`: The type of system call operation to execute, defined in the `Syscall` enum.
-/// - `caller_id`: The unique identifier of the calling process or application.
+/// - `args`: The scheduler operation to perform:
+///   - `AddPeriodicTask(name, app, init, period, ends_in, id_out)`
+///     - `name`: Task name/identifier.
+///     - `app`: The app entry/call to schedule.
+///     - `init`: Optional app instance/state to pass to the scheduler.
+///     - `period`: The periodic interval in milliseconds.
+///     - `ends_in`: Optional duration after which the task should stop.
+///     - `id_out`: Output parameter; on success receives the newly created task id.
+///   - `RemovePeriodicTask(name, param)`
+///     - `name`: Task name/identifier.
+///     - `param`: Optional task id to disambiguate/select a specific instance.
+///   - `NewTaskDuration(name, param, time)`
+///     - `name`: Task name/identifier.
+///     - `param`: Optional task id to select a specific instance.
+///     - `time`: New duration/limit in milliseconds.
 ///
 /// # Returns
+/// - `Ok(())` if the scheduler operation succeeds.
+/// - `Err(KernelError)` if the scheduler operation fails.
 ///
-/// Returns a `KernelResult<()>`, which is:
-/// - `Ok(())` if the system call operation is executed successfully.
-/// - `Err(KernelError)` if an error occurs during the execution of the system call. The error is
-///   logged via the kernel's error handler.
+/// # Errors
+/// - Propagates any error returned by:
+///   - `Kernel::scheduler().add_periodic_app(...)`
+///   - `Kernel::scheduler().remove_periodic_app(...)`
+///   - `Kernel::scheduler().set_new_task_duration(...)`
 ///
-/// # Error Handling
+/// In all error cases, `Kernel::errors().error_handler(&err)` is called before returning the error.
 ///
-/// If an error occurs during the execution of the system call:
-/// - The kernel's error handler (`Kernel::errors().error_handler`) is invoked with the specific error.
-/// - The function returns the error encapsulated in `Err(KernelError)`.
-///
-pub fn syscall(syscall_type: Syscall, caller_id: u32) -> KernelResult<()> {
-    let result = match syscall_type {
-        Syscall::Hal(args) => match args.action {
-            SysCallHalActions::Write(act) => Kernel::hal()
-                .interface_write(args.id, caller_id, act)
-                .map_err(KernelError::HalError),
-            SysCallHalActions::Read(act, res) => {
-                *res = Kernel::hal()
-                    .interface_read(args.id, caller_id, act)
-                    .map_err(KernelError::HalError)?;
-                Ok(())
-            }
-            SysCallHalActions::Lock => Kernel::hal()
-                .lock_interface(args.id, caller_id)
-                .map_err(KernelError::HalError),
-            SysCallHalActions::Unlock => Kernel::hal()
-                .unlock_interface(args.id, caller_id)
-                .map_err(KernelError::HalError),
-            SysCallHalActions::GetID(name, id) => match Kernel::hal().get_interface_id(name) {
-                Ok(hal_id) => {
-                    *id = hal_id;
-                    Ok(())
-                }
-                Err(e) => Err(KernelError::HalError(e)),
-            },
-            SysCallHalActions::ConfigureCallback(callback) => Kernel::hal()
-                .configure_callback(args.id, caller_id, callback)
-                .map_err(KernelError::HalError),
-        },
-        Syscall::AddPeriodicTask(name, app, init, period, ends_in, id) => {
+/// # Side effects
+/// - For `AddPeriodicTask`, writes the created task id into the provided `&mut u32`.
+pub fn syscall_scheduler(args: SysCallSchedulerArgs) -> KernelResult<()> {
+    let result = match args {
+        SysCallSchedulerArgs::AddPeriodicTask(name, app, init, period, ends_in, id) => {
             match Kernel::scheduler().add_periodic_app(name, app, init, period, ends_in) {
                 Ok(new_id) => {
                     *id = new_id;
@@ -106,35 +206,102 @@ pub fn syscall(syscall_type: Syscall, caller_id: u32) -> KernelResult<()> {
                 Err(e) => Err(e),
             }
         }
-        Syscall::RemovePeriodicTask(name, param) => {
+        SysCallSchedulerArgs::RemovePeriodicTask(name, param) => {
             Kernel::scheduler().remove_periodic_app(name, param)
         }
-        Syscall::NewTaskDuration(name, param, time) => {
+        SysCallSchedulerArgs::NewTaskDuration(name, param, time) => {
             Kernel::scheduler().set_new_task_duration(name, param, time)
         }
-        Syscall::Display(args) => match args {
-            SysCallDisplayArgs::Clear(color) => Kernel::display().clear(color, caller_id),
-            SysCallDisplayArgs::SetColor(color) => Kernel::display().set_color(color, caller_id),
-            SysCallDisplayArgs::SetFont(font) => Kernel::display().set_font(font, caller_id),
-            SysCallDisplayArgs::SetCursorPos(x, y) => {
-                Kernel::display().set_cursor_pos(x, y, caller_id)
-            }
-            SysCallDisplayArgs::WriteCharAtCursor(c, color) => {
-                Kernel::display().draw_char_at_cursor(c as u8, color, caller_id)
-            }
+    };
 
-            SysCallDisplayArgs::WriteChar(c, x, y, color) => {
-                Kernel::display().draw_char(c as u8, x, y, color, caller_id)
-            }
-            SysCallDisplayArgs::WriteStrAtCursor(str, color) => {
-                Kernel::display().draw_string_at_cursor(str, color, caller_id)
-            }
-            SysCallDisplayArgs::WriteStr(str, x, y, color) => {
-                Kernel::display().draw_string(str, x, y, color, caller_id)
-            }
+    match result {
+        Ok(..) => Ok(()),
+        Err(err) => {
+            Kernel::errors().error_handler(&err);
+            Err(err)
         }
-        .map_err(KernelError::DisplayError),
-        Syscall::TerminalWrite(formatting) => Kernel::terminal().write(&formatting),
+    }
+}
+
+/// Writes formatted output to the terminal device.
+///
+/// This function enforces that the caller is authorized to use the terminal device before
+/// performing the write. Any write error is routed through the kernel error handler.
+///
+/// # Parameters
+/// - `formatting`: The terminal formatting payload to write (text plus style/format settings).
+/// - `caller_id`: The ID of the calling process/app. Used to authorize access to the terminal.
+///
+/// # Returns
+/// - `Ok(())` if authorization and the terminal write succeed.
+/// - `Err(KernelError)` if authorization fails or the terminal write fails.
+///
+/// # Errors
+/// - Propagates any error produced by `Kernel::devices().authorize(DeviceType::Terminal, caller_id)`.
+/// - Propagates any error returned by `Kernel::terminal().write(&formatting)`.
+///
+/// In all error cases, `Kernel::errors().error_handler(&err)` is called before returning the error.
+///
+/// # Side effects
+/// - Writes to the terminal output device.
+pub fn syscall_terminal(formatting: ConsoleFormatting, caller_id: u32) -> KernelResult<()> {
+    // Check for device authorization
+    Kernel::devices().authorize(DeviceType::Terminal, caller_id)?;
+
+    match Kernel::terminal().write(&formatting) {
+        Ok(..) => Ok(()),
+        Err(err) => {
+            Kernel::errors().error_handler(&err);
+            Err(err)
+        }
+    }
+}
+
+pub enum SysCallDevicesArgs<'a> {
+    Lock,
+    Unlock,
+    GetState(&'a mut bool),
+}
+
+/// Dispatches device-management syscalls (lock/unlock/query) for a given device type.
+///
+/// This function provides a uniform entry point for device locking semantics and state queries.
+/// Any underlying error is routed through the kernel error handler.
+///
+/// # Parameters
+/// - `device_type`: The target device type to operate on (e.g. Display, Terminal, etc.).
+/// - `args`: The device operation to perform:
+///   - `Lock`: Attempt to lock the device for `caller_id`.
+///   - `Unlock`: Attempt to unlock the device for `caller_id`.
+///   - `GetState(state_out)`: Query whether the device is locked; writes result into `state_out`.
+/// - `caller_id`: The ID of the calling process/app, used for ownership checks during lock/unlock.
+///
+/// # Returns
+/// - `Ok(())` if the requested operation succeeds.
+/// - `Err(KernelError)` if the operation fails.
+///
+/// # Errors
+/// - Propagates any error returned by:
+///   - `Kernel::devices().lock(device_type, caller_id)`
+///   - `Kernel::devices().unlock(device_type, caller_id)`
+///   - `Kernel::devices().is_locked(device_type)`
+///
+/// In all error cases, `Kernel::errors().error_handler(&err)` is called before returning the error.
+///
+/// # Side effects
+/// - For `GetState`, writes the locked/unlocked state into the provided `&mut bool`.
+pub fn syscall_devices(
+    device_type: DeviceType,
+    args: SysCallDevicesArgs,
+    caller_id: u32,
+) -> KernelResult<()> {
+    let result = match args {
+        SysCallDevicesArgs::Lock => Kernel::devices().lock(device_type, caller_id),
+        SysCallDevicesArgs::Unlock => Kernel::devices().unlock(device_type, caller_id),
+        SysCallDevicesArgs::GetState(state) => {
+            *state = Kernel::devices().is_locked(device_type)?;
+            Ok(())
+        }
     };
 
     match result {

@@ -15,6 +15,7 @@ use crate::bindings::{
     gpio_write, hal_init,
 };
 use crate::lock::Locker;
+pub use bindings::interface_name;
 pub use errors::*;
 
 pub const BUFFER_SIZE: usize = 32;
@@ -197,6 +198,30 @@ impl Hal {
             locker.authorize_action(id, locker_id)?;
         }
         Ok(())
+    }
+
+    /// Checks whether the specified interface is currently locked.
+    ///
+    /// If a [`Locker`] has been configured via [`Hal::configure_locker`], this method
+    /// delegates to the locker to determine whether `id` is locked and returns the
+    /// locker’s result.
+    ///
+    /// If no locker is configured (`self.locker` is `None`), this method treats the
+    /// interface as unlocked and returns `Ok(None)`.
+    ///
+    /// # Parameters
+    /// - `id`: The interface identifier to query.
+    ///
+    /// # Returns
+    /// - `Ok(Some(u32))` if the interface is locked, with the locker ID.
+    /// - `Ok(None)` if the interface is not locked, or if no locker is configured.
+    /// - `Err(HalError)` if the underlying locker reports an error while querying the lock state.
+    pub fn is_interface_locked(&mut self, id: usize) -> HalResult<Option<u32>> {
+        if let Some(locker) = &mut self.locker {
+            locker.is_locked(id)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Performs a write operation on the specified interface based on the action provided.

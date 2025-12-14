@@ -1,7 +1,8 @@
 use crate::KernelError::CannotAddNewPeriodicApp;
+use crate::console_output::ConsoleFormatting;
 use crate::data::Kernel;
 use crate::systick::set_ticks_target;
-use crate::{KernelError, KernelResult, Milliseconds, TerminalFormatting};
+use crate::{KernelError, KernelResult, Milliseconds};
 use cortex_m::peripheral::SCB;
 use cortex_m::peripheral::scb::{Exception, SystemHandler, VectActive};
 use heapless::Vec;
@@ -104,6 +105,11 @@ pub enum AppCall {
 ///   implies the application is actively running or enabled, while `false` means it is
 ///   inactive or disabled.
 ///
+/// * `app_id` (`u32`) -
+///   A unique identifier for the application within the system. This ID is used for
+///   tracking and managing the application's lifecycle and interactions with other
+///   components of the system.
+///
 /// # Usage
 ///
 /// The `AppWrapper` structure is used to manage the state and metadata of applications
@@ -117,6 +123,7 @@ struct AppWrapper {
     app_period: u32,
     ends_in: Option<u32>,
     active: bool,
+    app_id: u32,
 }
 /// Struct representing a Scheduler, which manages tasks and their execution
 /// in a cyclic time period.
@@ -208,7 +215,7 @@ impl Scheduler {
         }
 
         self.started = true;
-        Kernel::terminal().write(&TerminalFormatting::StrNewLineBoth("Scheduler started !"))
+        Kernel::terminal().write(&ConsoleFormatting::StrNewLineBoth("Scheduler started !"))
     }
 
     /// Adds a periodic application to the scheduler.
@@ -278,6 +285,9 @@ impl Scheduler {
             return Err(KernelError::AppAlreadyScheduled(name));
         }
 
+        // Increment app ID
+        self.next_id += 1;
+
         // Register app in the scheduler
         self.tasks
             .push(AppWrapper {
@@ -287,11 +297,9 @@ impl Scheduler {
                 app_period: period.to_u32() / self.sched_period.to_u32(),
                 active: true,
                 ends_in: ends_in.map(|e| e.to_u32() / period.to_u32()),
+                app_id: self.next_id,
             })
             .map_err(|_| CannotAddNewPeriodicApp(name))?;
-
-        // Increment app ID
-        self.next_id += 1;
 
         // Return ID
         Ok(self.next_id)
@@ -585,5 +593,24 @@ impl Scheduler {
     ///
     pub fn get_period(&self) -> Milliseconds {
         self.sched_period
+    }
+    
+    /// Checks whether a task with the given application ID is currently active.
+    ///
+    /// This helper scans the scheduler's internal task list and returns `true` if it
+    /// finds a task whose `app_id` matches `id` **and** whose `active` flag is set.
+    ///
+    /// # Parameters
+    /// - `id`: The application ID previously returned by [`Scheduler::add_periodic_app`].
+    ///
+    /// # Returns
+    /// - `true` if a task with this ID exists and is active.
+    /// - `false` if no matching task exists or if the task is present but inactive.
+    ///
+    /// # Notes
+    /// - Inactive tasks can occur when a task is aborted due to an error via
+    ///   [`Scheduler::abort_task_on_error`].
+    pub(crate) fn is_id_active(&self, id: u32) -> bool {
+        self.tasks.iter().any(|task| task.app_id == id && task.active)
     }
 }

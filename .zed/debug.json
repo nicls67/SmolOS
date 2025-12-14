@@ -9,7 +9,7 @@
     "coreConfigs": [
       {
         "coreIndex": 0,
-        "programBinary": "target/thumbv7em-none-eabihf/release/SmolOS"
+        "programBinary": "target/thumbv7em-none-eabihf/debug/SmolOS"
       }
     ],
     "flashingConfig": {

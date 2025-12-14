@@ -1,6 +1,6 @@
 use crate::KernelError::{
     AppAlreadyScheduled, AppInitError, AppNotFound, AppNotScheduled, CannotAddNewPeriodicApp,
-    DisplayError, HalError, TerminalError, WrongSyscallArgs,
+    DeviceLocked, DeviceNotOwned, DisplayError, HalError, TerminalError, WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use display::{DisplayError as DisplayErrorDef, DisplayErrorLevel};
@@ -30,13 +30,15 @@ impl KernelErrorLevel {
 pub enum KernelError {
     HalError(HalErrorDef),
     DisplayError(DisplayErrorDef),
-    TerminalError(KernelErrorLevel, &'static str, &'static str),
+    TerminalError(KernelErrorLevel, &'static str),
     CannotAddNewPeriodicApp(&'static str),
     AppInitError(&'static str),
     WrongSyscallArgs(&'static str),
     AppNotScheduled(&'static str),
     AppAlreadyScheduled(&'static str),
     AppNotFound,
+    DeviceLocked(&'static str),
+    DeviceNotOwned(&'static str),
 }
 
 impl KernelError {
@@ -45,10 +47,10 @@ impl KernelError {
         match self {
             HalError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
             DisplayError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
-            TerminalError(_, name, err) => {
+            TerminalError(_, err) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
-                    format!(200; "Error in terminal {} : {}", name, err)
+                    format!(200; "Error in terminal : {}", err)
                         .unwrap()
                         .as_str(),
                 )
@@ -104,6 +106,24 @@ impl KernelError {
                 msg.push_str(format!(200; "App does not exist").unwrap().as_str())
                     .unwrap();
             }
+            DeviceLocked(device_name) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(200; "Device {} is locked", device_name)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
+            DeviceNotOwned(device_name) => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str(
+                    format!(200; "Device {} is not owned by caller", device_name)
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap();
+            }
         }
         msg
     }
@@ -127,13 +147,15 @@ impl KernelError {
                 DisplayErrorLevel::Critical => Critical,
                 DisplayErrorLevel::Error => Error,
             },
-            TerminalError(lvl, _, _) => *lvl,
+            TerminalError(lvl, _) => *lvl,
             CannotAddNewPeriodicApp(_) => Critical,
             AppInitError(_) => Critical,
             WrongSyscallArgs(_) => Error,
             AppNotScheduled(_) => Error,
             AppAlreadyScheduled(_) => Error,
             AppNotFound => Error,
+            DeviceLocked(_) => Error,
+            DeviceNotOwned(_) => Error,
         }
     }
 }

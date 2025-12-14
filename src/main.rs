@@ -5,8 +5,7 @@ mod interrupts;
 
 use cortex_m_rt::entry;
 use hal_interface::Hal;
-use heapless::Vec;
-use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds, TerminalType};
+use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds};
 
 #[entry]
 fn main() -> ! {
@@ -27,11 +26,7 @@ fn main() -> ! {
             systick_period: Milliseconds(1),
         },
         hal,
-        system_terminals: Vec::from_slice(&[
-            TerminalType::Usart("SERIAL_MAIN"),
-            TerminalType::Display,
-        ])
-        .unwrap(),
+        system_terminal: "SERIAL_MAIN",
         err_led_name: Some("ERR_LED"),
         display_name: Some("LCD"),
     });

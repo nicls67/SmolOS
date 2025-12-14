@@ -1,4 +1,5 @@
 use crate::apps_manager::AppsManager;
+use crate::devices::DevicesManager;
 use crate::errors_mgt::ErrorsManager;
 use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
@@ -16,6 +17,7 @@ pub static mut KERNEL_DATA: Kernel = Kernel {
     errors: None,
     display: None,
     apps: None,
+    devices: None,
 };
 
 /// A data structure representing timing-related configuration for the system kernel.
@@ -91,6 +93,7 @@ pub struct Kernel {
     errors: Option<ErrorsManager>,
     display: Option<Display>,
     apps: Option<AppsManager>,
+    devices: Option<DevicesManager>,
 }
 
 impl Kernel {
@@ -127,6 +130,7 @@ impl Kernel {
         scheduler: Scheduler,
         errors: ErrorsManager,
         apps_manager: AppsManager,
+        devices: DevicesManager,
     ) {
         unsafe {
             KERNEL_DATA.hal = Some(hal);
@@ -136,6 +140,7 @@ impl Kernel {
             KERNEL_DATA.scheduler = Some(scheduler);
             KERNEL_DATA.errors = Some(errors);
             KERNEL_DATA.apps = Some(apps_manager);
+            KERNEL_DATA.devices = Some(devices);
         }
     }
 
@@ -369,6 +374,37 @@ impl Kernel {
                 KERNEL_DATA.apps.as_mut().unwrap()
             } else {
                 panic!("Apps manager is not initialized");
+            }
+        }
+    }
+    
+    /// Provides mutable access to the global `DevicesManager` instance.
+    ///
+    /// This function retrieves a mutable reference to the global instance of the
+    /// `DevicesManager` by accessing the `KERNEL_DATA.devices` field. If the `devices`
+    /// field is not initialized (i.e., it contains `None`), the function will panic.
+    ///
+    /// # Safety
+    /// This function uses `unsafe` code to dereference and return a mutable reference
+    /// to a static variable. Since it allows mutable access to a static reference,
+    /// this can lead to undefined behavior if multiple mutable references are created
+    /// and used simultaneously. Use this function with caution and ensure that
+    /// no data races or aliasing occur.
+    ///
+    /// # Panics
+    /// This function will panic if the `KERNEL_DATA.devices` field is not initialized
+    /// (i.e., contains `None`).
+    ///
+    /// # Returns
+    /// A mutable reference to the global `DevicesManager` instance.
+    ///
+    #[allow(static_mut_refs)]
+    pub fn devices() -> &'static mut DevicesManager {
+        unsafe {
+            if KERNEL_DATA.devices.is_some() {
+                KERNEL_DATA.devices.as_mut().unwrap()
+            } else {
+                panic!("Devices manager is not initialized");
             }
         }
     }

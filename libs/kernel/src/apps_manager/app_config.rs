@@ -1,7 +1,7 @@
 use crate::apps_manager::app_config::AppStatus::{Running, Stopped};
 use crate::data::Kernel;
 use crate::scheduler::{App, AppCall, AppParam};
-use crate::{KernelError, KernelResult, Milliseconds, Syscall, syscall};
+use crate::{KernelError, KernelResult, Milliseconds, SysCallSchedulerArgs, syscall_scheduler};
 
 #[derive(Copy, Clone)]
 pub enum CallPeriodicity {
@@ -89,16 +89,13 @@ impl AppConfig {
 
     pub fn stop(&mut self) -> KernelResult<()> {
         if self.app_status == Running {
-            syscall(
-                Syscall::RemovePeriodicTask(
-                    self.name,
-                    match self.app_fn {
-                        CallMethod::Call(_) => None,
-                        CallMethod::CallWithParam(_, param) => Some(param),
-                    },
-                ),
-                self.id.unwrap(),
-            )?;
+            syscall_scheduler(SysCallSchedulerArgs::RemovePeriodicTask(
+                self.name,
+                match self.app_fn {
+                    CallMethod::Call(_) => None,
+                    CallMethod::CallWithParam(_, param) => Some(param),
+                },
+            ))?;
             self.app_status = Stopped;
             self.id = None;
         }
