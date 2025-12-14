@@ -44,68 +44,78 @@ pub enum ConsoleOutputType {
     Display,
 }
 
-/// A handle representing a locked console output destination.
-///
-/// Depending on [`ConsoleOutputType`], this either holds a locked HAL interface id
-/// (for USART) or indicates that the display device has been locked.
-///
-/// # Fields
-/// - `interface_id`: The HAL interface id used when `output` is [`ConsoleOutputType::Usart`].
-///   For [`ConsoleOutputType::Display`], this is left as `0`.
-/// - `output`: The configured output destination.
-/// - `current_color`: The color used when outputting to the display.
 #[derive(Debug)]
+/// A locked console output target (USART or Display) with associated formatting state.
+///
+/// `ConsoleOutput` represents an exclusive handle to a concrete output destination.
+/// It is created via [`ConsoleOutput::new`] which locks the underlying resource
+/// (a named HAL UART/USART interface or the display device) using `KERNEL_MASTER_ID`.
+///
+/// The struct also tracks the `current_color` used for display rendering (ignored for USART).
+///
+/// Call [`ConsoleOutput::release`] to unlock the underlying destination when done.
 pub struct ConsoleOutput {
-    pub interface_id: usize,
+    pub interface_id: Option<usize>,
     pub output: ConsoleOutputType,
     pub current_color: Colors,
 }
 
 impl ConsoleOutput {
-    /// Creates a new [`ConsoleOutput`] and locks the underlying device/interface for exclusive use.
+    /// Creates a new [`ConsoleOutput`] targeting the given output destination.
     ///
-    /// When `output` is [`ConsoleOutputType::Usart`], this function:
-    /// 1) resolves the interface id from the provided interface name, and
-    /// 2) locks that interface using `KERNEL_MASTER_ID`.
-    ///
-    /// When `output` is [`ConsoleOutputType::Display`], this function locks the display device
-    /// using `KERNEL_MASTER_ID`.
+    /// This constructor initializes the struct with no locked interface/device
+    /// (`interface_id` is set to `None`). Call [`ConsoleOutput::initialize`] to
+    /// acquire the underlying lock before writing.
     ///
     /// # Parameters
-    /// - `output`: The output destination (USART by name, or Display).
-    /// - `current_color`: The color used for subsequent display writes (ignored for USART output).
+    /// - `output`: The destination to write to (USART interface or Display).
+    /// - `current_color`: The active display color used when `output` is `Display`
+    ///   (ignored for USART).
     ///
     /// # Returns
-    /// - `Ok(ConsoleOutput)` on success.
+    /// - `ConsoleOutput`.
+    pub fn new(output: ConsoleOutputType, current_color: Colors) -> Self {
+        ConsoleOutput {
+            interface_id: None,
+            output,
+            current_color,
+        }
+    }
+
+    /// Initializes (locks) the configured console output destination.
+    ///
+    /// For [`ConsoleOutputType::Usart`], this resolves the HAL interface ID from the interface
+    /// name, stores it in [`ConsoleOutput::interface_id`], and acquires an exclusive lock on
+    /// that interface using [`KERNEL_MASTER_ID`].
+    ///
+    /// For [`ConsoleOutputType::Display`], this acquires an exclusive lock on the display
+    /// device using [`KERNEL_MASTER_ID`].
+    ///
+    /// # Returns
+    /// - `Ok(())` if the destination is successfully resolved (USART only) and locked.
     ///
     /// # Errors
-    /// Returns a [`KernelError`] wrapped in [`KernelResult`] if:
-    /// - the HAL interface name cannot be resolved to an id (`KernelError::HalError`),
-    /// - the HAL interface cannot be locked (`KernelError::HalError`), or
-    /// - the display device cannot be locked (device lock error propagated by `Kernel::devices().lock`).
-    pub fn new(output: ConsoleOutputType, current_color: Colors) -> KernelResult<Self> {
-        let mut interface_id = 0;
-
-        if let ConsoleOutputType::Usart(name) = output {
+    /// - Returns [`KernelError::HalError`] if resolving or locking the USART interface fails.
+    /// - Propagates any error returned by [`Kernel::devices().lock`] when locking the display.
+    pub fn initialize(&mut self) -> KernelResult<()> {
+        if let ConsoleOutputType::Usart(name) = self.output {
             // Get id for interface
-            interface_id = Kernel::hal()
-                .get_interface_id(name)
-                .map_err(KernelError::HalError)?;
+            self.interface_id = Some(
+                Kernel::hal()
+                    .get_interface_id(name)
+                    .map_err(KernelError::HalError)?,
+            );
 
             // Try to lock the interface
             Kernel::hal()
-                .lock_interface(interface_id, KERNEL_MASTER_ID)
+                .lock_interface(self.interface_id.unwrap(), KERNEL_MASTER_ID)
                 .map_err(KernelError::HalError)?;
         } else {
             // Try to lock the display device
             Kernel::devices().lock(crate::DeviceType::Display, KERNEL_MASTER_ID)?;
         }
 
-        Ok(ConsoleOutput {
-            interface_id,
-            output,
-            current_color,
-        })
+        Ok(())
     }
 
     /// Writes a CRLF newline sequence (`'\r'` then `'\n'`) to the configured output.
@@ -140,7 +150,7 @@ impl ConsoleOutput {
     pub(crate) fn write_char(&self, data: char) -> KernelResult<()> {
         match self.output {
             Usart(_) => syscall_hal(
-                self.interface_id,
+                self.interface_id.unwrap(),
                 SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
                     UartWriteActions::SendChar(data as u8),
                 )),
@@ -174,7 +184,7 @@ impl ConsoleOutput {
     pub(crate) fn write_str(&self, data: &str) -> KernelResult<()> {
         match self.output {
             Usart(_) => syscall_hal(
-                self.interface_id,
+                self.interface_id.unwrap(),
                 SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
                     UartWriteActions::SendString(data),
                 )),
@@ -205,7 +215,7 @@ impl ConsoleOutput {
     pub fn clear_terminal(&self) -> KernelResult<()> {
         match self.output {
             Usart(_) => syscall_hal(
-                self.interface_id,
+                self.interface_id.unwrap(),
                 SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
                     UartWriteActions::SendString("\x1B[2J\x1B[H"),
                 )),
@@ -247,7 +257,7 @@ impl ConsoleOutput {
     pub fn release(&mut self) -> KernelResult<()> {
         match self.output {
             Usart(_) => syscall_devices(
-                crate::DeviceType::Peripheral(self.interface_id),
+                crate::DeviceType::Peripheral(self.interface_id.unwrap()),
                 crate::SysCallDevicesArgs::Unlock,
                 KERNEL_MASTER_ID,
             ),

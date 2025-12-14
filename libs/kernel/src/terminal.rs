@@ -43,26 +43,25 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    /// Create a new terminal instance bound to a named USART console output.
+    /// Construct a new [`Terminal`] bound to a named USART console output.
+    ///
+    /// This initializes the primary [`ConsoleOutput`] as a USART backend using
+    /// the provided `name` and a default color of [`Colors::White`]. The terminal
+    /// starts in the [`TerminalState::Stopped`] state with an empty line buffer,
+    /// cursor position at `0`, and no display mirror configured.
     ///
     /// # Parameters
-    /// - `name`: Static name/identifier used to select the USART interface.
+    /// - `name`: Static name/identifier used by the HAL to select the USART interface.
     ///
     /// # Returns
     /// - `Ok(Terminal)` on success.
-    /// - `Err(_)` if the underlying [`ConsoleOutput::new`] fails.
-    ///
-    /// # Errors
-    /// Propagates any [`KernelError`](crate::KernelError) produced by the console
-    /// output initialization (e.g., interface open/configuration failures).
+    /// - `Err(_)` if creating the underlying [`ConsoleOutput`] fails.
     pub fn new(name: &'static str) -> KernelResult<Terminal> {
-        let output = ConsoleOutput::new(
-            crate::console_output::ConsoleOutputType::Usart(name),
-            Colors::White,
-        )?;
-
         Ok(Terminal {
-            output,
+            output: ConsoleOutput::new(
+                crate::console_output::ConsoleOutputType::Usart(name),
+                Colors::White,
+            ),
             line_buffer: String::new(),
             mode: TerminalState::Stopped,
             cursor_pos: 0,
@@ -95,7 +94,8 @@ impl Terminal {
             self.display_mirror = Some(ConsoleOutput::new(
                 crate::console_output::ConsoleOutputType::Display,
                 Colors::White,
-            )?);
+            ));
+            self.display_mirror.as_mut().unwrap().initialize()?;
         } else if let Some(mirror) = self.display_mirror.as_mut()
             && !display_mirror
         {
@@ -105,27 +105,30 @@ impl Terminal {
         Ok(())
     }
 
-    /// Switch the terminal to prompt mode and print the prompt (`>`).
+    /// Switch the terminal into prompt mode.
     ///
-    /// In prompt mode, the terminal registers [`terminal_prompt_callback`] as the
-    /// HAL callback for the underlying interface. User input is echoed and
-    /// accumulated into an internal line buffer until carriage return (`'\r'`)
-    /// triggers execution via `Kernel::apps().start_app(...)`.
-    ///
-    /// # Parameters
-    /// - `&mut self`: The terminal to configure.
+    /// Prompt mode enables interactive input:
+    /// - Ensures the underlying output interface is initialized.
+    /// - Registers the HAL callback [`terminal_prompt_callback`] so incoming bytes
+    ///   are forwarded to [`Terminal::process_input`].
+    /// - If transitioning from another mode, resets the cursor state and prints a
+    ///   new prompt (`>`).
     ///
     /// # Returns
-    /// - `Ok(())` if the callback is configured and the prompt is displayed.
-    /// - `Err(_)` if configuring the callback or writing to the console fails.
+    /// - `Ok(())` on success.
     ///
     /// # Errors
-    /// - Propagates errors from [`syscall_hal`] when configuring the callback.
-    /// - Propagates errors from console output operations (`new_line`, `write_char`).
+    /// Propagates errors from initializing the underlying [`ConsoleOutput`] or from
+    /// configuring the HAL callback via [`syscall_hal`].
     pub fn set_prompt_mode(&mut self) -> KernelResult<()> {
+        // Initialize output interface if not already initialized
+        if self.output.interface_id.is_none() {
+            self.output.initialize()?;
+        }
+
         // Configure callback for user prompt data
         syscall_hal(
-            self.output.interface_id,
+            self.output.interface_id.unwrap(),
             SysCallHalActions::ConfigureCallback(terminal_prompt_callback),
             KERNEL_MASTER_ID,
         )?;
@@ -141,20 +144,27 @@ impl Terminal {
         Ok(())
     }
 
-    /// Switch the terminal to display-only mode.
+    /// Switch the terminal into display mode.
     ///
-    /// In display mode, the terminal will render output provided via [`Terminal::write`],
-    /// and it will ignore user input processing.
+    /// Display mode is intended for output-only operation:
+    /// - Ensures the underlying output interface is initialized.
+    /// - Sets the terminal state to [`TerminalState::Display`].
     ///
-    /// # Parameters
-    /// - `&mut self`: The terminal to configure.
+    /// While in display mode, [`Terminal::write`] will render output to the
+    /// console (and optionally to the configured display mirror), and user input
+    /// will be ignored by [`Terminal::process_input`].
     ///
     /// # Returns
-    /// - Always returns `Ok(())`.
+    /// - `Ok(())` on success.
     ///
     /// # Errors
-    /// This function does not currently produce errors.
+    /// Propagates errors from initializing the underlying [`ConsoleOutput`].
     pub fn set_display_mode(&mut self) -> KernelResult<()> {
+        // Initialize output interface if not already initialized
+        if self.output.interface_id.is_none() {
+            self.output.initialize()?;
+        }
+
         // Set mode to display
         if self.mode != Display {
             self.mode = Display;
