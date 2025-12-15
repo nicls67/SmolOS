@@ -173,62 +173,64 @@ impl Terminal {
         Ok(())
     }
 
-    /// Write formatted output to the terminal when in display mode.
+
+    /// Write formatted output to the terminal (and optionally to the display mirror).
     ///
-    /// If the terminal is not in display mode, this call is a no-op.
+    /// This method renders the provided [`ConsoleFormatting`] to the terminal's
+    /// primary [`ConsoleOutput`]. If a display mirror has been enabled via
+    /// [`Terminal::set_display_mirror`], the same formatting operation is also
+    /// applied to the mirror output.
     ///
     /// # Parameters
-    /// - `format`: The formatting instruction to render to the underlying console.
+    /// - `format`: The [`ConsoleFormatting`] variant describing what to render.
     ///
     /// # Returns
-    /// - `Ok(())` on success (or if no-op due to not being in display mode).
-    /// - `Err(_)` if any underlying console write operation fails.
+    /// - `Ok(())` on success.
     ///
     /// # Errors
-    /// Propagates errors from [`ConsoleOutput`] operations such as `write_str`,
-    /// `write_char`, `new_line`, and `clear_terminal`.
+    /// Propagates any error returned by the underlying [`ConsoleOutput`] methods
+    /// (e.g., `write_str`, `write_char`, `new_line`, or `clear_terminal`) for either
+    /// the primary output or the optional mirror output.
     pub fn write(&self, format: &ConsoleFormatting) -> KernelResult<()> {
-        if self.mode == Display {
+        match format {
+            ConsoleFormatting::StrNoFormatting(text) => self.output.write_str(text)?,
+            ConsoleFormatting::StrNewLineAfter(text) => {
+                self.output.write_str(text)?;
+                self.output.new_line()?;
+            }
+            ConsoleFormatting::StrNewLineBefore(text) => {
+                self.output.new_line()?;
+                self.output.write_str(text)?;
+            }
+            ConsoleFormatting::StrNewLineBoth(text) => {
+                self.output.new_line()?;
+                self.output.write_str(text)?;
+                self.output.new_line()?;
+            }
+            ConsoleFormatting::Newline => self.output.new_line()?,
+            ConsoleFormatting::Char(c) => self.output.write_char(*c)?,
+            ConsoleFormatting::Clear => self.output.clear_terminal()?,
+        }
+
+        if let Some(mirror) = self.display_mirror.as_ref() {
             match format {
-                ConsoleFormatting::StrNoFormatting(text) => self.output.write_str(text)?,
+                ConsoleFormatting::StrNoFormatting(text) => mirror.write_str(text)?,
                 ConsoleFormatting::StrNewLineAfter(text) => {
-                    self.output.write_str(text)?;
-                    self.output.new_line()?;
+                    mirror.write_str(text)?;
+                    mirror.new_line()?;
                 }
                 ConsoleFormatting::StrNewLineBefore(text) => {
-                    self.output.new_line()?;
-                    self.output.write_str(text)?;
+                    mirror.new_line()?;
+                    mirror.write_str(text)?;
                 }
                 ConsoleFormatting::StrNewLineBoth(text) => {
-                    self.output.new_line()?;
-                    self.output.write_str(text)?;
-                    self.output.new_line()?;
+                    mirror.new_line()?;
+                    mirror.write_str(text)?;
+                    mirror.new_line()?;
                 }
-                ConsoleFormatting::Newline => self.output.new_line()?,
-                ConsoleFormatting::Char(c) => self.output.write_char(*c)?,
-                ConsoleFormatting::Clear => self.output.clear_terminal()?,
-            }
-
-            if let Some(mirror) = self.display_mirror.as_ref() {
-                match format {
-                    ConsoleFormatting::StrNoFormatting(text) => mirror.write_str(text)?,
-                    ConsoleFormatting::StrNewLineAfter(text) => {
-                        mirror.write_str(text)?;
-                        mirror.new_line()?;
-                    }
-                    ConsoleFormatting::StrNewLineBefore(text) => {
-                        mirror.new_line()?;
-                        mirror.write_str(text)?;
-                    }
-                    ConsoleFormatting::StrNewLineBoth(text) => {
-                        mirror.new_line()?;
-                        mirror.write_str(text)?;
-                        mirror.new_line()?;
-                    }
-                    ConsoleFormatting::Newline => mirror.new_line()?,
-                    ConsoleFormatting::Char(c) => mirror.write_char(*c)?,
-                    ConsoleFormatting::Clear => mirror.clear_terminal()?,
-                }
+                ConsoleFormatting::Newline => mirror.new_line()?,
+                ConsoleFormatting::Char(c) => mirror.write_char(*c)?,
+                ConsoleFormatting::Clear => mirror.clear_terminal()?,
             }
         }
 
@@ -257,28 +259,31 @@ impl Terminal {
         Ok(())
     }
 
-    /// Process input bytes received from the HAL interface in prompt mode.
+
+    /// Process a buffer of input bytes received from the terminal interface.
     ///
-    /// The first byte (`buffer[0]`) is treated as the received character.
-    /// - If it is carriage return (`'\r'`), the current line is executed via
-    ///   `Kernel::apps().start_app(&self.line_buffer)`, and the line buffer is cleared.
-    /// - Otherwise, the character is echoed and appended to the line buffer.
+    /// In [`TerminalState::Prompt`] mode, this function implements a simple line
+    /// editor:
+    /// - Non-`'\r'` bytes are echoed to the terminal and appended to the internal
+    ///   line buffer.
+    /// - On carriage return (`'\r'`), the accumulated line is treated as an
+    ///   application command and is started via [`Kernel::apps().start_app`]. If
+    ///   the application starts successfully, the terminal device is locked to
+    ///   that application.
+    ///
+    /// In other terminal modes, the input is ignored.
     ///
     /// # Parameters
-    /// - `buffer`: A buffer read from the interface (expects at least 1 byte).
+    /// - `buffer`: A byte buffer read from the HAL interface (typically containing
+    ///   one byte for prompt input).
     ///
     /// # Returns
-    /// - `Ok(())` on success (or if no-op due to not being in prompt mode).
-    /// - `Err(_)` if echoing/writing fails or the line buffer overflows.
+    /// - `Ok(())` on success.
     ///
     /// # Errors
-    /// - Propagates errors from console output operations (echo/prompt/newline).
-    /// - Returns `TerminalError(Error, "Line buffer overflow")` if the internal
-    ///   `line_buffer` cannot accept more characters.
-    ///
-    /// # Panics
-    /// This function will panic if `buffer` is empty, because it unconditionally
-    /// indexes `buffer[0]`.
+    /// - Returns a terminal error if the internal line buffer overflows.
+    /// - Propagates any I/O error from writing to the underlying console output.
+    /// - Propagates any error from locking the terminal device after starting an app.
     pub fn process_input(&mut self, buffer: Vec<u8, BUFFER_SIZE>) -> KernelResult<()> {
         // If the terminal is in prompt mode
         if self.mode == Prompt {
@@ -286,17 +291,14 @@ impl Terminal {
             if buffer[0] == '\r' as u8 {
                 // Start the requested command
                 match Kernel::apps().start_app(&self.line_buffer) {
-                    Ok(_) => {}
+                    Ok(app_id) => {
+                        // Lock terminal for this app
+                        Kernel::devices().lock(crate::DeviceType::Terminal, app_id)?;
+                    }
                     Err(err) => self
                         .output
                         .write_str(format!(256;"\r\n{}",err.to_string()).unwrap().as_str())?,
                 };
-
-                // Empty the line buffer and go to a new line
-                self.line_buffer.clear();
-                self.cursor_pos = 0;
-                self.output.new_line()?;
-                self.output.write_char('>')?;
             } else {
                 // Echo the received character
                 self.output.write_char(buffer[0] as char)?;

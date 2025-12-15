@@ -44,7 +44,27 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub fn start(&mut self) -> KernelResult<()> {
+    /// Starts (schedules) this app if it is currently stopped.
+    ///
+    /// This registers the configured app with the kernel scheduler according to its
+    /// [`CallPeriodicity`] and [`CallMethod`].
+    ///
+    /// - [`CallPeriodicity::Once`]: schedules the app to run once (using the scheduler period).
+    /// - [`CallPeriodicity::Periodic`]: schedules the app to run indefinitely at the given period.
+    /// - [`CallPeriodicity::PeriodicUntil`]: schedules the app to run at the given period until
+    ///   the provided duration elapses.
+    ///
+    /// On success, this function:
+    /// - stores the returned scheduler id in `self.id`,
+    /// - updates `self.app_status` to [`AppStatus::Running`],
+    /// - calls `self.app_id_storage` (if provided) with the assigned id.
+    ///
+    /// # Returns
+    /// The scheduler id assigned to the app.
+    ///
+    /// # Errors
+    /// Returns [`KernelError::AppAlreadyScheduled`] if the app is already running/scheduled.
+    pub fn start(&mut self) -> KernelResult<u32> {
         if self.app_status == Stopped {
             let period;
             let ends_in;
@@ -81,12 +101,23 @@ impl AppConfig {
             if let Some(app_id_storage) = self.app_id_storage {
                 app_id_storage(app_id);
             }
-            Ok(())
+            Ok(app_id)
         } else {
             Err(KernelError::AppAlreadyScheduled(self.name))
         }
     }
 
+    /// Stops (unschedules) this app if it is currently running.
+    ///
+    /// If the app is [`AppStatus::Running`], this removes the periodic task from the scheduler
+    /// (matching by `self.name` and, when applicable, the configured parameter), then:
+    /// - sets `self.app_status` to [`AppStatus::Stopped`],
+    /// - clears `self.id`.
+    ///
+    /// If the app is already stopped, this is a no-op.
+    ///
+    /// # Errors
+    /// Propagates any scheduler error encountered while removing the task.
     pub fn stop(&mut self) -> KernelResult<()> {
         if self.app_status == Running {
             syscall_scheduler(SysCallSchedulerArgs::RemovePeriodicTask(

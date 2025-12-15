@@ -46,6 +46,17 @@ impl AppsManager {
         Self { apps: Vec::new() }
     }
 
+    /// Initialize and register the compile-time `DEFAULT_APPS` list into this [`AppsManager`].
+    ///
+    /// For each app defined in [`DEFAULT_APPS`], this function:
+    /// - Clones the [`AppConfig`] entry (it is `Copy`) into a temporary value,
+    /// - Starts it immediately if its name is present in [`DEFAULT_APPS_START_LIST`],
+    /// - Pushes it into the internal apps list.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Starting a default app fails (via [`AppConfig::start`]), or
+    /// - The internal apps list is full and the app cannot be added.
     pub fn init_default_apps(&mut self) -> KernelResult<()> {
         for app in DEFAULT_APPS.iter() {
             // Check if the app is in the start list
@@ -74,7 +85,21 @@ impl AppsManager {
         }
     }
 
-    pub fn start_app(&mut self, app_name: &str) -> KernelResult<()> {
+    /// Start a registered app by name.
+    ///
+    /// This searches the internal apps list for an app whose [`AppConfig::name`]
+    /// matches `app_name` and invokes [`AppConfig::start`] on it.
+    ///
+    /// # Arguments
+    /// * `app_name` - The name of the app to start.
+    ///
+    /// # Returns
+    /// On success, returns the started app's ID (as returned by [`AppConfig::start`]).
+    ///
+    /// # Errors
+    /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `app_name`,
+    /// or propagates any error returned by [`AppConfig::start`].
+    pub fn start_app(&mut self, app_name: &str) -> KernelResult<u32> {
         self.apps
             .iter_mut()
             .find(|app| app.name == app_name)
