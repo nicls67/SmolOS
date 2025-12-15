@@ -16,6 +16,42 @@ use std::io::Write;
 use std::path::PathBuf;
 
 fn main() {
+    // Run drivers allocator generation script
+    let status = std::process::Command::new("sh")
+        .arg("tools/build/gen_drivers_alloc.sh")
+        .status()
+        .expect("failed to execute tools/build/gen_drivers_alloc.sh");
+    if !status.success() {
+        panic!(
+            "tools/build/gen_drivers_alloc.sh failed with exit status: {}",
+            status
+        );
+    }
+
+    // Run CMake configure script
+    let status = std::process::Command::new("sh")
+        .arg("tools/build/cmake_configure.sh")
+        .status()
+        .expect("failed to execute tools/build/cmake_configure.sh");
+    if !status.success() {
+        panic!(
+            "tools/build/cmake_configure.sh failed with exit status: {}",
+            status
+        );
+    }
+
+    // Run libdrivers build script
+    let status = std::process::Command::new("sh")
+        .arg("tools/build/cmake_build.sh")
+        .status()
+        .expect("failed to execute tools/build/build_libdrivers.sh");
+    if !status.success() {
+        panic!(
+            "tools/build/build_libdrivers.sh failed with exit status: {}",
+            status
+        );
+    }
+
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -29,7 +65,7 @@ fn main() {
     // any file in the project changes. By specifying `memory.x`
     // here, we ensure the build script is only re-run when
     // `memory.x` is changed.
-    println!("cargo:rerun-if-changed=memory.x");
+    //println!("cargo:rerun-if-changed=memory.x");
 
     // Specify linker arguments.
 

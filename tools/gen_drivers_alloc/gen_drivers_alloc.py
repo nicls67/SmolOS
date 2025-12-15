@@ -405,7 +405,7 @@ def gen_c_code(template: str, config: dict, analysis: dict, header: bool = False
                         generated_lines.append(f"#define {buffer_size} {analysis['buffers_size'][buffer_size]}")
                 elif marker == FUNCTIONS_MARKER:
                     if header:
-                        generated_lines.append(f"void drivers_init();")
+                        generated_lines.append("void drivers_init();")
                     else:
                         generated_lines.extend(gen_init_func(config, analysis))
                         generated_lines.extend(gen_handlers_func(config))
@@ -533,3 +533,5 @@ if __name__ == "__main__":
 
     # Generate Rust file
     gen_rust_code(gen_config)
+    
+    exit(0)
