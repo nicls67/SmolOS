@@ -4,7 +4,7 @@ target_c_file:
 
 target_rust_file:
   name: interrupts
-  directory: smolos/src
+  directory: crates/smolos/src
 
 includes_c:
   - "../Inc/drivers_alloc.h"

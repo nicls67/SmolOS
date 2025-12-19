@@ -23,11 +23,13 @@ fn main() {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
     let workspace_root = crate_dir
         .parent()
-        .expect("smolos crate must live one level under the workspace root")
+        .expect("smolos crate must live two levels under the workspace root")
+        .parent()
+        .expect("smolos crate must live two levels under the workspace root")
         .to_path_buf();
     env::set_current_dir(&workspace_root)
         .unwrap_or_else(|e| panic!("failed to set current dir to {:?}: {}", workspace_root, e));
-    
+
     // Run drivers allocator generation script
     let status = std::process::Command::new("sh")
         .arg("tools/build/gen_drivers_alloc.sh")

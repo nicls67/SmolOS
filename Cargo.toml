@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["smolos", "kernel", "hal_interface", "display"]
+members = ["crates/smolos", "crates/kernel", "crates/hal_interface", "crates/display"]
 
 [profile.release]
 codegen-units = 1 # better optimizations
