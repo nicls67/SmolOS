@@ -1,0 +1,63 @@
+target_c_file:
+  name: drivers_alloc
+  directory: drivers/Interface
+
+target_rust_file:
+  name: interrupts
+  directory: crates/smolos/src
+
+includes_c:
+  - "../Inc/drivers_alloc.h"
+
+includes_h:
+  - "drivers_types.h"
+
+drivers:
+  - name: SERIAL_MAIN
+    type: USART
+    direction: INOUT
+    peripheral: USART1
+    it_enabled: true
+
+  - name: ACT_LED
+    type: GPIO
+    direction: OUT
+    peripheral:
+      port: J
+      pin: 5
+
+  - name: ERR_LED
+    type: GPIO
+    direction: OUT
+    peripheral:
+      port: J
+      pin: 13
+
+  - name: LCD
+    type: LCD
+    direction: INOUT
+    peripheral: None
+
+init_sequence:
+  - driver: USART
+    includes:
+      - "usart.h"
+    sequence:
+      - "MX_<drv_name>_UART_Init();"
+    it_enabled_sequence:
+      - "HAL_UART_Receive_IT(<handler>, <buffer>.buffer, 1);"
+    buffer_size: 32
+
+  - driver: GPIO
+    includes:
+      - "gpio.h"
+    sequence:
+      - "MX_GPIO_Init();"
+
+  - driver: LCD
+    includes:
+      - "stm32f769i_discovery_lcd.h"
+    sequence:
+      - "BSP_LCD_Init();"
+      - "BSP_LCD_LayerDefaultInit(1, LCD_FB_START_ADDRESS);"
+      - "BSP_LCD_DisplayOff();"

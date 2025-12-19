@@ -15,6 +15,7 @@
 /************/
 /* Includes */
 /************/
+#include <stdint.h>
 
 /********************/
 /* Exported defines */
@@ -23,7 +24,6 @@
 /******************/
 /* Exported types */
 /******************/
-
 typedef enum
 {
     OK = 0,
@@ -60,5 +60,8 @@ typedef enum
 /**********************/
 /* Exported functions */
 /**********************/
+void HAL_Delay(uint32_t ms);
 
 #endif //LIB_INTERFACE_H
+
+

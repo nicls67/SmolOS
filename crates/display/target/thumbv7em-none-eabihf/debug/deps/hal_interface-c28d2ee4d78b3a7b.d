@@ -1,0 +1,10 @@
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/display/target/thumbv7em-none-eabihf/debug/deps/hal_interface-c28d2ee4d78b3a7b.d: /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/lib.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/bindings.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/errors.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/interface_read.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/interface_write.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/lock.rs
+
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/display/target/thumbv7em-none-eabihf/debug/deps/libhal_interface-c28d2ee4d78b3a7b.rmeta: /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/lib.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/bindings.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/errors.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/interface_read.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/interface_write.rs /home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/lock.rs
+
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/lib.rs:
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/bindings.rs:
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/errors.rs:
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/interface_read.rs:
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/interface_write.rs:
+/home/nicolas/Documents/Programmation/CLionProjects/SmolOS/libs/hal_interface/src/lock.rs:
