@@ -40,6 +40,7 @@ pub struct Terminal {
     mode: TerminalState,
     cursor_pos: usize,
     display_mirror: Option<ConsoleOutput>,
+    app_exe_in_progress: Option<u32>,
 }
 
 impl Terminal {
@@ -66,6 +67,7 @@ impl Terminal {
             mode: TerminalState::Stopped,
             cursor_pos: 0,
             display_mirror: None,
+            app_exe_in_progress: None,
         })
     }
 
@@ -290,6 +292,7 @@ impl Terminal {
                 // Start the requested command
                 match Kernel::apps().start_app(&self.line_buffer) {
                     Ok(app_id) => {
+                        self.app_exe_in_progress = Some(app_id);
                         // Lock terminal for this app
                         Kernel::devices().lock(crate::DeviceType::Terminal, app_id)?;
                     }
@@ -310,6 +313,20 @@ impl Terminal {
                     .push(buffer[0] as char)
                     .map_err(|_| TerminalError(Error, "Line buffer overflow"))?;
                 self.cursor_pos += 1;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn app_exit_notifier(&mut self, app_exit_id: u32) -> KernelResult<()> {
+        if let Some(id) = self.app_exe_in_progress {
+            if id == app_exit_id {
+                self.app_exe_in_progress = None;
+                Kernel::devices().unlock(crate::DeviceType::Terminal, id)?;
+                self.cursor_pos = 0;
+                self.output.new_line()?;
+                self.output.write_char('>')?;
             }
         }
 

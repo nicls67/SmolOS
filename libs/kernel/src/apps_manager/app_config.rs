@@ -107,17 +107,18 @@ impl AppConfig {
         }
     }
 
+
     /// Stops (unschedules) this app if it is currently running.
     ///
-    /// If the app is [`AppStatus::Running`], this removes the periodic task from the scheduler
-    /// (matching by `self.name` and, when applicable, the configured parameter), then:
-    /// - sets `self.app_status` to [`AppStatus::Stopped`],
-    /// - clears `self.id`.
+    /// If the app is [`AppStatus::Running`], this function:
+    /// - removes the corresponding periodic task from the scheduler,
+    /// - notifies the terminal that the app exited (using the stored scheduler id),
+    /// - updates `self.app_status` to [`AppStatus::Stopped`] and clears `self.id`.
     ///
     /// If the app is already stopped, this is a no-op.
     ///
     /// # Errors
-    /// Propagates any scheduler error encountered while removing the task.
+    /// Returns any error produced by the terminal exit notifier.
     pub fn stop(&mut self) -> KernelResult<()> {
         if self.app_status == Running {
             syscall_scheduler(SysCallSchedulerArgs::RemovePeriodicTask(
@@ -126,7 +127,9 @@ impl AppConfig {
                     CallMethod::Call(_) => None,
                     CallMethod::CallWithParam(_, param) => Some(param),
                 },
-            ))?;
+            ))
+            .unwrap_or(());
+            Kernel::terminal().app_exit_notifier(self.id.unwrap())?;
             self.app_status = Stopped;
             self.id = None;
         }

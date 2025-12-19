@@ -106,4 +106,26 @@ impl AppsManager {
             .ok_or(crate::KernelError::AppNotFound)?
             .start()
     }
+    
+    /// Stop a running registered app by its ID.
+    ///
+    /// This searches the internal apps list for an app whose [`AppConfig::id`]
+    /// matches `app_id` and invokes [`AppConfig::stop`] on it.
+    ///
+    /// # Arguments
+    /// * `app_id` - The ID of the app to stop.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the app was found and successfully stopped.
+    ///
+    /// # Errors
+    /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `app_id`,
+    /// or propagates any error returned by [`AppConfig::stop`].
+    pub fn stop_app(&mut self, app_id: u32) -> KernelResult<()> {
+        self.apps
+            .iter_mut()
+            .find(|app| app.id == Some(app_id))
+            .ok_or(crate::KernelError::AppNotFound)?
+            .stop()
+    }
 }

@@ -337,6 +337,7 @@ impl Scheduler {
         param: Option<u32>,
     ) -> KernelResult<()> {
         if let Some(index) = self.app_exists(name, param) {
+            Kernel::apps().stop_app(self.tasks[index].app_id)?;
             self.tasks.swap_remove(index);
             Ok(())
         } else {
@@ -594,7 +595,7 @@ impl Scheduler {
     pub fn get_period(&self) -> Milliseconds {
         self.sched_period
     }
-    
+
     /// Checks whether a task with the given application ID is currently active.
     ///
     /// This helper scans the scheduler's internal task list and returns `true` if it
@@ -611,6 +612,8 @@ impl Scheduler {
     /// - Inactive tasks can occur when a task is aborted due to an error via
     ///   [`Scheduler::abort_task_on_error`].
     pub(crate) fn is_id_active(&self, id: u32) -> bool {
-        self.tasks.iter().any(|task| task.app_id == id && task.active)
+        self.tasks
+            .iter()
+            .any(|task| task.app_id == id && task.active)
     }
 }
