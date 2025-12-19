@@ -1,24 +1,6 @@
-[package]
-authors = ["Nicolas SIMON <nicolas.simon6790@gmail.com>"]
-name = "SmolOS"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-cortex-m-rt = { version = "0.7.0" }
-kernel = { path = "libs/kernel" }
-hal_interface = { path = "libs/hal_interface" }
-heapless = "0.9.1"
-
-[dependencies.stm32f7]
-features = ["stm32f769", "rt"]
-version = "0.16.0"
-
-[[bin]]
-name = "SmolOS"
-test = false
-doctest = false
-bench = false
+[workspace]
+resolver = "3"
+members = ["smolos", "kernel", "hal_interface", "display"]
 
 [profile.release]
 codegen-units = 1 # better optimizations

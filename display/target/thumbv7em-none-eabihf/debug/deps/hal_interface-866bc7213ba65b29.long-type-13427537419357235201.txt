@@ -1,0 +1,1 @@
+VecInner<_, _, vec::storage::VecStorageInner<[MaybeUninit<_>; _]>>: From<&interface_read::RxBuffer>
