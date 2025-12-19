@@ -304,6 +304,7 @@ impl Terminal {
                         self.output.write_char('>')?;
                     }
                 };
+                self.line_buffer.clear();
             } else {
                 // Echo the received character
                 self.output.write_char(buffer[0] as char)?;
