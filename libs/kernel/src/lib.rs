@@ -1,5 +1,5 @@
 #![no_std]
-mod apps_manager;
+mod apps;
 mod boot;
 mod data;
 mod devices;
@@ -11,6 +11,7 @@ mod systick;
 mod terminal;
 mod types;
 mod console_output;
+mod kernel_apps;
 
 pub use crate::data::KernelTimeData;
 pub use crate::console_output::ConsoleOutput;

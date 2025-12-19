@@ -1,4 +1,4 @@
-use crate::apps_manager::app_config::AppStatus::{Running, Stopped};
+use crate::apps::app_config::AppStatus::{Running, Stopped};
 use crate::data::Kernel;
 use crate::scheduler::{App, AppCall, AppParam};
 use crate::{KernelError, KernelResult, Milliseconds, SysCallSchedulerArgs, syscall_scheduler};

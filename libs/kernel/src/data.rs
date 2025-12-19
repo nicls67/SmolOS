@@ -1,4 +1,4 @@
-use crate::apps_manager::AppsManager;
+use crate::apps::AppsManager;
 use crate::devices::DevicesManager;
 use crate::errors_mgt::ErrorsManager;
 use crate::scheduler::Scheduler;

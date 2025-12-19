@@ -1,9 +1,10 @@
-use crate::apps_manager::AppsManager;
+use crate::apps::AppsManager;
 use crate::console_output::ConsoleFormatting;
 use crate::data::Kernel;
 use crate::devices::DevicesManager;
 use crate::errors_mgt::ErrorsManager;
 use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME, KERNEL_VERSION};
+use crate::kernel_apps::init_kernel_apps;
 use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
 use crate::{KernelTimeData, Milliseconds, init_systick};
@@ -88,7 +89,7 @@ pub fn boot(config: BootConfig) {
         .unwrap();
 
     // Initialize default apps
-    Kernel::apps().init_default_apps().unwrap();
+    init_kernel_apps().unwrap();
 
     // Start scheduler
     Kernel::scheduler()
