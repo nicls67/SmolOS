@@ -289,21 +289,29 @@ impl Terminal {
         if self.mode == Prompt {
             // If the received character is a return character, process the line
             if buffer[0] == '\r' as u8 {
-                // Start the requested command
-                match Kernel::apps().start_app(&self.line_buffer) {
-                    Ok(app_id) => {
-                        self.app_exe_in_progress = Some(app_id);
-                        // Lock terminal for this app
-                        Kernel::devices().lock(crate::DeviceType::Terminal, app_id)?;
-                    }
-                    Err(err) => {
-                        self.output
-                            .write_str(format!(256;"\r\n{}",err.to_string()).unwrap().as_str())?;
-                        self.cursor_pos = 0;
-                        self.output.new_line()?;
-                        self.output.write_char('>')?;
-                    }
-                };
+                // If the line buffer is not empty
+                if self.line_buffer.len() > 1 {
+                    // Start the requested command
+                    match Kernel::apps().start_app(&self.line_buffer) {
+                        Ok(app_id) => {
+                            self.app_exe_in_progress = Some(app_id);
+                            // Lock terminal for this app
+                            Kernel::devices().lock(crate::DeviceType::Terminal, app_id)?;
+                        }
+                        Err(err) => {
+                            self.output.write_str(
+                                format!(256;"\r\n{}",err.to_string()).unwrap().as_str(),
+                            )?;
+                            self.cursor_pos = 0;
+                            self.output.new_line()?;
+                            self.output.write_char('>')?;
+                        }
+                    };
+                } else {
+                    self.cursor_pos = 0;
+                    self.output.new_line()?;
+                    self.output.write_char('>')?;
+                }
                 self.line_buffer.clear();
             } else {
                 // Echo the received character
