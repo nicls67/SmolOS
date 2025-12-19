@@ -64,18 +64,12 @@ fn main() {
         );
     }
 
-    // Workspace root: .../SmolOS
-    let workspace_root = crate_dir
-        .parent()
-        .expect("smolos crate must live one level under the workspace root")
-        .to_path_buf();
-
     // ---- Ensure the linker can find memory.x ----
-    let memory_x_src = workspace_root.join("memory.x");
+    let memory_x_src = workspace_root.join("config").join("memory.x");
     if !memory_x_src.exists() {
         panic!(
             "Expected linker memory script at {:?}. \
-             Make sure `memory.x` exists at the workspace root.",
+             Make sure `memory.x` exists in config folder.",
             memory_x_src
         );
     }

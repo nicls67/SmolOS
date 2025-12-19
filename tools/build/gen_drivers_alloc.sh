@@ -1,7 +1,7 @@
 echo Start generating drivers allocation
 echo
 
-python3 tools/gen_drivers_alloc/gen_drivers_alloc.py  drivers_conf.yaml
+python3 tools/gen_drivers_alloc/gen_drivers_alloc.py  config/drivers_conf.yaml
 rc=$?
 
 echo
