@@ -173,7 +173,6 @@ impl Terminal {
         Ok(())
     }
 
-
     /// Write formatted output to the terminal (and optionally to the display mirror).
     ///
     /// This method renders the provided [`ConsoleFormatting`] to the terminal's
@@ -259,7 +258,6 @@ impl Terminal {
         Ok(())
     }
 
-
     /// Process a buffer of input bytes received from the terminal interface.
     ///
     /// In [`TerminalState::Prompt`] mode, this function implements a simple line
@@ -295,9 +293,13 @@ impl Terminal {
                         // Lock terminal for this app
                         Kernel::devices().lock(crate::DeviceType::Terminal, app_id)?;
                     }
-                    Err(err) => self
-                        .output
-                        .write_str(format!(256;"\r\n{}",err.to_string()).unwrap().as_str())?,
+                    Err(err) => {
+                        self.output
+                            .write_str(format!(256;"\r\n{}",err.to_string()).unwrap().as_str())?;
+                        self.cursor_pos = 0;
+                        self.output.new_line()?;
+                        self.output.write_char('>')?;
+                    }
                 };
             } else {
                 // Echo the received character
