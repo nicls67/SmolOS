@@ -3,9 +3,9 @@
 //! related errors with different severity levels and format
 
 use crate::HalError::{
-    IncompatibleAction, InterfaceAlreadyLocked, InterfaceBadConfig, InterfaceNotFound,
-    LockedInterface, LockerAlreadyConfigured, ReadError, ReadOnlyInterface, UnknownError,
-    WriteError, WriteOnlyInterface, WrongInterfaceId,
+    HalAlreadyInitialized, IncompatibleAction, InterfaceAlreadyLocked, InterfaceBadConfig,
+    InterfaceNotFound, LockedInterface, LockerAlreadyConfigured, ReadError, ReadOnlyInterface,
+    UnknownError, WriteError, WriteOnlyInterface, WrongInterfaceId,
 };
 use crate::HalErrorLevel::{Critical, Error, Fatal};
 use heapless::{String, format};
@@ -62,6 +62,7 @@ impl HalErrorLevel {
 
 #[derive(Debug)]
 pub enum HalError {
+    HalAlreadyInitialized,
     InterfaceNotFound(&'static str),
     WrongInterfaceId(usize),
     ReadOnlyInterface(&'static str),
@@ -101,6 +102,10 @@ impl HalError {
     pub fn to_string(&self) -> String<256> {
         let mut msg = String::new();
         match self {
+            HalAlreadyInitialized => {
+                msg.push_str(self.severity().as_str()).unwrap();
+                msg.push_str("HAL already initialized").unwrap();
+            }
             InterfaceNotFound(name) => {
                 msg.push_str(self.severity().as_str()).unwrap();
                 msg.push_str(
@@ -221,6 +226,7 @@ impl HalError {
     ///
     pub fn severity(&self) -> HalErrorLevel {
         match self {
+            HalAlreadyInitialized => Critical,
             InterfaceNotFound(_) => Critical,
             WrongInterfaceId(_) => Critical,
             ReadOnlyInterface(_) => Error,

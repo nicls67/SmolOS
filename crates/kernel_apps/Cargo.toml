@@ -1,0 +1,16 @@
+[package]
+name = "kernel_apps"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kernel = { path = "../kernel" }
+hal_interface = { path = "../hal_interface" }
+heapless = "0.9.1"
+cortex-m = { version = "0.7.0", features = ["critical-section-single-core"] }
+
+[lib]
+name = "kernel_apps"
+test = false
+doctest = false
+bench = false

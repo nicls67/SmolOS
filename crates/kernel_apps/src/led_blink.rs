@@ -1,8 +1,9 @@
-use crate::{syscall_devices, syscall_hal, KernelResult, SysCallDevicesArgs, SysCallHalActions};
 use core::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
-use hal_interface::GpioWriteAction::Toggle;
 use hal_interface::InterfaceWriteActions;
+use kernel::{
+    DeviceType, KernelResult, SysCallDevicesArgs, SysCallHalActions, syscall_devices, syscall_hal,
+};
 
 /// Name of the GPIO interface used as the activity LED.
 const LED_NAME: &str = "ACT_LED";
@@ -21,7 +22,9 @@ static LED_ID: AtomicUsize = AtomicUsize::new(0);
 pub fn led_blink() -> KernelResult<()> {
     syscall_hal(
         LED_ID.load(Ordering::Relaxed),
-        SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(Toggle)),
+        SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(
+            hal_interface::GpioWriteAction::Toggle,
+        )),
         LED_APP_ID.load(Ordering::Relaxed),
     )?;
 
@@ -46,7 +49,7 @@ pub fn init_led_blink() -> KernelResult<()> {
 
     // Try to get a lock on the interface
     syscall_devices(
-        crate::DeviceType::Peripheral(id),
+        DeviceType::Peripheral(id),
         SysCallDevicesArgs::Lock,
         LED_APP_ID.load(Ordering::Relaxed),
     )

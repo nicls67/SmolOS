@@ -4,7 +4,6 @@ use crate::data::Kernel;
 use crate::devices::DevicesManager;
 use crate::errors_mgt::ErrorsManager;
 use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME, KERNEL_VERSION};
-use crate::kernel_apps::init_kernel_apps;
 use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
 use crate::{KernelTimeData, Milliseconds, init_systick};
@@ -87,9 +86,6 @@ pub fn boot(config: BootConfig) {
     terminal
         .write(&ConsoleFormatting::StrNewLineBoth("Kernel ready !"))
         .unwrap();
-
-    // Initialize default apps
-    init_kernel_apps().unwrap();
 
     // Start scheduler
     Kernel::scheduler()

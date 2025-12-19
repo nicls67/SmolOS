@@ -6,6 +6,8 @@ mod interface_read;
 mod interface_write;
 mod lock;
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use heapless::Vec;
 pub use interface_read::*;
 pub use interface_write::*;
@@ -20,6 +22,8 @@ pub use errors::*;
 
 pub const BUFFER_SIZE: usize = 32;
 
+static HAL_INIT: AtomicBool = AtomicBool::new(false);
+
 pub struct Hal {
     locker: Option<Locker>,
 }
@@ -27,23 +31,39 @@ pub struct Hal {
 pub type InterfaceCallback = extern "C" fn(u8);
 
 impl Hal {
-    /// Creates a new instance of the struct.
+    /// Creates a new [`Hal`] instance, ensuring the underlying HAL is initialized once.
     ///
-    /// This function initializes the hardware abstraction layer by
-    /// calling an unsafe `hal_init` function and then constructs
-    /// the instance of the struct with default values.
+    /// # Details
     ///
-    /// # Safety
-    /// The internal call to `hal_init` is marked as `unsafe`; ensure that
-    /// calling this function aligns with the requirements of that unsafe
-    /// function.
+    /// This type provides high-level access to the underlying hardware abstraction layer.
+    /// Construction is split into two steps:
     ///
-    /// # Returns
-    /// A new instance of the struct with the `locker` property set to `None`.
+    /// 1. [`Hal::new`] ensures the global HAL initialization routine (`hal_init`) is executed
+    ///    exactly once for the whole program (guarded by an atomic flag).
+    /// 2. Optional locking can be enabled afterwards via [`Hal::configure_locker`].
     ///
-    pub fn new() -> Self {
-        unsafe { hal_init() }
-        Self { locker: None }
+    /// The returned instance starts with no [`Locker`] configured (`locker: None`).
+    /// When no locker is configured, lock/authorization methods are effectively no-ops
+    /// and interface access is unrestricted by this crate.
+    ///
+    /// # Concurrency
+    ///
+    /// Global initialization is guarded with an [`AtomicBool`] using [`Ordering::Relaxed`].
+    /// This is sufficient when `hal_init` itself provides any required synchronization
+    /// or when initialization is performed during single-threaded startup.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HalError`] via [`HalResult`] if initialization fails (as reported by the
+    /// underlying implementation).
+    pub fn new() -> HalResult<Self> {
+        if !HAL_INIT.load(Ordering::Relaxed) {
+            unsafe { hal_init() }
+            HAL_INIT.store(true, Ordering::Relaxed);
+            Ok(Self { locker: None })
+        } else {
+            Ok(Self { locker: None })
+        }
     }
 
     /// Configures the locker with a master lock ID if it has not been previously configured.
