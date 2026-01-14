@@ -12,10 +12,32 @@ pub struct AppsManager {
 }
 
 impl AppsManager {
+    /// Creates a new `AppsManager` instance with an empty application registry.
+    ///
+    /// # Returns
+    ///
+    /// A new `AppsManager` with no registered applications.
     pub fn new() -> AppsManager {
         Self { apps: Vec::new() }
     }
 
+    /// Registers a new application with the manager.
+    ///
+    /// The application is added to the internal registry in a stopped state, ready to be
+    /// started later via [`AppsManager::start_app`]. Any existing `app_status` and `id`
+    /// values in the provided configuration are reset.
+    ///
+    /// # Parameters
+    ///
+    /// * `app` - The application configuration to register. The `app_status` will be
+    ///   set to [`AppStatus::Stopped`] and `id` will be cleared to `None`.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - If the application was successfully registered.
+    ///
+    /// * `Err(KernelError::CannotAddNewPeriodicApp)` - If the application registry is
+    ///   full (maximum of 32 applications).
     pub fn add_app(&mut self, mut app: AppConfig) -> KernelResult<()> {
         app.app_status = AppStatus::Stopped;
         app.id = None;

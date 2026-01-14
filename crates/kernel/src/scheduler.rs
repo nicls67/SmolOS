@@ -49,6 +49,22 @@ pub type App = fn() -> KernelResult<()>;
 /// - This alias helps standardize function signatures across different modules.
 pub type AppParam = fn(u32) -> KernelResult<()>;
 
+/// Represents the different ways an application can be called by the scheduler.
+///
+/// This enum allows the scheduler to handle both parameterless applications and
+/// applications that require a runtime parameter. This is useful for scenarios where
+/// multiple instances of the same application logic need to operate on different
+/// resources (e.g., blinking different LEDs identified by their HAL interface ID).
+///
+/// # Variants
+///
+/// * `AppNoParam(App)` - An application that takes no parameters. The wrapped [`App`]
+///   function pointer is called directly without arguments.
+///
+/// * `AppParam(AppParam, u32)` - An application that requires a `u32` parameter. The
+///   wrapped [`AppParam`] function pointer is called with the stored `u32` value.
+///   This variant enables a single function to be scheduled multiple times with
+///   different parameters, allowing for resource-specific behavior.
 pub enum AppCall {
     AppNoParam(App),
     AppParam(AppParam, u32),
@@ -200,6 +216,44 @@ impl Scheduler {
         Kernel::terminal().write(&ConsoleFormatting::StrNewLineBoth("Scheduler started !"))
     }
 
+    /// Registers a new periodic application with the scheduler.
+    ///
+    /// This method adds an application to the scheduler's task list, configuring it to run
+    /// at a specified interval. The application can optionally have initialization and
+    /// cleanup callbacks, as well as a finite lifetime.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` - A static string identifier for the application. Must be unique within
+    ///   the scheduler (combined with the parameter value for `AppParam` variants).
+    ///
+    /// * `app` - The application entry point, either [`AppCall::AppNoParam`] for
+    ///   parameterless apps or [`AppCall::AppParam`] for apps requiring a `u32` argument.
+    ///
+    /// * `app_init` - Optional initialization function called once before the first
+    ///   execution of the application. If initialization fails, the app is skipped
+    ///   until the next cycle and init is retried.
+    ///
+    /// * `app_closure` - Optional cleanup function called when the application's lifetime
+    ///   expires (i.e., when `ends_in` reaches zero). Useful for releasing resources.
+    ///
+    /// * `period` - The interval between consecutive executions of the application,
+    ///   expressed in milliseconds. Internally converted to scheduler cycles.
+    ///
+    /// * `ends_in` - Optional finite lifetime for the application. When specified, the
+    ///   application will be automatically removed after this duration elapses.
+    ///   If `None`, the application runs indefinitely until explicitly removed.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(u32)` - The unique identifier assigned to the newly registered application.
+    ///   This ID can be used for tracking or removing the application later.
+    ///
+    /// * `Err(KernelError::AppAlreadyScheduled)` - If an application with the same name
+    ///   (and parameter, if applicable) is already registered.
+    ///
+    /// * `Err(KernelError::CannotAddNewPeriodicApp)` - If the task list is full and
+    ///   cannot accommodate additional applications.
     pub fn add_periodic_app(
         &mut self,
         name: &'static str,
@@ -280,7 +334,43 @@ impl Scheduler {
         }
     }
 
-
+    /// Executes all due periodic tasks for the current scheduler cycle.
+    ///
+    /// This method is the core scheduling loop, typically invoked from the PendSV interrupt
+    /// handler. It iterates through all registered tasks and executes those whose period
+    /// aligns with the current cycle counter.
+    ///
+    /// # Behavior
+    ///
+    /// For each active task whose execution period has elapsed:
+    ///
+    /// 1. **Initialization**: If the task has a pending `app_init` function, it is called
+    ///    first. On success, the init function is cleared (runs only once). On failure,
+    ///    the error is handled and the task is skipped for this cycle.
+    ///
+    /// 2. **Execution**: The main application function is invoked (with or without
+    ///    parameter depending on the [`AppCall`] variant). Errors are routed through
+    ///    the kernel error handler unless an error was already flagged for this task.
+    ///
+    /// 3. **Lifetime management**: If the task has a finite lifetime (`ends_in`), the
+    ///    remaining count is decremented. When it reaches zero:
+    ///    - The `app_closure` callback is invoked (if configured) for cleanup.
+    ///    - The task is marked for removal.
+    ///
+    /// 4. **Cleanup**: All tasks marked for removal are unregistered from the scheduler.
+    ///
+    /// 5. **Cycle increment**: The global cycle counter is incremented.
+    ///
+    /// # Error handling
+    ///
+    /// Errors during task execution are passed to [`Kernel::errors().error_handler()`].
+    /// The `current_task_has_error` flag prevents duplicate error handling if the error
+    /// handler itself triggers additional errors for the same task.
+    ///
+    /// # Panics
+    ///
+    /// May panic if the internal `tasks_to_remove` buffer overflows (more than 8 tasks
+    /// ending in a single cycle) or if `remove_periodic_app` fails unexpectedly.
     pub fn periodic_task(&mut self) {
         let mut tasks_to_remove: Vec<(&'static str, Option<u32>), 8> = Vec::new();
 

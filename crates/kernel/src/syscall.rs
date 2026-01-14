@@ -167,19 +167,20 @@ pub enum SysCallSchedulerArgs<'a> {
 ///
 /// # Parameters
 /// - `args`: The scheduler operation to perform:
-///   - `AddPeriodicTask(name, app, init, period, ends_in, id_out)`
+///   - `AddPeriodicTask(name, app, init, closure, period, ends_in, id_out)`
 ///     - `name`: Task name/identifier.
-///     - `app`: The app entry/call to schedule.
-///     - `init`: Optional app instance/state to pass to the scheduler.
+///     - `app`: The app entry/call to schedule (see [`AppCall`]).
+///     - `init`: Optional initialization function called once before first execution.
+///     - `closure`: Optional cleanup function called when the task's lifetime expires.
 ///     - `period`: The periodic interval in milliseconds.
 ///     - `ends_in`: Optional duration after which the task should stop.
 ///     - `id_out`: Output parameter; on success receives the newly created task id.
 ///   - `RemovePeriodicTask(name, param)`
 ///     - `name`: Task name/identifier.
-///     - `param`: Optional task id to disambiguate/select a specific instance.
+///     - `param`: Optional parameter value to disambiguate tasks with the same name.
 ///   - `NewTaskDuration(name, param, time)`
 ///     - `name`: Task name/identifier.
-///     - `param`: Optional task id to select a specific instance.
+///     - `param`: Optional parameter value to select a specific task instance.
 ///     - `time`: New duration/limit in milliseconds.
 ///
 /// # Returns
