@@ -215,8 +215,9 @@ impl ErrorsManager {
                         let mut err_app_id = 0;
                         syscall_scheduler(crate::SysCallSchedulerArgs::AddPeriodicTask(
                             Self::LED_BLINK_APP_NAME,
-                            AppCall::AppParam(blink_err_led, id as u32, Some(reset_err_led)),
+                            AppCall::AppParam(blink_err_led, id as u32),
                             None,
+                            Some(reset_err_led),
                             Milliseconds(100),
                             Some(Milliseconds(10000)),
                             &mut err_app_id,

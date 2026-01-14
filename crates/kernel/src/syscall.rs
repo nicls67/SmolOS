@@ -151,6 +151,7 @@ pub enum SysCallSchedulerArgs<'a> {
         &'static str,
         AppCall,
         Option<App>,
+        Option<App>,
         Milliseconds,
         Option<Milliseconds>,
         &'a mut u32,
@@ -197,8 +198,8 @@ pub enum SysCallSchedulerArgs<'a> {
 /// - For `AddPeriodicTask`, writes the created task id into the provided `&mut u32`.
 pub fn syscall_scheduler(args: SysCallSchedulerArgs) -> KernelResult<()> {
     let result = match args {
-        SysCallSchedulerArgs::AddPeriodicTask(name, app, init, period, ends_in, id) => {
-            match Kernel::scheduler().add_periodic_app(name, app, init, period, ends_in) {
+        SysCallSchedulerArgs::AddPeriodicTask(name, app, init, closure, period, ends_in, id) => {
+            match Kernel::scheduler().add_periodic_app(name, app, init, closure, period, ends_in) {
                 Ok(new_id) => {
                     *id = new_id;
                     Ok(())

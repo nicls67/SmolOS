@@ -86,12 +86,11 @@ impl AppConfig {
             let app_id = Kernel::scheduler().add_periodic_app(
                 self.name,
                 match self.app_fn {
-                    CallMethod::Call(app) => AppCall::AppNoParam(app, self.end_fn),
-                    CallMethod::CallWithParam(app, param) => {
-                        AppCall::AppParam(app, param, self.end_fn)
-                    }
+                    CallMethod::Call(app) => AppCall::AppNoParam(app),
+                    CallMethod::CallWithParam(app, param) => AppCall::AppParam(app, param),
                 },
                 self.init_fn,
+                self.end_fn,
                 period,
                 ends_in,
             )?;
@@ -106,7 +105,6 @@ impl AppConfig {
             Err(KernelError::AppAlreadyScheduled(self.name))
         }
     }
-
 
     /// Stops (unschedules) this app if it is currently running.
     ///
