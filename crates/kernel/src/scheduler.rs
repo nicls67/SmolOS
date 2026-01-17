@@ -169,11 +169,11 @@ impl Scheduler {
     /// - `current_task_has_error`: Set to `false`, indicating no task errors have been encountered.
     ///
     /// Use this constructor to create a new instance of the `Scheduler` and begin adding tasks or configuring it based on specified requirements.
-    pub fn new(period: Milliseconds) -> Scheduler {
+    pub fn new(p_period: Milliseconds) -> Scheduler {
         Scheduler {
             tasks: Vec::new(),
             cycle_counter: 0,
-            sched_period: period,
+            sched_period: p_period,
             started: false,
             current_task_id: None,
             current_task_has_error: false,
@@ -203,13 +203,13 @@ impl Scheduler {
     /// interrupt to its lowest value (0xFF), and initializes periodic interrupts by setting the scheduler ticks target.
     /// The unsafe block must ensure safe interaction with shared hardware resources to avoid undefined behavior.
     ///
-    pub fn start(&mut self, systick_period: Milliseconds) -> KernelResult<()> {
-        let cortex_p = Kernel::cortex_peripherals();
+    pub fn start(&mut self, p_systick_period: Milliseconds) -> KernelResult<()> {
+        let l_cortex_p = Kernel::cortex_peripherals();
 
         // Initialize scheduler periodic IT
         unsafe {
-            cortex_p.SCB.set_priority(SystemHandler::PendSV, 0xFF);
-            set_ticks_target(self.sched_period.to_u32() / systick_period.to_u32())
+            l_cortex_p.SCB.set_priority(SystemHandler::PendSV, 0xFF);
+            set_ticks_target(self.sched_period.to_u32() / p_systick_period.to_u32())
         }
 
         self.started = true;
@@ -256,21 +256,21 @@ impl Scheduler {
     ///   cannot accommodate additional applications.
     pub fn add_periodic_app(
         &mut self,
-        name: &'static str,
-        app: AppCall,
-        app_init: Option<App>,
-        app_closure: Option<App>,
-        period: Milliseconds,
-        ends_in: Option<Milliseconds>,
+        p_name: &'static str,
+        p_app: AppCall,
+        p_app_init: Option<App>,
+        p_app_closure: Option<App>,
+        p_period: Milliseconds,
+        p_ends_in: Option<Milliseconds>,
     ) -> KernelResult<u32> {
         // Check if the app already exists
-        if (match app {
-            AppCall::AppNoParam(_) => self.app_exists(name, None),
-            AppCall::AppParam(_, p) => self.app_exists(name, Some(p)),
+        if (match p_app {
+            AppCall::AppNoParam(_) => self.app_exists(p_name, None),
+            AppCall::AppParam(_, l_p) => self.app_exists(p_name, Some(l_p)),
         })
         .is_some()
         {
-            return Err(KernelError::AppAlreadyScheduled(name));
+            return Err(KernelError::AppAlreadyScheduled(p_name));
         }
 
         // Increment app ID
@@ -279,16 +279,16 @@ impl Scheduler {
         // Register app in the scheduler
         self.tasks
             .push(AppWrapper {
-                name,
-                app,
-                app_init,
-                app_closure,
-                app_period: period.to_u32() / self.sched_period.to_u32(),
+                name: p_name,
+                app: p_app,
+                app_init: p_app_init,
+                app_closure: p_app_closure,
+                app_period: p_period.to_u32() / self.sched_period.to_u32(),
                 active: true,
-                ends_in: ends_in.map(|e| e.to_u32() / period.to_u32()),
+                ends_in: p_ends_in.map(|l_e| l_e.to_u32() / p_period.to_u32()),
                 app_id: self.next_id,
             })
-            .map_err(|_| CannotAddNewPeriodicApp(name))?;
+            .map_err(|_| CannotAddNewPeriodicApp(p_name))?;
 
         // Return ID
         Ok(self.next_id)
@@ -322,15 +322,15 @@ impl Scheduler {
     /// - If the task does not exist, no changes are made to the list.
     pub fn remove_periodic_app(
         &mut self,
-        name: &'static str,
-        param: Option<u32>,
+        p_name: &'static str,
+        p_param: Option<u32>,
     ) -> KernelResult<()> {
-        if let Some(index) = self.app_exists(name, param) {
-            Kernel::apps().stop_app(self.tasks[index].app_id)?;
-            self.tasks.swap_remove(index);
+        if let Some(l_index) = self.app_exists(p_name, p_param) {
+            Kernel::apps().stop_app(self.tasks[l_index].app_id)?;
+            self.tasks.swap_remove(l_index);
             Ok(())
         } else {
-            Err(KernelError::AppNotScheduled(name))
+            Err(KernelError::AppNotScheduled(p_name))
         }
     }
 
@@ -372,40 +372,40 @@ impl Scheduler {
     /// May panic if the internal `tasks_to_remove` buffer overflows (more than 8 tasks
     /// ending in a single cycle) or if `remove_periodic_app` fails unexpectedly.
     pub fn periodic_task(&mut self) {
-        let mut tasks_to_remove: Vec<(&'static str, Option<u32>), 8> = Vec::new();
+        let mut l_tasks_to_remove: Vec<(&'static str, Option<u32>), 8> = Vec::new();
 
         // Run all tasks
-        for (id, task) in self.tasks.iter_mut().enumerate() {
-            if self.cycle_counter.is_multiple_of(task.app_period) && task.active {
-                self.current_task_id = Some(id);
+        for (l_id, l_task) in self.tasks.iter_mut().enumerate() {
+            if self.cycle_counter.is_multiple_of(l_task.app_period) && l_task.active {
+                self.current_task_id = Some(l_id);
                 self.current_task_has_error = false;
 
                 // Try to initialize the app at the first call
-                if let Some(init_func) = task.app_init {
-                    match init_func() {
-                        Ok(..) => task.app_init = None,
-                        Err(e) => {
-                            Kernel::errors().error_handler(&e);
+                if let Some(l_init_func) = l_task.app_init {
+                    match l_init_func() {
+                        Ok(..) => l_task.app_init = None,
+                        Err(l_e) => {
+                            Kernel::errors().error_handler(&l_e);
                             continue;
                         }
                     }
                 }
 
                 // Execute the task
-                match task.app {
-                    AppCall::AppNoParam(app) => match app() {
+                match l_task.app {
+                    AppCall::AppNoParam(l_app) => match l_app() {
                         Ok(..) => {}
-                        Err(e) => {
+                        Err(l_e) => {
                             if !self.current_task_has_error {
-                                Kernel::errors().error_handler(&e);
+                                Kernel::errors().error_handler(&l_e);
                             }
                         }
                     },
-                    AppCall::AppParam(app, param) => match app(param) {
+                    AppCall::AppParam(l_app, l_param) => match l_app(l_param) {
                         Ok(..) => {}
-                        Err(e) => {
+                        Err(l_e) => {
                             if !self.current_task_has_error {
-                                Kernel::errors().error_handler(&e);
+                                Kernel::errors().error_handler(&l_e);
                             }
                         }
                     },
@@ -414,25 +414,25 @@ impl Scheduler {
                 self.current_task_id = None;
 
                 // Check if the task has ended
-                if task.ends_in.is_some() {
-                    task.ends_in = task.ends_in.map(|e| e - 1);
-                    if task.ends_in.unwrap() == 0 {
-                        match task.app {
+                if l_task.ends_in.is_some() {
+                    l_task.ends_in = l_task.ends_in.map(|l_e| l_e - 1);
+                    if l_task.ends_in.unwrap() == 0 {
+                        match l_task.app {
                             AppCall::AppNoParam(_) => {
-                                tasks_to_remove.push((task.name, None)).unwrap();
+                                l_tasks_to_remove.push((l_task.name, None)).unwrap();
                             }
-                            AppCall::AppParam(_, p) => {
-                                tasks_to_remove.push((task.name, Some(p))).unwrap();
+                            AppCall::AppParam(_, l_p) => {
+                                l_tasks_to_remove.push((l_task.name, Some(l_p))).unwrap();
                             }
                         };
 
                         // Apply closure
-                        if let Some(c) = task.app_closure {
-                            match c() {
+                        if let Some(l_c) = l_task.app_closure {
+                            match l_c() {
                                 Ok(..) => {}
-                                Err(e) => {
+                                Err(l_e) => {
                                     if !self.current_task_has_error {
-                                        Kernel::errors().error_handler(&e);
+                                        Kernel::errors().error_handler(&l_e);
                                     }
                                 }
                             }
@@ -443,8 +443,8 @@ impl Scheduler {
         }
 
         // Remove tasks that have ended
-        for (task_name, param) in tasks_to_remove {
-            self.remove_periodic_app(task_name, param).unwrap();
+        for (l_task_name, l_param) in l_tasks_to_remove {
+            self.remove_periodic_app(l_task_name, l_param).unwrap();
         }
 
         // Increment cycle counter
@@ -474,8 +474,8 @@ impl Scheduler {
     pub fn abort_task_on_error(&mut self) {
         if SCB::vect_active() == VectActive::Exception(Exception::PendSV) {
             // Set the current task as inactive
-            if let Some(id) = self.current_task_id {
-                self.tasks[id].active = false;
+            if let Some(l_id) = self.current_task_id {
+                self.tasks[l_id].active = false;
                 self.current_task_has_error = true;
             }
         }
@@ -506,19 +506,19 @@ impl Scheduler {
     /// * If a `param` is provided, both the name and parameter must match for the index to be returned.
     /// * If no `param` is provided, only the name needs to match for the index to be returned.
     ///
-    pub fn app_exists(&self, name: &str, param: Option<u32>) -> Option<usize> {
-        for (index, task) in self.tasks.iter().enumerate() {
-            if task.name == name {
-                if let AppCall::AppParam(_, app_param) = task.app {
-                    if let Some(p) = param {
-                        if p == app_param {
-                            return Some(index);
+    pub fn app_exists(&self, p_name: &str, p_param: Option<u32>) -> Option<usize> {
+        for (l_index, l_task) in self.tasks.iter().enumerate() {
+            if l_task.name == p_name {
+                if let AppCall::AppParam(_, l_app_param) = l_task.app {
+                    if let Some(l_p) = p_param {
+                        if l_p == l_app_param {
+                            return Some(l_index);
                         }
                     } else {
-                        return Some(index);
+                        return Some(l_index);
                     }
                 } else {
-                    return Some(index);
+                    return Some(l_index);
                 }
             }
         }
@@ -556,16 +556,16 @@ impl Scheduler {
     /// prevent division-related errors.
     pub fn set_new_task_duration(
         &mut self,
-        name: &'static str,
-        param: Option<u32>,
-        time: Milliseconds,
+        p_name: &'static str,
+        p_param: Option<u32>,
+        p_time: Milliseconds,
     ) -> KernelResult<()> {
-        if let Some(index) = self.app_exists(name, param) {
-            self.tasks[index].ends_in =
-                Some(time.to_u32() / self.sched_period.to_u32() / self.tasks[index].app_period);
+        if let Some(l_index) = self.app_exists(p_name, p_param) {
+            self.tasks[l_index].ends_in =
+                Some(p_time.to_u32() / self.sched_period.to_u32() / self.tasks[l_index].app_period);
             Ok(())
         } else {
-            Err(KernelError::AppNotScheduled(name))
+            Err(KernelError::AppNotScheduled(p_name))
         }
     }
 

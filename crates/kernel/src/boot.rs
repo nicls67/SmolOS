@@ -3,7 +3,7 @@ use crate::console_output::ConsoleFormatting;
 use crate::data::Kernel;
 use crate::devices::DevicesManager;
 use crate::errors_mgt::ErrorsManager;
-use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME, KERNEL_VERSION};
+use crate::ident::{K_KERNEL_MASTER_ID, K_KERNEL_NAME, K_KERNEL_VERSION};
 use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
 use crate::{KernelTimeData, Milliseconds, init_systick};
@@ -21,54 +21,54 @@ pub struct BootConfig {
     pub display_name: Option<&'static str>,
 }
 
-pub fn boot(config: BootConfig) {
+pub fn boot(p_config: BootConfig) {
     //////////////////////////
     // Kernel initialization
     //////////////////////////
-    let sched = Scheduler::new(config.sched_period);
+    let l_sched = Scheduler::new(p_config.sched_period);
     Kernel::init_kernel_data(
-        config.hal,
-        Display::new(KERNEL_MASTER_ID),
-        config.kernel_time_data.clone(),
-        Terminal::new(config.system_terminal).unwrap(),
-        sched,
+        p_config.hal,
+        Display::new(K_KERNEL_MASTER_ID),
+        p_config.kernel_time_data.clone(),
+        Terminal::new(p_config.system_terminal).unwrap(),
+        l_sched,
         ErrorsManager::new(),
         AppsManager::new(),
         DevicesManager::new(),
     );
-    Kernel::hal().configure_locker(KERNEL_MASTER_ID).unwrap();
+    Kernel::hal().configure_locker(K_KERNEL_MASTER_ID).unwrap();
 
     ////////////////////////////////////
     // Errors Manager initialization
     ////////////////////////////////////
-    Kernel::errors().init(config.err_led_name).unwrap();
+    Kernel::errors().init(p_config.err_led_name).unwrap();
 
     //////////////////////////
     // Display initialization
     //////////////////////////
     Kernel::display()
-        .init(config.display_name.unwrap(), Kernel::hal(), Colors::Black)
+        .init(p_config.display_name.unwrap(), Kernel::hal(), Colors::Black)
         .unwrap();
     Kernel::display().set_font(Font24).unwrap();
 
     ////////////////////////////
     // Terminal start
     ////////////////////////////
-    let terminal = Kernel::terminal();
-    terminal.set_display_mode().unwrap();
-    terminal.set_display_mirror(true).unwrap();
-    terminal.write(&ConsoleFormatting::Clear).unwrap();
-    terminal
+    let l_terminal = Kernel::terminal();
+    l_terminal.set_display_mode().unwrap();
+    l_terminal.set_display_mirror(true).unwrap();
+    l_terminal.write(&ConsoleFormatting::Clear).unwrap();
+    l_terminal
         .write(&ConsoleFormatting::StrNewLineAfter("Booting..."))
         .unwrap();
-    terminal
+    l_terminal
         .write(&ConsoleFormatting::StrNewLineAfter(
-            format!(30; "{} version {}", KERNEL_NAME, KERNEL_VERSION)
+            format!(30; "{} version {}", K_KERNEL_NAME, K_KERNEL_VERSION)
                 .unwrap()
                 .as_str(),
         ))
         .unwrap();
-    terminal
+    l_terminal
         .write(&ConsoleFormatting::StrNewLineAfter(
             format!(30; "Core frequency is {} MHz", Kernel::time_data().core_frequency.to_u32() / 1_000_000)
                 .unwrap()
@@ -79,11 +79,11 @@ pub fn boot(config: BootConfig) {
     ////////////////////////////////////
     // Systick initialization
     ////////////////////////////////////
-    init_systick(Some(config.kernel_time_data.systick_period));
+    init_systick(Some(p_config.kernel_time_data.systick_period));
 
     //Boot completed
-    terminal.set_color(Colors::Green).unwrap();
-    terminal
+    l_terminal.set_color(Colors::Green).unwrap();
+    l_terminal
         .write(&ConsoleFormatting::StrNewLineBoth("Kernel ready !"))
         .unwrap();
 
@@ -93,6 +93,6 @@ pub fn boot(config: BootConfig) {
         .unwrap();
 
     // Set terminal in prompt mode
-    terminal.set_display_mirror(false).unwrap();
-    terminal.set_prompt_mode().unwrap();
+    l_terminal.set_display_mirror(false).unwrap();
+    l_terminal.set_prompt_mode().unwrap();
 }

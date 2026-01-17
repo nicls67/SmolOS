@@ -43,37 +43,37 @@ pub enum SysCallHalActions<'a> {
 ///   [`InterfaceReadResult`] via the mutable reference parameter.
 /// - For [`SysCallHalActions::GetID`], writes the resolved interface id into the provided `usize`.
 pub fn syscall_hal(
-    interface_id: usize,
-    action: SysCallHalActions,
-    caller_id: u32,
+    p_interface_id: usize,
+    p_action: SysCallHalActions,
+    p_caller_id: u32,
 ) -> KernelResult<()> {
-    let result = match action {
-        SysCallHalActions::Write(act) => Kernel::hal()
-            .interface_write(interface_id, caller_id, act)
+    let l_result = match p_action {
+        SysCallHalActions::Write(l_act) => Kernel::hal()
+            .interface_write(p_interface_id, p_caller_id, l_act)
             .map_err(KernelError::HalError),
-        SysCallHalActions::Read(act, res) => {
-            *res = Kernel::hal()
-                .interface_read(interface_id, caller_id, act)
+        SysCallHalActions::Read(l_act, l_res) => {
+            *l_res = Kernel::hal()
+                .interface_read(p_interface_id, p_caller_id, l_act)
                 .map_err(KernelError::HalError)?;
             Ok(())
         }
-        SysCallHalActions::GetID(name, id) => match Kernel::hal().get_interface_id(name) {
-            Ok(hal_id) => {
-                *id = hal_id;
+        SysCallHalActions::GetID(l_name, l_id) => match Kernel::hal().get_interface_id(l_name) {
+            Ok(l_hal_id) => {
+                *l_id = l_hal_id;
                 Ok(())
             }
-            Err(e) => Err(KernelError::HalError(e)),
+            Err(l_e) => Err(KernelError::HalError(l_e)),
         },
-        SysCallHalActions::ConfigureCallback(callback) => Kernel::hal()
-            .configure_callback(interface_id, caller_id, callback)
+        SysCallHalActions::ConfigureCallback(l_callback) => Kernel::hal()
+            .configure_callback(p_interface_id, p_caller_id, l_callback)
             .map_err(KernelError::HalError),
     };
 
-    match result {
+    match l_result {
         Ok(..) => Ok(()),
-        Err(err) => {
-            Kernel::errors().error_handler(&err);
-            Err(err)
+        Err(l_err) => {
+            Kernel::errors().error_handler(&l_err);
+            Err(l_err)
         }
     }
 }
@@ -112,36 +112,36 @@ pub enum SysCallDisplayArgs<'a> {
 ///
 /// # Side effects
 /// - Writes to the display framebuffer/hardware through `Kernel::display()`.
-pub fn syscall_display(args: SysCallDisplayArgs, caller_id: u32) -> KernelResult<()> {
+pub fn syscall_display(p_args: SysCallDisplayArgs, p_caller_id: u32) -> KernelResult<()> {
     // Check for device authorization
-    Kernel::devices().authorize(DeviceType::Display, caller_id)?;
+    Kernel::devices().authorize(DeviceType::Display, p_caller_id)?;
 
-    let result = match args {
-        SysCallDisplayArgs::Clear(color) => Kernel::display().clear(color),
-        SysCallDisplayArgs::SetColor(color) => Kernel::display().set_color(color),
-        SysCallDisplayArgs::SetFont(font) => Kernel::display().set_font(font),
-        SysCallDisplayArgs::SetCursorPos(x, y) => Kernel::display().set_cursor_pos(x, y),
-        SysCallDisplayArgs::WriteCharAtCursor(c, color) => {
-            Kernel::display().draw_char_at_cursor(c as u8, color)
+    let l_result = match p_args {
+        SysCallDisplayArgs::Clear(l_color) => Kernel::display().clear(l_color),
+        SysCallDisplayArgs::SetColor(l_color) => Kernel::display().set_color(l_color),
+        SysCallDisplayArgs::SetFont(l_font) => Kernel::display().set_font(l_font),
+        SysCallDisplayArgs::SetCursorPos(l_x, l_y) => Kernel::display().set_cursor_pos(l_x, l_y),
+        SysCallDisplayArgs::WriteCharAtCursor(l_c, l_color) => {
+            Kernel::display().draw_char_at_cursor(l_c as u8, l_color)
         }
 
-        SysCallDisplayArgs::WriteChar(c, x, y, color) => {
-            Kernel::display().draw_char(c as u8, x, y, color)
+        SysCallDisplayArgs::WriteChar(l_c, l_x, l_y, l_color) => {
+            Kernel::display().draw_char(l_c as u8, l_x, l_y, l_color)
         }
-        SysCallDisplayArgs::WriteStrAtCursor(str, color) => {
-            Kernel::display().draw_string_at_cursor(str, color)
+        SysCallDisplayArgs::WriteStrAtCursor(l_str, l_color) => {
+            Kernel::display().draw_string_at_cursor(l_str, l_color)
         }
-        SysCallDisplayArgs::WriteStr(str, x, y, color) => {
-            Kernel::display().draw_string(str, x, y, color)
+        SysCallDisplayArgs::WriteStr(l_str, l_x, l_y, l_color) => {
+            Kernel::display().draw_string(l_str, l_x, l_y, l_color)
         }
     }
     .map_err(KernelError::DisplayError);
 
-    match result {
+    match l_result {
         Ok(..) => Ok(()),
-        Err(err) => {
-            Kernel::errors().error_handler(&err);
-            Err(err)
+        Err(l_err) => {
+            Kernel::errors().error_handler(&l_err);
+            Err(l_err)
         }
     }
 }
@@ -197,30 +197,40 @@ pub enum SysCallSchedulerArgs<'a> {
 ///
 /// # Side effects
 /// - For `AddPeriodicTask`, writes the created task id into the provided `&mut u32`.
-pub fn syscall_scheduler(args: SysCallSchedulerArgs) -> KernelResult<()> {
-    let result = match args {
-        SysCallSchedulerArgs::AddPeriodicTask(name, app, init, closure, period, ends_in, id) => {
-            match Kernel::scheduler().add_periodic_app(name, app, init, closure, period, ends_in) {
-                Ok(new_id) => {
-                    *id = new_id;
+pub fn syscall_scheduler(p_args: SysCallSchedulerArgs) -> KernelResult<()> {
+    let l_result = match p_args {
+        SysCallSchedulerArgs::AddPeriodicTask(
+            l_name,
+            l_app,
+            l_init,
+            l_closure,
+            l_period,
+            l_ends_in,
+            l_id,
+        ) => {
+            match Kernel::scheduler()
+                .add_periodic_app(l_name, l_app, l_init, l_closure, l_period, l_ends_in)
+            {
+                Ok(l_new_id) => {
+                    *l_id = l_new_id;
                     Ok(())
                 }
-                Err(e) => Err(e),
+                Err(l_e) => Err(l_e),
             }
         }
-        SysCallSchedulerArgs::RemovePeriodicTask(name, param) => {
-            Kernel::scheduler().remove_periodic_app(name, param)
+        SysCallSchedulerArgs::RemovePeriodicTask(l_name, l_param) => {
+            Kernel::scheduler().remove_periodic_app(l_name, l_param)
         }
-        SysCallSchedulerArgs::NewTaskDuration(name, param, time) => {
-            Kernel::scheduler().set_new_task_duration(name, param, time)
+        SysCallSchedulerArgs::NewTaskDuration(l_name, l_param, l_time) => {
+            Kernel::scheduler().set_new_task_duration(l_name, l_param, l_time)
         }
     };
 
-    match result {
+    match l_result {
         Ok(..) => Ok(()),
-        Err(err) => {
-            Kernel::errors().error_handler(&err);
-            Err(err)
+        Err(l_err) => {
+            Kernel::errors().error_handler(&l_err);
+            Err(l_err)
         }
     }
 }
@@ -246,15 +256,15 @@ pub fn syscall_scheduler(args: SysCallSchedulerArgs) -> KernelResult<()> {
 ///
 /// # Side effects
 /// - Writes to the terminal output device.
-pub fn syscall_terminal(formatting: ConsoleFormatting, caller_id: u32) -> KernelResult<()> {
+pub fn syscall_terminal(p_formatting: ConsoleFormatting, p_caller_id: u32) -> KernelResult<()> {
     // Check for device authorization
-    Kernel::devices().authorize(DeviceType::Terminal, caller_id)?;
+    Kernel::devices().authorize(DeviceType::Terminal, p_caller_id)?;
 
-    match Kernel::terminal().write(&formatting) {
+    match Kernel::terminal().write(&p_formatting) {
         Ok(..) => Ok(()),
-        Err(err) => {
-            Kernel::errors().error_handler(&err);
-            Err(err)
+        Err(l_err) => {
+            Kernel::errors().error_handler(&l_err);
+            Err(l_err)
         }
     }
 }
@@ -293,24 +303,24 @@ pub enum SysCallDevicesArgs<'a> {
 /// # Side effects
 /// - For `GetState`, writes the locked/unlocked state into the provided `&mut bool`.
 pub fn syscall_devices(
-    device_type: DeviceType,
-    args: SysCallDevicesArgs,
-    caller_id: u32,
+    p_device_type: DeviceType,
+    p_args: SysCallDevicesArgs,
+    p_caller_id: u32,
 ) -> KernelResult<()> {
-    let result = match args {
-        SysCallDevicesArgs::Lock => Kernel::devices().lock(device_type, caller_id),
-        SysCallDevicesArgs::Unlock => Kernel::devices().unlock(device_type, caller_id),
-        SysCallDevicesArgs::GetState(state) => {
-            *state = Kernel::devices().is_locked(device_type)?;
+    let l_result = match p_args {
+        SysCallDevicesArgs::Lock => Kernel::devices().lock(p_device_type, p_caller_id),
+        SysCallDevicesArgs::Unlock => Kernel::devices().unlock(p_device_type, p_caller_id),
+        SysCallDevicesArgs::GetState(l_state) => {
+            *l_state = Kernel::devices().is_locked(p_device_type)?;
             Ok(())
         }
     };
 
-    match result {
+    match l_result {
         Ok(..) => Ok(()),
-        Err(err) => {
-            Kernel::errors().error_handler(&err);
-            Err(err)
+        Err(l_err) => {
+            Kernel::errors().error_handler(&l_err);
+            Err(l_err)
         }
     }
 }

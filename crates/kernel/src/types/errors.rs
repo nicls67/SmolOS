@@ -43,89 +43,98 @@ pub enum KernelError {
 
 impl KernelError {
     pub fn to_string(&self) -> String<256> {
-        let mut msg = String::new();
+        let mut l_msg = String::new();
         match self {
-            HalError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
-            DisplayError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
-            TerminalError(_, err) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "Error in terminal : {}", err)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            CannotAddNewPeriodicApp(name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "Cannot add periodic app {} : app vector is full", name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            AppInitError(name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "Cannot initialize app {}", name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            WrongSyscallArgs(err) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "Wrong syscall arguments : {}", err)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            AppNotScheduled(app_name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "Could not find app {} in scheduler", app_name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            AppAlreadyScheduled(app_name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "App {} already exists in scheduler", app_name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            AppNotFound => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(format!(200; "App does not exist").unwrap().as_str())
+            HalError(l_e) => l_msg.push_str(l_e.to_string().as_str()).unwrap(),
+            DisplayError(l_e) => l_msg.push_str(l_e.to_string().as_str()).unwrap(),
+            TerminalError(_, l_err) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "Error in terminal : {}", l_err)
+                            .unwrap()
+                            .as_str(),
+                    )
                     .unwrap();
             }
-            DeviceLocked(device_name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "Device {} is locked", device_name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
+            CannotAddNewPeriodicApp(l_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "Cannot add periodic app {} : app vector is full", l_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
             }
-            DeviceNotOwned(device_name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(200; "Device {} is not owned by caller", device_name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
+            AppInitError(l_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "Cannot initialize app {}", l_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            WrongSyscallArgs(l_err) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "Wrong syscall arguments : {}", l_err)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            AppNotScheduled(l_app_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "Could not find app {} in scheduler", l_app_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            AppAlreadyScheduled(l_app_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "App {} already exists in scheduler", l_app_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            AppNotFound => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(format!(200; "App does not exist").unwrap().as_str())
+                    .unwrap();
+            }
+            DeviceLocked(l_device_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "Device {} is locked", l_device_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            DeviceNotOwned(l_device_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "Device {} is not owned by caller", l_device_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
             }
         }
-        msg
+        l_msg
     }
 
     /// Returns the severity level of the kernel error.
@@ -137,17 +146,17 @@ impl KernelError {
     ///
     pub fn severity(&self) -> KernelErrorLevel {
         match self {
-            HalError(err) => match err.severity() {
+            HalError(l_err) => match l_err.severity() {
                 HalErrorLevel::Fatal => Fatal,
                 HalErrorLevel::Critical => Critical,
                 HalErrorLevel::Error => Error,
             },
-            DisplayError(err) => match err.severity() {
+            DisplayError(l_err) => match l_err.severity() {
                 DisplayErrorLevel::Fatal => Fatal,
                 DisplayErrorLevel::Critical => Critical,
                 DisplayErrorLevel::Error => Error,
             },
-            TerminalError(lvl, _) => *lvl,
+            TerminalError(l_lvl, _) => *l_lvl,
             CannotAddNewPeriodicApp(_) => Critical,
             AppInitError(_) => Critical,
             WrongSyscallArgs(_) => Error,

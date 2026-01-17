@@ -19,78 +19,78 @@ use std::path::PathBuf;
 
 fn main() {
     // Ensure we are positioned in the SmolOS workspace root directory.
-    let crate_dir =
+    let l_crate_dir =
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
-    let workspace_root = crate_dir
+    let l_workspace_root = l_crate_dir
         .parent()
         .expect("smolos crate must live two levels under the workspace root")
         .parent()
         .expect("smolos crate must live two levels under the workspace root")
         .to_path_buf();
-    env::set_current_dir(&workspace_root)
-        .unwrap_or_else(|e| panic!("failed to set current dir to {:?}: {}", workspace_root, e));
+    env::set_current_dir(&l_workspace_root)
+        .unwrap_or_else(|e| panic!("failed to set current dir to {:?}: {}", l_workspace_root, e));
 
     // Run drivers allocator generation script
-    let status = std::process::Command::new("sh")
+    let l_gen_status = std::process::Command::new("sh")
         .arg("tools/build/gen_drivers_alloc.sh")
         .status()
         .expect("failed to execute tools/build/gen_drivers_alloc.sh");
-    if !status.success() {
+    if !l_gen_status.success() {
         panic!(
             "tools/build/gen_drivers_alloc.sh failed with exit status: {}",
-            status
+            l_gen_status
         );
     }
 
     // Run CMake configure script
-    let status = std::process::Command::new("sh")
+    let l_config_status = std::process::Command::new("sh")
         .arg("tools/build/cmake_configure.sh")
         .status()
         .expect("failed to execute tools/build/cmake_configure.sh");
-    if !status.success() {
+    if !l_config_status.success() {
         panic!(
             "tools/build/cmake_configure.sh failed with exit status: {}",
-            status
+            l_config_status
         );
     }
 
     // Run libdrivers build script
-    let status = std::process::Command::new("sh")
+    let l_build_status = std::process::Command::new("sh")
         .arg("tools/build/cmake_build.sh")
         .status()
         .expect("failed to execute tools/build/build_libdrivers.sh");
-    if !status.success() {
+    if !l_build_status.success() {
         panic!(
             "tools/build/build_libdrivers.sh failed with exit status: {}",
-            status
+            l_build_status
         );
     }
 
     // ---- Ensure the linker can find memory.x ----
-    let memory_x_src = workspace_root.join("config").join("memory.x");
-    if !memory_x_src.exists() {
+    let l_memory_x_src = l_workspace_root.join("config").join("memory.x");
+    if !l_memory_x_src.exists() {
         panic!(
             "Expected linker memory script at {:?}. \
              Make sure `memory.x` exists in config folder.",
-            memory_x_src
+            l_memory_x_src
         );
     }
 
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR not set"));
-    let memory_x_dst = out_dir.join("memory.x");
+    let l_out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR not set"));
+    let l_memory_x_dst = l_out_dir.join("memory.x");
 
-    fs::copy(&memory_x_src, &memory_x_dst).unwrap_or_else(|e| {
+    fs::copy(&l_memory_x_src, &l_memory_x_dst).unwrap_or_else(|e| {
         panic!(
             "Failed to copy {:?} to {:?}: {}",
-            memory_x_src, memory_x_dst, e
+            l_memory_x_src, l_memory_x_dst, e
         )
     });
 
     // Add OUT_DIR to the linker search path so `link.x` can include `memory.x`.
-    println!("cargo:rustc-link-search={}", out_dir.display());
+    println!("cargo:rustc-link-search={}", l_out_dir.display());
 
     // Re-run when the memory layout changes.
-    println!("cargo:rerun-if-changed={}", memory_x_src.display());
+    println!("cargo:rerun-if-changed={}", l_memory_x_src.display());
 
     // ---- Linker arguments required for cortex-m-rt embedded targets ----
     // `--nmagic` is required when memory regions are not aligned to 0x10000.
@@ -102,10 +102,13 @@ fn main() {
     // ---- Link the native drivers static library (built elsewhere) ----
     // The library is expected at: workspace_root/drivers/build/Release/libdrivers.a
     // We add the directory to the native link search path and link `-ldrivers`.
-    let drivers_lib_dir = workspace_root.join("drivers").join("build").join("Release");
+    let l_drivers_lib_dir = l_workspace_root
+        .join("drivers")
+        .join("build")
+        .join("Release");
     println!(
         "cargo:rustc-link-search=native={}",
-        drivers_lib_dir.display()
+        l_drivers_lib_dir.display()
     );
     println!("cargo:rustc-link-lib=static=drivers");
 }

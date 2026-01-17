@@ -15,7 +15,7 @@ use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use crate::console_output::ConsoleFormatting;
 use crate::console_output::ConsoleFormatting::StrNewLineBoth;
 use crate::data::Kernel;
-use crate::ident::{KERNEL_MASTER_ID, KERNEL_NAME};
+use crate::ident::{K_KERNEL_MASTER_ID, K_KERNEL_NAME};
 use crate::scheduler::AppCall;
 use crate::{
     KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalActions, syscall_devices,
@@ -38,8 +38,8 @@ use hal_interface::{GpioWriteAction, InterfaceWriteActions};
 /// # Errors
 /// - No recoverable errors are returned. Printing is best-effort via semihosting.
 #[exception]
-unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
-    hprintln!("{:#?}", ef);
+unsafe fn HardFault(p_exception_frame: &ExceptionFrame) -> ! {
+    hprintln!("{:#?}", p_exception_frame);
 
     #[allow(clippy::empty_loop)]
     loop {}
@@ -58,10 +58,10 @@ unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
 /// # Errors
 /// - No recoverable errors are returned. Output is best-effort via semihosting.
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(p_info: &PanicInfo) -> ! {
     // Print the panic message
-    hprintln!("{} has panicked !!!!!", KERNEL_NAME);
-    hprintln!("{}", info);
+    hprintln!("{} has panicked !!!!!", K_KERNEL_NAME);
+    hprintln!("{}", p_info);
     hprintln!("\r\nSystem will reboot in 5 seconds...");
 
     // Wait for 3 seconds
@@ -84,7 +84,7 @@ pub struct ErrorsManager {
 
 impl ErrorsManager {
     /// Name of the periodic scheduler task used to blink the error LED.
-    const LED_BLINK_APP_NAME: &'static str = "ERR_LED_BLINK";
+    const K_LED_BLINK_APP_NAME: &'static str = "ERR_LED_BLINK";
 
     /// Create a new `ErrorsManager` with no configured LED and no recorded errors.
     ///
@@ -119,18 +119,22 @@ impl ErrorsManager {
     ///
     /// # Errors
     /// - Propagates errors from `syscall_hal` (ID lookup / write) and `syscall_devices` (lock).
-    pub fn init(&mut self, err_led_name: Option<&'static str>) -> KernelResult<()> {
-        if let Some(name) = err_led_name {
+    pub fn init(&mut self, p_err_led_name: Option<&'static str>) -> KernelResult<()> {
+        if let Some(l_name) = p_err_led_name {
             // Get LED interface ID from HAL
-            let mut id = 0;
-            syscall_hal(0, SysCallHalActions::GetID(name, &mut id), KERNEL_MASTER_ID)?;
-            self.err_led_id = Some(id);
+            let mut l_id = 0;
+            syscall_hal(
+                0,
+                SysCallHalActions::GetID(l_name, &mut l_id),
+                K_KERNEL_MASTER_ID,
+            )?;
+            self.err_led_id = Some(l_id);
 
             // Get a lock on the error LED
             syscall_devices(
                 crate::DeviceType::Peripheral(self.err_led_id.unwrap()),
                 crate::SysCallDevicesArgs::Lock,
-                KERNEL_MASTER_ID,
+                K_KERNEL_MASTER_ID,
             )?;
         }
 
@@ -149,16 +153,16 @@ impl ErrorsManager {
     ///
     /// # Errors
     /// - Propagates errors from `syscall_hal` when writing to the GPIO interface.
-    fn set_err_led(&mut self, state: bool) -> KernelResult<()> {
-        if let Some(id) = self.err_led_id {
+    fn set_err_led(&mut self, p_state: bool) -> KernelResult<()> {
+        if let Some(l_id) = self.err_led_id {
             syscall_hal(
-                id,
-                SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(if state {
+                l_id,
+                SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(if p_state {
                     GpioWriteAction::Set
                 } else {
                     GpioWriteAction::Clear
                 })),
-                KERNEL_MASTER_ID,
+                K_KERNEL_MASTER_ID,
             )?;
         }
         Ok(())
@@ -182,12 +186,12 @@ impl ErrorsManager {
     /// # Errors
     /// - Internal operations (LED writes, scheduler calls, terminal writes) are best-effort and
     ///   largely ignored via `unwrap_or(())` to avoid recursive failure while handling an error.
-    pub fn error_handler(&mut self, err: &KernelError) {
-        match err.severity() {
+    pub fn error_handler(&mut self, p_err: &KernelError) {
+        match p_err.severity() {
             Fatal => {
                 self.set_err_led(true).unwrap_or(());
                 self.has_error = Some(Fatal);
-                panic!("{}", err.to_string())
+                panic!("{}", p_err.to_string())
             }
             Critical => {
                 self.set_err_led(true).unwrap_or(());
@@ -197,7 +201,7 @@ impl ErrorsManager {
                 Kernel::terminal().set_display_mirror(true).unwrap();
                 Kernel::terminal().set_color(Colors::Magenta).unwrap();
                 Kernel::terminal()
-                    .write(&StrNewLineBoth(err.to_string().as_str()))
+                    .write(&StrNewLineBoth(p_err.to_string().as_str()))
                     .unwrap_or(());
                 Kernel::scheduler().abort_task_on_error();
                 Kernel::terminal().set_display_mirror(false).unwrap();
@@ -207,26 +211,29 @@ impl ErrorsManager {
                     self.has_error = Some(Error);
                 }
 
-                if let Some(id) = self.err_led_id {
+                if let Some(l_id) = self.err_led_id {
                     if Kernel::scheduler()
-                        .app_exists(Self::LED_BLINK_APP_NAME, self.err_led_id.map(|x| x as u32))
+                        .app_exists(
+                            Self::K_LED_BLINK_APP_NAME,
+                            self.err_led_id.map(|l_err_led_id| l_err_led_id as u32),
+                        )
                         .is_none()
                     {
-                        let mut err_app_id = 0;
+                        let mut l_err_app_id = 0;
                         syscall_scheduler(crate::SysCallSchedulerArgs::AddPeriodicTask(
-                            Self::LED_BLINK_APP_NAME,
-                            AppCall::AppParam(blink_err_led, id as u32),
+                            Self::K_LED_BLINK_APP_NAME,
+                            AppCall::AppParam(blink_err_led, l_id as u32),
                             None,
                             Some(reset_err_led),
                             Milliseconds(100),
                             Some(Milliseconds(10000)),
-                            &mut err_app_id,
+                            &mut l_err_app_id,
                         ))
                         .unwrap_or(());
                     } else {
                         syscall_scheduler(crate::SysCallSchedulerArgs::NewTaskDuration(
-                            Self::LED_BLINK_APP_NAME,
-                            Some(id as u32),
+                            Self::K_LED_BLINK_APP_NAME,
+                            Some(l_id as u32),
                             Milliseconds(10000),
                         ))
                         .unwrap_or(())
@@ -236,7 +243,7 @@ impl ErrorsManager {
                 Kernel::terminal().write(&ConsoleFormatting::Clear).unwrap();
                 Kernel::terminal().set_color(Colors::Red).unwrap();
                 Kernel::terminal()
-                    .write(&StrNewLineBoth(err.to_string().as_str()))
+                    .write(&StrNewLineBoth(p_err.to_string().as_str()))
                     .unwrap_or(())
             }
         }
@@ -257,8 +264,8 @@ impl ErrorsManager {
     /// # Errors
     /// - Propagates errors from `set_err_led` / underlying HAL writes.
     pub(in crate::errors_mgt) fn reset_err_led(&mut self) -> KernelResult<()> {
-        if let Some(err_lvl) = self.has_error {
-            match err_lvl {
+        if let Some(l_err_lvl) = self.has_error {
+            match l_err_lvl {
                 Error => self.set_err_led(false),
                 Critical | Fatal => self.set_err_led(true),
             }
@@ -281,11 +288,11 @@ impl ErrorsManager {
 ///
 /// # Errors
 /// - Propagates errors from `syscall_hal` when toggling the GPIO.
-fn blink_err_led(id: u32) -> KernelResult<()> {
+fn blink_err_led(p_id: u32) -> KernelResult<()> {
     syscall_hal(
-        id as usize,
+        p_id as usize,
         SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(GpioWriteAction::Toggle)),
-        KERNEL_MASTER_ID,
+        K_KERNEL_MASTER_ID,
     )
 }
 

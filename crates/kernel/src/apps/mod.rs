@@ -5,10 +5,10 @@ mod app_config;
 
 pub use self::app_config::{AppConfig, AppStatus, CallMethod, CallPeriodicity};
 
-const MAX_APPS: usize = 32;
+const K_MAX_APPS: usize = 32;
 
 pub struct AppsManager {
-    apps: Vec<AppConfig, MAX_APPS>,
+    apps: Vec<AppConfig, K_MAX_APPS>,
 }
 
 impl AppsManager {
@@ -38,13 +38,13 @@ impl AppsManager {
     ///
     /// * `Err(KernelError::CannotAddNewPeriodicApp)` - If the application registry is
     ///   full (maximum of 32 applications).
-    pub fn add_app(&mut self, mut app: AppConfig) -> KernelResult<()> {
-        app.app_status = AppStatus::Stopped;
-        app.id = None;
+    pub fn add_app(&mut self, mut p_app: AppConfig) -> KernelResult<()> {
+        p_app.app_status = AppStatus::Stopped;
+        p_app.id = None;
 
-        match self.apps.push(app) {
+        match self.apps.push(p_app) {
             Ok(_) => Ok(()),
-            Err(_) => Err(crate::KernelError::CannotAddNewPeriodicApp(app.name)),
+            Err(_) => Err(crate::KernelError::CannotAddNewPeriodicApp(p_app.name)),
         }
     }
 
@@ -62,10 +62,10 @@ impl AppsManager {
     /// # Errors
     /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `app_name`,
     /// or propagates any error returned by [`AppConfig::start`].
-    pub fn start_app(&mut self, app_name: &str) -> KernelResult<u32> {
+    pub fn start_app(&mut self, p_app_name: &str) -> KernelResult<u32> {
         self.apps
             .iter_mut()
-            .find(|app| app.name == app_name)
+            .find(|l_app| l_app.name == p_app_name)
             .ok_or(crate::KernelError::AppNotFound)?
             .start()
     }
@@ -84,10 +84,10 @@ impl AppsManager {
     /// # Errors
     /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `app_id`,
     /// or propagates any error returned by [`AppConfig::stop`].
-    pub fn stop_app(&mut self, app_id: u32) -> KernelResult<()> {
+    pub fn stop_app(&mut self, p_app_id: u32) -> KernelResult<()> {
         self.apps
             .iter_mut()
-            .find(|app| app.id == Some(app_id))
+            .find(|l_app| l_app.id == Some(p_app_id))
             .ok_or(crate::KernelError::AppNotFound)?
             .stop()
     }

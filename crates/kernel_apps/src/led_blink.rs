@@ -6,13 +6,13 @@ use kernel::{
 };
 
 /// Name of the GPIO interface used as the activity LED.
-const LED_NAME: &str = "ACT_LED";
+const K_LED_NAME: &str = "ACT_LED";
 
 /// App/owner identifier used when locking and writing to the LED interface.
-static LED_APP_ID: AtomicU32 = AtomicU32::new(0);
+static G_LED_APP_ID: AtomicU32 = AtomicU32::new(0);
 
 /// Cached interface ID for the LED GPIO, resolved during [`init_led_blink`].
-static LED_ID: AtomicUsize = AtomicUsize::new(0);
+static G_LED_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// Toggle the LED state once.
 ///
@@ -21,11 +21,11 @@ static LED_ID: AtomicUsize = AtomicUsize::new(0);
 /// interface not locked for this app, or device unavailable).
 pub fn led_blink() -> KernelResult<()> {
     syscall_hal(
-        LED_ID.load(Ordering::Relaxed),
+        G_LED_ID.load(Ordering::Relaxed),
         SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(
             hal_interface::GpioWriteAction::Toggle,
         )),
-        LED_APP_ID.load(Ordering::Relaxed),
+        G_LED_APP_ID.load(Ordering::Relaxed),
     )?;
 
     Ok(())
@@ -34,28 +34,28 @@ pub fn led_blink() -> KernelResult<()> {
 /// Initialize LED blinking support by resolving the interface ID and locking it.
 ///
 /// This function:
-/// 1) Queries the HAL for the interface ID corresponding to [`LED_NAME`]
+/// 1) Queries the HAL for the interface ID corresponding to [`K_LED_NAME`]
 /// 2) Stores the ID for later use by [`led_blink`]
-/// 3) Attempts to lock the device for the current [`LED_APP_ID`]
+/// 3) Attempts to lock the device for the current [`G_LED_APP_ID`]
 ///
 /// # Errors
 /// Returns an error if the interface ID cannot be resolved or the device lock
 /// cannot be obtained.
 pub fn init_led_blink() -> KernelResult<()> {
     // Get LED interface ID
-    let mut id = 0;
-    syscall_hal(0, SysCallHalActions::GetID(LED_NAME, &mut id), 0)?;
-    LED_ID.store(id, Ordering::Relaxed);
+    let mut l_id = 0;
+    syscall_hal(0, SysCallHalActions::GetID(K_LED_NAME, &mut l_id), 0)?;
+    G_LED_ID.store(l_id, Ordering::Relaxed);
 
     // Try to get a lock on the interface
     syscall_devices(
-        DeviceType::Peripheral(id),
+        DeviceType::Peripheral(l_id),
         SysCallDevicesArgs::Lock,
-        LED_APP_ID.load(Ordering::Relaxed),
+        G_LED_APP_ID.load(Ordering::Relaxed),
     )
 }
 
 /// Store the app/owner ID used for subsequent LED operations.
-pub fn led_blink_id_storage(id: u32) {
-    LED_APP_ID.store(id, Ordering::Relaxed);
+pub fn led_blink_id_storage(p_id: u32) {
+    G_LED_APP_ID.store(p_id, Ordering::Relaxed);
 }

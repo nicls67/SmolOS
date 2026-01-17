@@ -66,41 +66,41 @@ impl AppConfig {
     /// Returns [`KernelError::AppAlreadyScheduled`] if the app is already running/scheduled.
     pub fn start(&mut self) -> KernelResult<u32> {
         if self.app_status == Stopped {
-            let period;
-            let ends_in;
+            let l_period;
+            let l_ends_in;
             match self.periodicity {
                 CallPeriodicity::Once => {
-                    period = Kernel::scheduler().get_period();
-                    ends_in = Some(period);
+                    l_period = Kernel::scheduler().get_period();
+                    l_ends_in = Some(l_period);
                 }
-                CallPeriodicity::Periodic(p) => {
-                    period = p;
-                    ends_in = None;
+                CallPeriodicity::Periodic(l_p) => {
+                    l_period = l_p;
+                    l_ends_in = None;
                 }
-                CallPeriodicity::PeriodicUntil(p, e) => {
-                    period = p;
-                    ends_in = Some(e);
+                CallPeriodicity::PeriodicUntil(l_p, l_e) => {
+                    l_period = l_p;
+                    l_ends_in = Some(l_e);
                 }
             }
 
-            let app_id = Kernel::scheduler().add_periodic_app(
+            let l_app_id = Kernel::scheduler().add_periodic_app(
                 self.name,
                 match self.app_fn {
-                    CallMethod::Call(app) => AppCall::AppNoParam(app),
-                    CallMethod::CallWithParam(app, param) => AppCall::AppParam(app, param),
+                    CallMethod::Call(l_app) => AppCall::AppNoParam(l_app),
+                    CallMethod::CallWithParam(l_app, l_param) => AppCall::AppParam(l_app, l_param),
                 },
                 self.init_fn,
                 self.end_fn,
-                period,
-                ends_in,
+                l_period,
+                l_ends_in,
             )?;
-            self.id = Some(app_id);
+            self.id = Some(l_app_id);
             self.app_status = Running;
 
-            if let Some(app_id_storage) = self.app_id_storage {
-                app_id_storage(app_id);
+            if let Some(l_app_id_storage) = self.app_id_storage {
+                l_app_id_storage(l_app_id);
             }
-            Ok(app_id)
+            Ok(l_app_id)
         } else {
             Err(KernelError::AppAlreadyScheduled(self.name))
         }
@@ -123,7 +123,7 @@ impl AppConfig {
                 self.name,
                 match self.app_fn {
                     CallMethod::Call(_) => None,
-                    CallMethod::CallWithParam(_, param) => Some(param),
+                    CallMethod::CallWithParam(_, l_param) => Some(l_param),
                 },
             ))
             .unwrap_or(());

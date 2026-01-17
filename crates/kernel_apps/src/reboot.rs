@@ -6,14 +6,14 @@ use kernel::{ConsoleFormatting, KernelResult, syscall_terminal};
 ///
 /// This ID is used when sending output to the terminal so the message is routed
 /// to the correct application session.
-static REBOOT_APP_ID: AtomicU32 = AtomicU32::new(0);
+static G_REBOOT_APP_ID: AtomicU32 = AtomicU32::new(0);
 
 /// Persist the command application's ID for later terminal output.
 ///
 /// # Parameters
 /// - `id`: The application identifier to store.
-pub fn reboot_app_id_storage(id: u32) {
-    REBOOT_APP_ID.store(id, Ordering::Relaxed);
+pub fn reboot_app_id_storage(p_id: u32) {
+    G_REBOOT_APP_ID.store(p_id, Ordering::Relaxed);
 }
 
 /// Perform the final reboot action by resetting the system.
@@ -30,10 +30,10 @@ pub fn reboot_end() -> KernelResult<()> {
 }
 
 /// Default number of seconds to wait before rebooting.
-pub const REBOOT_DELAY: u8 = 3;
+pub const K_REBOOT_DELAY: u8 = 3;
 
 /// Countdown value used by [`reboot_periodic`] to report remaining time.
-static REBOOT_COUNTER: AtomicU8 = AtomicU8::new(REBOOT_DELAY);
+static G_REBOOT_COUNTER: AtomicU8 = AtomicU8::new(K_REBOOT_DELAY);
 
 /// Periodic reboot countdown handler.
 ///
@@ -48,11 +48,11 @@ pub fn reboot_periodic() -> KernelResult<()> {
             format!(
                 50;
                 "Rebooting in {} seconds...",
-                REBOOT_COUNTER.fetch_sub(1, Ordering::Relaxed)
+                G_REBOOT_COUNTER.fetch_sub(1, Ordering::Relaxed)
             )
             .unwrap()
             .as_str(),
         ),
-        REBOOT_APP_ID.load(Ordering::Relaxed),
+        G_REBOOT_APP_ID.load(Ordering::Relaxed),
     )
 }
