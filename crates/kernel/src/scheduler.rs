@@ -26,50 +26,6 @@ use heapless::Vec;
 ///
 pub type App = fn() -> KernelResult<()>;
 
-/// A type alias for a function pointer that takes an unsigned 32-bit integer (`u32`)
-/// as an input parameter and returns a `KernelResult<()>`.
-///
-/// # Type Definition
-/// ```
-/// pub type AppParam = fn(u32) -> KernelResult<()>;
-/// ```
-///
-/// # Usage
-/// This type alias represents a callback or function interface that can be used within
-/// the kernel or application context. The function is expected to perform an operation
-/// based on the given `u32` parameter and return a `KernelResult<()>`.
-///
-/// The `KernelResult<()>` typically indicates whether the operation was
-/// successful or encountered an error, following the convention of `Result<T, E>`
-/// where `()` represents a unit type for successful results.
-///
-/// # Notes
-/// - The `KernelResult` and potential return types (`Ok` or `Err`) need to be
-///   appropriately defined in your context.
-/// - This alias helps standardize function signatures across different modules.
-pub type AppParam = fn(u32) -> KernelResult<()>;
-
-/// Represents the different ways an application can be called by the scheduler.
-///
-/// This enum allows the scheduler to handle both parameterless applications and
-/// applications that require a runtime parameter. This is useful for scenarios where
-/// multiple instances of the same application logic need to operate on different
-/// resources (e.g., blinking different LEDs identified by their HAL interface ID).
-///
-/// # Variants
-///
-/// * `AppNoParam(App)` - An application that takes no parameters. The wrapped [`App`]
-///   function pointer is called directly without arguments.
-///
-/// * `AppParam(AppParam, u32)` - An application that requires a `u32` parameter. The
-///   wrapped [`AppParam`] function pointer is called with the stored `u32` value.
-///   This variant enables a single function to be scheduled multiple times with
-///   different parameters, allowing for resource-specific behavior.
-pub enum AppCall {
-    AppNoParam(App),
-    AppParam(AppParam, u32),
-}
-
 /// `AppWrapper` is a structure that encapsulates metadata and state for an application
 /// or service within a system. It provides details such as the application name,
 /// its initialization state, runtime period, lifecycle, and active status.
@@ -80,7 +36,7 @@ pub enum AppCall {
 ///   The static name identifier for the application. This name remains constant
 ///   throughout the lifecycle of the application.
 ///
-/// * `app` (`AppCall`) -
+/// * `app` (`App`) -
 ///   Represents the core application logic or callable function associated with the application.
 ///   This is the primary entry point for executing application-specific logic.
 ///
@@ -115,7 +71,7 @@ pub enum AppCall {
 ///
 struct AppWrapper {
     name: &'static str,
-    app: AppCall,
+    app: App,
     app_init: Option<App>,
     app_closure: Option<App>,
     app_period: u32,
@@ -225,10 +181,9 @@ impl Scheduler {
     /// # Parameters
     ///
     /// * `name` - A static string identifier for the application. Must be unique within
-    ///   the scheduler (combined with the parameter value for `AppParam` variants).
+    ///   the scheduler.
     ///
-    /// * `app` - The application entry point, either [`AppCall::AppNoParam`] for
-    ///   parameterless apps or [`AppCall::AppParam`] for apps requiring a `u32` argument.
+    /// * `app` - The application entry point.
     ///
     /// * `app_init` - Optional initialization function called once before the first
     ///   execution of the application. If initialization fails, the app is skipped
@@ -250,26 +205,21 @@ impl Scheduler {
     ///   This ID can be used for tracking or removing the application later.
     ///
     /// * `Err(KernelError::AppAlreadyScheduled)` - If an application with the same name
-    ///   (and parameter, if applicable) is already registered.
+    ///   is already registered.
     ///
     /// * `Err(KernelError::CannotAddNewPeriodicApp)` - If the task list is full and
     ///   cannot accommodate additional applications.
     pub fn add_periodic_app(
         &mut self,
         p_name: &'static str,
-        p_app: AppCall,
+        p_app: App,
         p_app_init: Option<App>,
         p_app_closure: Option<App>,
         p_period: Milliseconds,
         p_ends_in: Option<Milliseconds>,
     ) -> KernelResult<u32> {
         // Check if the app already exists
-        if (match p_app {
-            AppCall::AppNoParam(_) => self.app_exists(p_name, None),
-            AppCall::AppParam(_, l_p) => self.app_exists(p_name, Some(l_p)),
-        })
-        .is_some()
-        {
+        if (self.app_exists(p_name)).is_some() {
             return Err(KernelError::AppAlreadyScheduled(p_name));
         }
 
@@ -296,20 +246,17 @@ impl Scheduler {
 
     /// Removes a periodic application from the task list.
     ///
-    /// This function searches for a task by its name and an optional parameter.
-    /// If the task exists, it is removed from the internal task list. Otherwise,
+    /// This function searches for a task by its name. If the task exists, it is removed
+    /// from the internal task list. Otherwise,
     /// an error is returned indicating that the application was not found.
     ///
     /// # Parameters
     /// - `name`: A static string slice that specifies the name of the application
     ///   to be removed.
-    /// - `param`: An optional parameter of type `u32` that can be used to
-    ///   refine the search for the application.
-    ///
     /// # Returns
     /// - `Ok(())`: If the application was successfully removed.
     /// - `Err(KernelError::AppNotFound)`: If no application with the specified
-    ///   name (and parameter, if provided) exists.
+    ///   name exists.
     ///
     /// # Errors
     /// This function returns a `KernelError::AppNotFound` error if the application
@@ -320,12 +267,8 @@ impl Scheduler {
     ///   which removes the item at the specified index by swapping it with the
     ///   last element and then removing it.
     /// - If the task does not exist, no changes are made to the list.
-    pub fn remove_periodic_app(
-        &mut self,
-        p_name: &'static str,
-        p_param: Option<u32>,
-    ) -> KernelResult<()> {
-        if let Some(l_index) = self.app_exists(p_name, p_param) {
+    pub fn remove_periodic_app(&mut self, p_name: &'static str) -> KernelResult<()> {
+        if let Some(l_index) = self.app_exists(p_name) {
             Kernel::apps().stop_app(self.tasks[l_index].app_id)?;
             self.tasks.swap_remove(l_index);
             Ok(())
@@ -348,8 +291,7 @@ impl Scheduler {
     ///    first. On success, the init function is cleared (runs only once). On failure,
     ///    the error is handled and the task is skipped for this cycle.
     ///
-    /// 2. **Execution**: The main application function is invoked (with or without
-    ///    parameter depending on the [`AppCall`] variant). Errors are routed through
+    /// 2. **Execution**: The main application function is invoked. Errors are routed through
     ///    the kernel error handler unless an error was already flagged for this task.
     ///
     /// 3. **Lifetime management**: If the task has a finite lifetime (`ends_in`), the
@@ -372,7 +314,7 @@ impl Scheduler {
     /// May panic if the internal `tasks_to_remove` buffer overflows (more than 8 tasks
     /// ending in a single cycle) or if `remove_periodic_app` fails unexpectedly.
     pub fn periodic_task(&mut self) {
-        let mut l_tasks_to_remove: Vec<(&'static str, Option<u32>), 8> = Vec::new();
+        let mut l_tasks_to_remove: Vec<&'static str, 8> = Vec::new();
 
         // Run all tasks
         for (l_id, l_task) in self.tasks.iter_mut().enumerate() {
@@ -392,23 +334,13 @@ impl Scheduler {
                 }
 
                 // Execute the task
-                match l_task.app {
-                    AppCall::AppNoParam(l_app) => match l_app() {
-                        Ok(..) => {}
-                        Err(l_e) => {
-                            if !self.current_task_has_error {
-                                Kernel::errors().error_handler(&l_e);
-                            }
+                match (l_task.app)() {
+                    Ok(..) => {}
+                    Err(l_e) => {
+                        if !self.current_task_has_error {
+                            Kernel::errors().error_handler(&l_e);
                         }
-                    },
-                    AppCall::AppParam(l_app, l_param) => match l_app(l_param) {
-                        Ok(..) => {}
-                        Err(l_e) => {
-                            if !self.current_task_has_error {
-                                Kernel::errors().error_handler(&l_e);
-                            }
-                        }
-                    },
+                    }
                 }
                 self.current_task_has_error = false;
                 self.current_task_id = None;
@@ -417,14 +349,7 @@ impl Scheduler {
                 if l_task.ends_in.is_some() {
                     l_task.ends_in = l_task.ends_in.map(|l_e| l_e - 1);
                     if l_task.ends_in.unwrap() == 0 {
-                        match l_task.app {
-                            AppCall::AppNoParam(_) => {
-                                l_tasks_to_remove.push((l_task.name, None)).unwrap();
-                            }
-                            AppCall::AppParam(_, l_p) => {
-                                l_tasks_to_remove.push((l_task.name, Some(l_p))).unwrap();
-                            }
-                        };
+                        l_tasks_to_remove.push(l_task.name).unwrap();
 
                         // Apply closure
                         if let Some(l_c) = l_task.app_closure {
@@ -443,8 +368,8 @@ impl Scheduler {
         }
 
         // Remove tasks that have ended
-        for (l_task_name, l_param) in l_tasks_to_remove {
-            self.remove_periodic_app(l_task_name, l_param).unwrap();
+        for l_task_name in l_tasks_to_remove {
+            self.remove_periodic_app(l_task_name).unwrap();
         }
 
         // Increment cycle counter
@@ -481,51 +406,32 @@ impl Scheduler {
         }
     }
 
-    /// Checks if an application with the given name and an optional parameter exists within the task list.
+    /// Checks if an application with the given name exists within the task list.
     ///
     /// This function iterates through the internal list of tasks and checks if a task with the specified
-    /// `name` exists. If a `param` is passed, the function further checks if the optional parameter of the
-    /// task matches the provided value. If either of these conditions is met, the index of the matching
-    /// task is returned; otherwise, the function returns `None`.
+    /// `name` exists. If a matching task is found, the index is returned; otherwise, the function returns `None`.
     ///
     /// # Arguments
     ///
     /// * `name` - A string slice representing the name of the application to search for.
-    /// * `param` - An `Option<u32>` representing the optional parameter to match against.
-    ///   If `None` is provided, the function ignores parameter-based matching.
-    ///
     /// # Returns
     ///
-    /// * `Some(usize)` - The index of the first task in the list that matches the given name and optional parameter.
+    /// * `Some(usize)` - The index of the first task in the list that matches the given name.
     /// * `None` - If no such application is found.
     ///
     /// # Behavior
     ///
-    /// * If the task's name matches but the specific task has no associated parameter (i.e., the `AppCall` variant is not `AppParam`),
-    ///   the function will return the index of that task.
-    /// * If a `param` is provided, both the name and parameter must match for the index to be returned.
-    /// * If no `param` is provided, only the name needs to match for the index to be returned.
-    ///
-    pub fn app_exists(&self, p_name: &str, p_param: Option<u32>) -> Option<usize> {
+    /// * If the task's name matches, the function returns the index of that task.
+    pub fn app_exists(&self, p_name: &str) -> Option<usize> {
         for (l_index, l_task) in self.tasks.iter().enumerate() {
             if l_task.name == p_name {
-                if let AppCall::AppParam(_, l_app_param) = l_task.app {
-                    if let Some(l_p) = p_param {
-                        if l_p == l_app_param {
-                            return Some(l_index);
-                        }
-                    } else {
-                        return Some(l_index);
-                    }
-                } else {
-                    return Some(l_index);
-                }
+                return Some(l_index);
             }
         }
         None
     }
 
-    /// Updates the duration for a task specified by its name and optional parameter.
+    /// Updates the duration for a task specified by its name.
     ///
     /// This function modifies the `ends_in` field of a task, recalculating its
     /// value based on the provided duration (`time`), the scheduler period, and
@@ -534,15 +440,13 @@ impl Scheduler {
     ///
     /// # Parameters
     /// - `name`: A static string slice representing the name of the task to update.
-    /// - `param`: An optional 32-bit unsigned integer parameter to further identify
-    ///   the task. This can differentiate between tasks with the same name.
     /// - `time`: A `Milliseconds` instance representing the new duration for the
     ///   task, usually measured in milliseconds.
     ///
     /// # Returns
     /// - `Ok(())`: If the task's duration was successfully updated.
     /// - `Err(KernelError::AppNotFound)`: If no task matching the specified `name`
-    ///   and `param` is found.
+    ///   is found.
     ///
     /// # Panics
     /// This function does not explicitly panic under normal conditions. However,
@@ -557,10 +461,9 @@ impl Scheduler {
     pub fn set_new_task_duration(
         &mut self,
         p_name: &'static str,
-        p_param: Option<u32>,
         p_time: Milliseconds,
     ) -> KernelResult<()> {
-        if let Some(l_index) = self.app_exists(p_name, p_param) {
+        if let Some(l_index) = self.app_exists(p_name) {
             self.tasks[l_index].ends_in =
                 Some(p_time.to_u32() / self.sched_period.to_u32() / self.tasks[l_index].app_period);
             Ok(())

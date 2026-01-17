@@ -1,6 +1,6 @@
 use crate::console_output::ConsoleFormatting;
 use crate::data::Kernel;
-use crate::scheduler::{App, AppCall};
+use crate::scheduler::App;
 use crate::{DeviceType, KernelError, KernelResult, Milliseconds};
 use display::Colors;
 use hal_interface::{
@@ -149,15 +149,15 @@ pub fn syscall_display(p_args: SysCallDisplayArgs, p_caller_id: u32) -> KernelRe
 pub enum SysCallSchedulerArgs<'a> {
     AddPeriodicTask(
         &'static str,
-        AppCall,
+        App,
         Option<App>,
         Option<App>,
         Milliseconds,
         Option<Milliseconds>,
         &'a mut u32,
     ),
-    RemovePeriodicTask(&'static str, Option<u32>),
-    NewTaskDuration(&'static str, Option<u32>, Milliseconds),
+    RemovePeriodicTask(&'static str),
+    NewTaskDuration(&'static str, Milliseconds),
 }
 
 /// Dispatches scheduler-related syscalls (periodic task creation/removal/configuration).
@@ -169,18 +169,16 @@ pub enum SysCallSchedulerArgs<'a> {
 /// - `args`: The scheduler operation to perform:
 ///   - `AddPeriodicTask(name, app, init, closure, period, ends_in, id_out)`
 ///     - `name`: Task name/identifier.
-///     - `app`: The app entry/call to schedule (see [`AppCall`]).
+///     - `app`: The app entry/call to schedule.
 ///     - `init`: Optional initialization function called once before first execution.
 ///     - `closure`: Optional cleanup function called when the task's lifetime expires.
 ///     - `period`: The periodic interval in milliseconds.
 ///     - `ends_in`: Optional duration after which the task should stop.
 ///     - `id_out`: Output parameter; on success receives the newly created task id.
-///   - `RemovePeriodicTask(name, param)`
+///   - `RemovePeriodicTask(name)`
 ///     - `name`: Task name/identifier.
-///     - `param`: Optional parameter value to disambiguate tasks with the same name.
-///   - `NewTaskDuration(name, param, time)`
+///   - `NewTaskDuration(name, time)`
 ///     - `name`: Task name/identifier.
-///     - `param`: Optional parameter value to select a specific task instance.
 ///     - `time`: New duration/limit in milliseconds.
 ///
 /// # Returns
@@ -218,11 +216,11 @@ pub fn syscall_scheduler(p_args: SysCallSchedulerArgs) -> KernelResult<()> {
                 Err(l_e) => Err(l_e),
             }
         }
-        SysCallSchedulerArgs::RemovePeriodicTask(l_name, l_param) => {
-            Kernel::scheduler().remove_periodic_app(l_name, l_param)
+        SysCallSchedulerArgs::RemovePeriodicTask(l_name) => {
+            Kernel::scheduler().remove_periodic_app(l_name)
         }
-        SysCallSchedulerArgs::NewTaskDuration(l_name, l_param, l_time) => {
-            Kernel::scheduler().set_new_task_duration(l_name, l_param, l_time)
+        SysCallSchedulerArgs::NewTaskDuration(l_name, l_time) => {
+            Kernel::scheduler().set_new_task_duration(l_name, l_time)
         }
     };
 

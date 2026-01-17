@@ -16,7 +16,6 @@ use crate::console_output::ConsoleFormatting;
 use crate::console_output::ConsoleFormatting::StrNewLineBoth;
 use crate::data::Kernel;
 use crate::ident::{K_KERNEL_MASTER_ID, K_KERNEL_NAME};
-use crate::scheduler::AppCall;
 use crate::{
     KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalActions, syscall_devices,
     syscall_hal, syscall_scheduler,
@@ -211,18 +210,15 @@ impl ErrorsManager {
                     self.has_error = Some(Error);
                 }
 
-                if let Some(l_id) = self.err_led_id {
+                if self.err_led_id.is_some() {
                     if Kernel::scheduler()
-                        .app_exists(
-                            Self::K_LED_BLINK_APP_NAME,
-                            self.err_led_id.map(|l_err_led_id| l_err_led_id as u32),
-                        )
+                        .app_exists(Self::K_LED_BLINK_APP_NAME)
                         .is_none()
                     {
                         let mut l_err_app_id = 0;
                         syscall_scheduler(crate::SysCallSchedulerArgs::AddPeriodicTask(
                             Self::K_LED_BLINK_APP_NAME,
-                            AppCall::AppParam(blink_err_led, l_id as u32),
+                            blink_err_led,
                             None,
                             Some(reset_err_led),
                             Milliseconds(100),
@@ -233,7 +229,6 @@ impl ErrorsManager {
                     } else {
                         syscall_scheduler(crate::SysCallSchedulerArgs::NewTaskDuration(
                             Self::K_LED_BLINK_APP_NAME,
-                            Some(l_id as u32),
                             Milliseconds(10000),
                         ))
                         .unwrap_or(())
@@ -273,6 +268,10 @@ impl ErrorsManager {
             self.set_err_led(false)
         }
     }
+
+    pub(in crate::errors_mgt) fn get_err_led_id(&self) -> usize {
+        self.err_led_id.unwrap_or(0)
+    }
 }
 
 /// Scheduler task body: toggle the configured error LED.
@@ -288,9 +287,9 @@ impl ErrorsManager {
 ///
 /// # Errors
 /// - Propagates errors from `syscall_hal` when toggling the GPIO.
-fn blink_err_led(p_id: u32) -> KernelResult<()> {
+fn blink_err_led() -> KernelResult<()> {
     syscall_hal(
-        p_id as usize,
+        Kernel::errors().get_err_led_id(),
         SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(GpioWriteAction::Toggle)),
         K_KERNEL_MASTER_ID,
     )

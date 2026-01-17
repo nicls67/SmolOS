@@ -3,7 +3,7 @@ use heapless::Vec;
 
 mod app_config;
 
-pub use self::app_config::{AppConfig, AppStatus, CallMethod, CallPeriodicity};
+pub use self::app_config::{AppConfig, AppStatus, CallPeriodicity};
 
 const K_MAX_APPS: usize = 32;
 

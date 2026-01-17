@@ -1,19 +1,13 @@
 use crate::apps::app_config::AppStatus::{Running, Stopped};
 use crate::data::Kernel;
-use crate::scheduler::{App, AppCall, AppParam};
-use crate::{KernelError, KernelResult, Milliseconds, SysCallSchedulerArgs, syscall_scheduler};
+use crate::scheduler::App;
+use crate::{KernelError, KernelResult, Milliseconds};
 
 #[derive(Copy, Clone)]
 pub enum CallPeriodicity {
     Once,
     Periodic(Milliseconds),
     PeriodicUntil(Milliseconds, Milliseconds),
-}
-
-#[derive(Copy, Clone)]
-pub enum CallMethod {
-    Call(App),
-    CallWithParam(AppParam, u32),
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -35,7 +29,7 @@ impl AppStatus {
 pub struct AppConfig {
     pub name: &'static str,
     pub periodicity: CallPeriodicity,
-    pub app_fn: CallMethod,
+    pub app_fn: App,
     pub init_fn: Option<App>,
     pub end_fn: Option<App>,
     pub app_status: AppStatus,
@@ -47,7 +41,7 @@ impl AppConfig {
     /// Starts (schedules) this app if it is currently stopped.
     ///
     /// This registers the configured app with the kernel scheduler according to its
-    /// [`CallPeriodicity`] and [`CallMethod`].
+    /// [`CallPeriodicity`] and `app_fn`.
     ///
     /// - [`CallPeriodicity::Once`]: schedules the app to run once (using the scheduler period).
     /// - [`CallPeriodicity::Periodic`]: schedules the app to run indefinitely at the given period.
@@ -85,10 +79,7 @@ impl AppConfig {
 
             let l_app_id = Kernel::scheduler().add_periodic_app(
                 self.name,
-                match self.app_fn {
-                    CallMethod::Call(l_app) => AppCall::AppNoParam(l_app),
-                    CallMethod::CallWithParam(l_app, l_param) => AppCall::AppParam(l_app, l_param),
-                },
+                self.app_fn,
                 self.init_fn,
                 self.end_fn,
                 l_period,
@@ -119,14 +110,7 @@ impl AppConfig {
     /// Returns any error produced by the terminal exit notifier.
     pub fn stop(&mut self) -> KernelResult<()> {
         if self.app_status == Running {
-            syscall_scheduler(SysCallSchedulerArgs::RemovePeriodicTask(
-                self.name,
-                match self.app_fn {
-                    CallMethod::Call(_) => None,
-                    CallMethod::CallWithParam(_, l_param) => Some(l_param),
-                },
-            ))
-            .unwrap_or(());
+            Kernel::scheduler().remove_periodic_app(self.name)?;
             Kernel::terminal().app_exit_notifier(self.id.unwrap())?;
             self.app_status = Stopped;
             self.id = None;

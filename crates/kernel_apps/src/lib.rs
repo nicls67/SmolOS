@@ -1,6 +1,6 @@
 #![no_std]
 
-use kernel::{AppConfig, AppStatus, CallMethod, CallPeriodicity, KernelResult, Milliseconds};
+use kernel::{AppConfig, AppStatus, CallPeriodicity, KernelResult, Milliseconds};
 
 use crate::reboot::K_REBOOT_DELAY;
 
@@ -19,7 +19,7 @@ const K_DEFAULT_APPS: [AppConfig; 2] = [
     AppConfig {
         name: "led_blink",
         periodicity: CallPeriodicity::Periodic(Milliseconds(1000)),
-        app_fn: CallMethod::Call(led_blink::led_blink),
+        app_fn: led_blink::led_blink,
         init_fn: Some(led_blink::init_led_blink),
         end_fn: None,
         app_status: AppStatus::Stopped,
@@ -32,7 +32,7 @@ const K_DEFAULT_APPS: [AppConfig; 2] = [
             Milliseconds(1000),
             Milliseconds((K_REBOOT_DELAY + 1) as u32 * 1000),
         ),
-        app_fn: CallMethod::Call(reboot::reboot_periodic),
+        app_fn: reboot::reboot_periodic,
         init_fn: None,
         end_fn: Some(reboot::reboot_end),
         app_status: AppStatus::Stopped,
