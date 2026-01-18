@@ -32,4 +32,4 @@ This file orients coding agents working in this repo. Keep changes focused, avoi
 2. Local variables starts with "l_"
 3. Global variables starts with "G_"
 4. Constants starts with "K_"
-5. Functions and methods parameters start with "p_"
+5. Functions and methods parameters starts with "p_"

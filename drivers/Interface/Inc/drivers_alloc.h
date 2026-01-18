@@ -19,11 +19,11 @@
 /********************/
 /* Exported defines */
 /********************/
-#define DRIVERS_ALLOC_SIZE 4
-#define DRIVER_ACTIVATE_USART
-#define DRIVER_ACTIVATE_GPIO
-#define DRIVER_ACTIVATE_LCD
-#define USART_BUFFER_SIZE 32
+#define K_DRIVERS_ALLOC_SIZE 4
+#define K_DRIVER_ACTIVATE_USART
+#define K_DRIVER_ACTIVATE_GPIO
+#define K_DRIVER_ACTIVATE_LCD
+#define K_USART_BUFFER_SIZE 32
 
 /******************/
 /* Exported types */
@@ -37,8 +37,8 @@ typedef struct
 /**********************/
 /* Exported constants */
 /**********************/
-extern const DRIVER_ALLOC DRIVERS_ALLOC[];
-extern RX_BUFFER USART1_BUFFER;
+extern const DRIVER_ALLOC K_DRIVERS_ALLOC[];
+extern RX_BUFFER G_USART1_BUFFER;
 
 /**********************/
 /* Exported variables */

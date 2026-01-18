@@ -31,6 +31,13 @@ fn main() {
         .unwrap_or_else(|e| panic!("failed to set current dir to {:?}: {}", l_workspace_root, e));
 
     // Run drivers allocator generation script
+    let l_drivers_conf = l_workspace_root.join("config").join("drivers_conf.yaml");
+    println!("cargo:rerun-if-changed={}", l_drivers_conf.display());
+    let l_gen_drivers_alloc_dir = l_workspace_root.join("tools").join("gen_drivers_alloc");
+    println!(
+        "cargo:rerun-if-changed={}",
+        l_gen_drivers_alloc_dir.display()
+    );
     let l_gen_status = std::process::Command::new("sh")
         .arg("tools/build/gen_drivers_alloc.sh")
         .status()
@@ -43,6 +50,8 @@ fn main() {
     }
 
     // Run CMake configure script
+    let l_drivers_dir = l_workspace_root.join("drivers");
+    println!("cargo:rerun-if-changed={}", l_drivers_dir.display());
     let l_config_status = std::process::Command::new("sh")
         .arg("tools/build/cmake_configure.sh")
         .status()
