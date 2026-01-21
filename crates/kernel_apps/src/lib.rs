@@ -25,6 +25,7 @@ const K_DEFAULT_APPS: [AppConfig; 2] = [
         app_status: AppStatus::Stopped,
         id: None,
         app_id_storage: Some(led_blink::led_blink_id_storage),
+        param_storage: None,
     },
     AppConfig {
         name: "reboot",
@@ -38,6 +39,7 @@ const K_DEFAULT_APPS: [AppConfig; 2] = [
         app_status: AppStatus::Stopped,
         id: None,
         app_id_storage: Some(reboot::reboot_app_id_storage),
+        param_storage: None,
     },
 ];
 

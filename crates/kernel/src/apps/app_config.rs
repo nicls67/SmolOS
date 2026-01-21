@@ -35,6 +35,7 @@ pub struct AppConfig {
     pub app_status: AppStatus,
     pub id: Option<u32>,
     pub app_id_storage: Option<fn(u32)>,
+    pub param_storage: Option<fn(&str)>,
 }
 
 impl AppConfig {
@@ -51,14 +52,18 @@ impl AppConfig {
     /// On success, this function:
     /// - stores the returned scheduler id in `self.id`,
     /// - updates `self.app_status` to [`AppStatus::Running`],
-    /// - calls `self.app_id_storage` (if provided) with the assigned id.
+    /// - calls `self.app_id_storage` (if provided) with the assigned id,
+    /// - calls `self.param_storage` (if provided) with `p_app_param`.
+    ///
+    /// # Arguments
+    /// * `p_app_param` - The full app parameter string captured at launch time.
     ///
     /// # Returns
     /// The scheduler id assigned to the app.
     ///
     /// # Errors
     /// Returns [`KernelError::AppAlreadyScheduled`] if the app is already running/scheduled.
-    pub fn start(&mut self) -> KernelResult<u32> {
+    pub fn start(&mut self, p_app_param: &str) -> KernelResult<u32> {
         if self.app_status == Stopped {
             let l_period;
             let l_ends_in;
@@ -88,9 +93,16 @@ impl AppConfig {
             self.id = Some(l_app_id);
             self.app_status = Running;
 
+            // Store the app ID in the storage function if provided
             if let Some(l_app_id_storage) = self.app_id_storage {
                 l_app_id_storage(l_app_id);
             }
+
+            // Store the app parameters in the storage function if provided
+            if let Some(l_param_storage) = self.param_storage {
+                l_param_storage(p_app_param);
+            }
+
             Ok(l_app_id)
         } else {
             Err(KernelError::AppAlreadyScheduled(self.name))
