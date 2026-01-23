@@ -1,6 +1,7 @@
 #![no_std]
 mod apps;
 mod boot;
+mod console_output;
 mod data;
 mod devices;
 mod errors_mgt;
@@ -10,22 +11,21 @@ mod syscall;
 mod systick;
 mod terminal;
 mod types;
-mod console_output;
 
 use crate::apps::AppsManager;
+pub use crate::console_output::ConsoleOutput;
 use crate::data::Kernel;
 pub use crate::data::KernelTimeData;
-pub use crate::console_output::ConsoleOutput;
+pub use apps::{AppConfig, AppStatus, CallPeriodicity};
+pub use boot::{BootConfig, boot};
+pub use console_output::ConsoleFormatting;
 pub use data::cortex_init;
 pub use devices::{DeviceType, LockState};
 pub use syscall::*;
 pub use systick::init_systick;
-pub use types::*;
-pub use boot::{BootConfig, boot};
-pub use apps::{AppConfig, CallPeriodicity,CallMethod,AppStatus};
-pub use types::Milliseconds;
 pub use types::KernelResult;
-pub use console_output::ConsoleFormatting;
+pub use types::Milliseconds;
+pub use types::*;
 
 /// Returns a mutable reference to the global [`AppsManager`].
 pub fn apps() -> &'static mut AppsManager {

@@ -4,7 +4,7 @@
   * @date               : Created on 22/09/2025
   * @author             : Nicolas SIMON
   *******************************************************************
-  * @brief 
+  * @brief
   *******************************************************************
   */
 
@@ -42,7 +42,7 @@
 /*********************/
 /* Private variables */
 /*********************/
-HAL_INTERFACE_CALLBACK callbacks[DRIVERS_ALLOC_SIZE];
+HAL_INTERFACE_CALLBACK G_callbacks[K_DRIVERS_ALLOC_SIZE];
 
 /*********************/
 /* Private functions */
@@ -55,21 +55,21 @@ HAL_INTERFACE_CALLBACK callbacks[DRIVERS_ALLOC_SIZE];
  * null-terminated strings. The comparison stops at the first mismatching
  * character or when the null terminator is encountered in either string.
  *
- * @param str1 Pointer to the first null-terminated string.
- * @param str2 Pointer to the second null-terminated string.
+ * @param p_str1 Pointer to the first null-terminated string.
+ * @param p_str2 Pointer to the second null-terminated string.
  *
  * @return true if both strings are identical; otherwise, false.
  */
-bool str_compare(const uint8_t *str1, const uint8_t *str2)
+bool str_compare(const uint8_t *p_str1, const uint8_t *p_str2)
 {
-    uint8_t i = 0;
-    while (str1[i] != '\0' && str2[i] != '\0')
+    uint8_t l_i = 0;
+    while (p_str1[l_i] != '\0' && p_str2[l_i] != '\0')
     {
-        if (str1[i] != str2[i])
+        if (p_str1[l_i] != p_str2[l_i])
         {
             return false;
         }
-        i++;
+        l_i++;
     }
     return true;
 }
@@ -86,21 +86,21 @@ extern void PeriphCommonClock_Config();
  * provided ID is within bounds and confirms that the driver type associated
  * with the ID is LCD.
  *
- * @param id The LCD interface ID to be validated.
+ * @param p_id The LCD interface ID to be validated.
  *
  * @return HAL_INTERFACE_RESULT indicating the result of the validation:
  * - OK: If the ID is valid and corresponds to an LCD interface.
  * - ERR_WRONG_INTERFACE_ID: If the ID exceeds the maximum allocated driver size.
  * - ERR_INCOMPATIBLE_ACTION: If the driver type for the provided ID is not LCD.
  */
-HAL_INTERFACE_RESULT lcd_id_check(const uint8_t id)
+HAL_INTERFACE_RESULT lcd_id_check(const uint8_t p_id)
 {
-    if (id >= DRIVERS_ALLOC_SIZE)
+    if (p_id >= K_DRIVERS_ALLOC_SIZE)
     {
         return ERR_WRONG_INTERFACE_ID;
     }
 
-    if (DRIVERS_ALLOC[id].drv_type != LCD)
+    if (K_DRIVERS_ALLOC[p_id].drv_type != LCD)
     {
         return ERR_INCOMPATIBLE_ACTION;
     }
@@ -136,30 +136,30 @@ void hal_init()
 
     drivers_init();
 
-    // Initialize callbacks to null
-    for (uint8_t i = 0; i < DRIVERS_ALLOC_SIZE; i++)
+    // Initialize callback table to null
+    for (uint8_t l_i = 0; l_i < K_DRIVERS_ALLOC_SIZE; l_i++)
     {
-        callbacks[i] = NULL;
+        G_callbacks[l_i] = NULL;
     }
 }
 
 /**
  * Retrieves the interface ID associated with a given interface name.
  *
- * @param name The name of the interface to search for. It is a pointer to a null-terminated string.
- * @param id A pointer to a location where the retrieved interface ID will be stored.
+ * @param p_name The name of the interface to search for. It is a pointer to a null-terminated string.
+ * @param p_id A pointer to a location where the retrieved interface ID will be stored.
  *           This value is valid only if the function returns OK.
  * @return Returns a HalInterfaceResult:
  *         - OK if the interface name was found and the ID was successfully retrieved.
  *         - ERR if the interface name was not found.
  */
-HAL_INTERFACE_RESULT get_interface_id(const uint8_t *name, uint8_t *id)
+HAL_INTERFACE_RESULT get_interface_id(const uint8_t *p_name, uint8_t *p_id)
 {
-    for (uint8_t i = 0; i < DRIVERS_ALLOC_SIZE; i++)
+    for (uint8_t l_i = 0; l_i < K_DRIVERS_ALLOC_SIZE; l_i++)
     {
-        if (str_compare(name, DRIVERS_ALLOC[i].drv_name))
+        if (str_compare(p_name, K_DRIVERS_ALLOC[l_i].drv_name))
         {
-            *id = DRIVERS_ALLOC[i].drv_id;
+            *p_id = K_DRIVERS_ALLOC[l_i].drv_id;
             return OK;
         }
     }
@@ -176,26 +176,26 @@ HAL_INTERFACE_RESULT get_interface_id(const uint8_t *name, uint8_t *id)
  *
  * The interface name is stored as a null-terminated string in the provided buffer.
  *
- * @param id The ID of the interface whose name is to be retrieved.
- * @param name Pointer to a buffer where the interface name will be stored.
+ * @param p_id The ID of the interface whose name is to be retrieved.
+ * @param p_name Pointer to a buffer where the interface name will be stored.
  *             The caller must ensure the buffer is large enough to hold the name.
  *
  * @return HAL_INTERFACE_RESULT
  *         - OK if the name is successfully retrieved.
  *         - ERR_WRONG_INTERFACE_ID if the given ID is invalid.
  */
-HAL_INTERFACE_RESULT get_interface_name(const uint8_t id, uint8_t *name)
+HAL_INTERFACE_RESULT get_interface_name(const uint8_t p_id, uint8_t *p_name)
 {
-    if (id >= DRIVERS_ALLOC_SIZE)
+    if (p_id >= K_DRIVERS_ALLOC_SIZE)
     {
         return ERR_WRONG_INTERFACE_ID;
     }
 
-    uint8_t i = 0;
-    while (*DRIVERS_ALLOC[i].drv_name != '\0')
+    uint8_t l_i = 0;
+    while (K_DRIVERS_ALLOC[p_id].drv_name[l_i] != '\0')
     {
-        name[i] = *DRIVERS_ALLOC[i].drv_name;
-        i++;
+        p_name[l_i] = K_DRIVERS_ALLOC[p_id].drv_name[l_i];
+        l_i++;
     }
     return OK;
 }
@@ -225,20 +225,20 @@ uint32_t get_core_clk()
  * The callback is stored and can be invoked when required by the specified interface.
  * The ID must be within the valid range of allocated driver interfaces.
  *
- * @param id The ID of the interface to configure the callback for. Must be less than DRIVERS_ALLOC_SIZE.
- * @param callback The callback function pointer to assign to the specified interface ID.
+ * @param p_id The ID of the interface to configure the callback for. Must be less than K_DRIVERS_ALLOC_SIZE.
+ * @param p_callback The callback function pointer to assign to the specified interface ID.
  *
  * @return OK if the callback is successfully configured;
  *         ERR_WRONG_INTERFACE_ID if the provided interface ID is invalid.
  */
-HAL_INTERFACE_RESULT configure_callback(const uint8_t id, const HAL_INTERFACE_CALLBACK callback)
+HAL_INTERFACE_RESULT configure_callback(const uint8_t p_id, const HAL_INTERFACE_CALLBACK p_callback)
 {
-    if (id >= DRIVERS_ALLOC_SIZE)
+    if (p_id >= K_DRIVERS_ALLOC_SIZE)
     {
         return ERR_WRONG_INTERFACE_ID;
     }
 
-    callbacks[id] = callback;
+    G_callbacks[p_id] = p_callback;
     return OK;
 }
 
@@ -250,35 +250,35 @@ HAL_INTERFACE_RESULT configure_callback(const uint8_t id, const HAL_INTERFACE_CA
  * read operations. The buffer is returned through the provided pointer
  * parameter if all checks pass successfully.
  *
- * @param id The ID of the interface for which the read buffer is being requested.
- * @param buffer Pointer to a pointer variable where the read buffer will be stored.
+ * @param p_id The ID of the interface for which the read buffer is being requested.
+ * @param p_buffer Pointer to a pointer variable where the read buffer will be stored.
  *
  * @return - OK: The read buffer was successfully retrieved.
  *         - ERR_WRONG_INTERFACE_ID: The provided interface ID is invalid or out of bounds.
  *         - ERR_WRITE_ONLY_INTERFACE: The interface is configured as write-only.
  *         - ERR_NO_BUFFER: No buffer is associated with the specified interface.
  */
-HAL_INTERFACE_RESULT get_read_buffer(const uint8_t id, RX_BUFFER **buffer)
+HAL_INTERFACE_RESULT get_read_buffer(const uint8_t p_id, RX_BUFFER **p_buffer)
 {
-    if (id >= DRIVERS_ALLOC_SIZE)
+    if (p_id >= K_DRIVERS_ALLOC_SIZE)
     {
         return ERR_WRONG_INTERFACE_ID;
     }
-    if (DRIVERS_ALLOC[id].drv_direction == OUT)
+    if (K_DRIVERS_ALLOC[p_id].drv_direction == OUT)
     {
         return ERR_WRITE_ONLY_INTERFACE;
     }
-    if (DRIVERS_ALLOC[id].buffer == NULL)
+    if (K_DRIVERS_ALLOC[p_id].buffer == NULL)
     {
         return ERR_NO_BUFFER;
     }
 
-    *buffer = DRIVERS_ALLOC[id].buffer;
+    *p_buffer = K_DRIVERS_ALLOC[p_id].buffer;
 
     return OK;
 }
 
-#ifdef DRIVER_ACTIVATE_GPIO
+#ifdef K_DRIVER_ACTIVATE_GPIO
 /**
  * @brief Writes a specified action to a GPIO pin, identified by its interface ID.
  *
@@ -287,9 +287,9 @@ HAL_INTERFACE_RESULT get_read_buffer(const uint8_t id, RX_BUFFER **buffer)
  * to a valid GPIO interface and that the direction and type of the interface are compatible
  * with the operation. If any of these validations fail, an appropriate error code is returned.
  *
- * @param id The identifier of the GPIO interface within the driver allocation table.
- *           Must be less than DRIVERS_ALLOC_SIZE.
- * @param action The action to perform on the GPIO pin, specified as a value of type GPIO_WRITE_ACTION.
+ * @param p_id The identifier of the GPIO interface within the driver allocation table.
+ *           Must be less than K_DRIVERS_ALLOC_SIZE.
+ * @param p_action The action to perform on the GPIO pin, specified as a value of type GPIO_WRITE_ACTION.
  *               Possible actions include:
  *               - SET_PIN: Set the pin to a high state.
  *               - CLEAR_PIN: Set the pin to a low state.
@@ -301,34 +301,34 @@ HAL_INTERFACE_RESULT get_read_buffer(const uint8_t id, RX_BUFFER **buffer)
  *         - ERR_READ_ONLY_INTERFACE: The interface is read-only and cannot perform a write action.
  *         - ERR_INCOMPATIBLE_ACTION: The interface is not a GPIO type.
  */
-HAL_INTERFACE_RESULT gpio_write(const uint8_t id, const GPIO_WRITE_ACTION action)
+HAL_INTERFACE_RESULT gpio_write(const uint8_t p_id, const GPIO_WRITE_ACTION p_action)
 {
-    if (id >= DRIVERS_ALLOC_SIZE)
+    if (p_id >= K_DRIVERS_ALLOC_SIZE)
     {
         return ERR_WRONG_INTERFACE_ID;
     }
 
-    if (DRIVERS_ALLOC[id].drv_direction == IN)
+    if (K_DRIVERS_ALLOC[p_id].drv_direction == IN)
     {
         return ERR_READ_ONLY_INTERFACE;
     }
 
-    if (DRIVERS_ALLOC[id].drv_type != GPIO)
+    if (K_DRIVERS_ALLOC[p_id].drv_type != GPIO)
     {
         return ERR_INCOMPATIBLE_ACTION;
     }
 
-    const GPIO_ALLOC *gpio = DRIVERS_ALLOC[id].drv;
-    switch (action)
+    const GPIO_ALLOC *l_gpio = K_DRIVERS_ALLOC[p_id].drv;
+    switch (p_action)
     {
         case SET_PIN:
-            HAL_GPIO_WritePin(gpio->gpio, gpio->pin, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(l_gpio->gpio, l_gpio->pin, GPIO_PIN_SET);
             break;
         case CLEAR_PIN:
-            HAL_GPIO_WritePin(gpio->gpio, gpio->pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(l_gpio->gpio, l_gpio->pin, GPIO_PIN_RESET);
             break;
         case TOGGLE_PIN:
-            HAL_GPIO_TogglePin(gpio->gpio, gpio->pin);
+            HAL_GPIO_TogglePin(l_gpio->gpio, l_gpio->pin);
             break;
     }
 
@@ -336,7 +336,7 @@ HAL_INTERFACE_RESULT gpio_write(const uint8_t id, const GPIO_WRITE_ACTION action
 }
 #endif
 
-#ifdef DRIVER_ACTIVATE_USART
+#ifdef K_DRIVER_ACTIVATE_USART
 /**
  * @brief Writes data to a specified USART interface.
  *
@@ -345,9 +345,9 @@ HAL_INTERFACE_RESULT gpio_write(const uint8_t id, const GPIO_WRITE_ACTION action
  * compatible with the USART type, and confirms write permissions before
  * transmitting the data. If any condition is not met, an error code is returned.
  *
- * @param id The ID of the USART interface to which the data will be written.
- * @param str Pointer to the buffer containing the data to be transmitted.
- * @param len The length of the data to be transmitted, in bytes.
+ * @param p_id The ID of the USART interface to which the data will be written.
+ * @param p_str Pointer to the buffer containing the data to be transmitted.
+ * @param p_len The length of the data to be transmitted, in bytes.
  * @return A result of type HAL_INTERFACE_RESULT, indicating success (OK) or
  *         an error code such as:
  *         - ERR_WRONG_INTERFACE_ID: Invalid USART interface ID.
@@ -356,24 +356,24 @@ HAL_INTERFACE_RESULT gpio_write(const uint8_t id, const GPIO_WRITE_ACTION action
  *         - ERR_WRITE_ERROR: Transmission failure.
  *         - OK: Data successfully written to the USART interface.
  */
-HAL_INTERFACE_RESULT usart_write(const uint8_t id, const uint8_t *str, const uint16_t len)
+HAL_INTERFACE_RESULT usart_write(const uint8_t p_id, const uint8_t *p_str, const uint16_t p_len)
 {
-    if (id >= DRIVERS_ALLOC_SIZE)
+    if (p_id >= K_DRIVERS_ALLOC_SIZE)
     {
         return ERR_WRONG_INTERFACE_ID;
     }
 
-    if (DRIVERS_ALLOC[id].drv_direction == IN)
+    if (K_DRIVERS_ALLOC[p_id].drv_direction == IN)
     {
         return ERR_READ_ONLY_INTERFACE;
     }
 
-    if (DRIVERS_ALLOC[id].drv_type != USART)
+    if (K_DRIVERS_ALLOC[p_id].drv_type != USART)
     {
         return ERR_INCOMPATIBLE_ACTION;
     }
 
-    if (HAL_UART_Transmit(DRIVERS_ALLOC[id].drv, str, len, HAL_MAX_DELAY) != HAL_OK)
+    if (HAL_UART_Transmit(K_DRIVERS_ALLOC[p_id].drv, p_str, p_len, HAL_MAX_DELAY) != HAL_OK)
     {
         return ERR_WRITE_ERROR;
     }
@@ -390,28 +390,28 @@ HAL_INTERFACE_RESULT usart_write(const uint8_t id, const uint8_t *str, const uin
  * the corresponding driver and calls the associated callback function
  * if it's configured.
  *
- * @param huart Pointer to the UART handle structure that contains
+ * @param p_huart Pointer to the UART handle structure that contains
  *              information about the UART instance.
  */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *p_huart)
 {
     // Re-initialize IT
-    if (huart->Instance == USART1)
+    if (p_huart->Instance == USART1)
     {
-        HAL_UART_Receive_IT(&huart1, USART1_BUFFER.buffer, 1);
-        USART1_BUFFER.size++;
+        HAL_UART_Receive_IT(&huart1, G_USART1_BUFFER.buffer, 1);
+        G_USART1_BUFFER.size++;
     }
 
     // Get the ID corresponding to the handler
-    for (uint8_t i = 0; i < DRIVERS_ALLOC_SIZE; i++)
+    for (uint8_t l_i = 0; l_i < K_DRIVERS_ALLOC_SIZE; l_i++)
     {
-        if (DRIVERS_ALLOC[i].drv == huart)
+        if (K_DRIVERS_ALLOC[l_i].drv == p_huart)
         {
             // If a callback is configured
-            if (callbacks[i] != NULL)
+            if (G_callbacks[l_i] != NULL)
             {
                 // Call the callback
-                callbacks[i](i);
+                G_callbacks[l_i](l_i);
             }
             break;
         }
@@ -420,7 +420,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 #endif
 
 
-#ifdef DRIVER_ACTIVATE_LCD
+#ifdef K_DRIVER_ACTIVATE_LCD
 /**
  * @brief Enables or disables the LCD identified by the given ID.
  *
@@ -438,8 +438,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
  * - The specified interface must not be read-only.
  * - The specified interface must be of type LCD.
  *
- * @param id The ID of the LCD interface to be enabled or disabled.
- * @param enable A boolean flag where true enables the display, and false disables it.
+ * @param p_id The ID of the LCD interface to be enabled or disabled.
+ * @param p_enable A boolean flag where true enables the display, and false disables it.
  *
  * @return HAL_INTERFACE_RESULT
  *         - OK: If the operation was successful.
@@ -447,15 +447,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
  *         - ERR_READ_ONLY_INTERFACE: If the specified interface is read-only.
  *         - ERR_INCOMPATIBLE_ACTION: If the specified interface is not of LCD type.
  */
-HAL_INTERFACE_RESULT lcd_enable(const uint8_t id, const bool enable)
+HAL_INTERFACE_RESULT lcd_enable(const uint8_t p_id, const bool p_enable)
 {
-    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
-    if (result != OK)
+    const HAL_INTERFACE_RESULT l_result = lcd_id_check(p_id);
+    if (l_result != OK)
     {
-        return result;
+        return l_result;
     }
 
-    if (enable)
+    if (p_enable)
     {
         BSP_LCD_DisplayOn();
     }
@@ -477,26 +477,26 @@ HAL_INTERFACE_RESULT lcd_enable(const uint8_t id, const bool enable)
  * - Selects the specified layer using BSP_LCD_SelectLayer.
  * - Clears the selected layer with the provided color using BSP_LCD_Clear.
  *
- * @param id The interface ID corresponding to the target LCD. Must be within
+ * @param p_id The interface ID corresponding to the target LCD. Must be within
  *           the valid range of interface IDs and associated with an LCD interface.
- * @param layer The layer index to select for clearing.
- * @param color The color value to fill the selected layer.
+ * @param p_layer The layer index to select for clearing.
+ * @param p_color The color value to fill the selected layer.
  * @return HAL_INTERFACE_RESULT Returns one of the following results:
  *         - OK on success.
  *         - ERR_WRONG_INTERFACE_ID if the specified interface ID is invalid.
  *         - ERR_READ_ONLY_INTERFACE if the interface ID corresponds to a read-only interface.
  *         - ERR_INCOMPATIBLE_ACTION if the specified interface is not an LCD type.
  */
-HAL_INTERFACE_RESULT lcd_clear(const uint8_t id, const uint8_t layer, const uint32_t color)
+HAL_INTERFACE_RESULT lcd_clear(const uint8_t p_id, const uint8_t p_layer, const uint32_t p_color)
 {
-    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
-    if (result != OK)
+    const HAL_INTERFACE_RESULT l_result = lcd_id_check(p_id);
+    if (l_result != OK)
     {
-        return result;
+        return l_result;
     }
 
-    BSP_LCD_SelectLayer(layer);
-    BSP_LCD_Clear(color);
+    BSP_LCD_SelectLayer(p_layer);
+    BSP_LCD_Clear(p_color);
 
     return OK;
 }
@@ -511,30 +511,30 @@ HAL_INTERFACE_RESULT lcd_clear(const uint8_t id, const uint8_t layer, const uint
  * returned if the interface ID does not refer to a compatible writable LCD
  * interface or if the ID does not exist.
  *
- * @param id The interface ID for the LCD driver to be used. Must refer to
+ * @param p_id The interface ID for the LCD driver to be used. Must refer to
  *           a valid writable LCD interface.
- * @param layer The LCD layer to which the pixel is drawn. Must be a valid
+ * @param p_layer The LCD layer to which the pixel is drawn. Must be a valid
  *              layer value supported by the hardware.
- * @param x The X-coordinate of the pixel to be drawn.
- * @param y The Y-coordinate of the pixel to be drawn.
- * @param color The RGB color value of the pixel to be drawn.
+ * @param p_x The X-coordinate of the pixel to be drawn.
+ * @param p_y The Y-coordinate of the pixel to be drawn.
+ * @param p_color The RGB color value of the pixel to be drawn.
  *
  * @return HAL_INTERFACE_RESULT Returns OK if the pixel is drawn successfully.
  *         Returns an error code (e.g., ERR_WRONG_INTERFACE_ID,
  *         ERR_INCOMPATIBLE_ACTION, ERR_READ_ONLY_INTERFACE) if the interface ID
  *         is invalid or the action is disallowed.
  */
-HAL_INTERFACE_RESULT lcd_draw_pixel(const uint8_t id, const uint8_t layer, const uint16_t x, const uint16_t y,
-                                    const uint32_t color)
+HAL_INTERFACE_RESULT lcd_draw_pixel(const uint8_t p_id, const uint8_t p_layer, const uint16_t p_x, const uint16_t p_y,
+                                    const uint32_t p_color)
 {
-    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
-    if (result != OK)
+    const HAL_INTERFACE_RESULT l_result = lcd_id_check(p_id);
+    if (l_result != OK)
     {
-        return result;
+        return l_result;
     }
 
-    BSP_LCD_SelectLayer(layer);
-    BSP_LCD_DrawPixel(x, y, color);
+    BSP_LCD_SelectLayer(p_layer);
+    BSP_LCD_DrawPixel(p_x, p_y, p_color);
 
     return OK;
 }
@@ -546,24 +546,24 @@ HAL_INTERFACE_RESULT lcd_draw_pixel(const uint8_t id, const uint8_t layer, const
  * the horizontal and vertical dimensions of the LCD screen in pixels.
  * It populates the provided pointers with the retrieved dimensions.
  *
- * @param id The ID of the LCD interface to query.
- * @param x Pointer to a variable where the horizontal size (width) of the LCD will be stored.
- * @param y Pointer to a variable where the vertical size (height) of the LCD will be stored.
+ * @param p_id The ID of the LCD interface to query.
+ * @param p_x Pointer to a variable where the horizontal size (width) of the LCD will be stored.
+ * @param p_y Pointer to a variable where the vertical size (height) of the LCD will be stored.
  *
  * @return OK if the operation is successful.
  *         ERR_WRONG_INTERFACE_ID if the ID is invalid or out of bounds.
  *         ERR_INCOMPATIBLE_ACTION if the ID does not correspond to an LCD interface.
  */
-HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t *x, uint16_t *y)
+HAL_INTERFACE_RESULT get_lcd_size(const uint8_t p_id, uint16_t *p_x, uint16_t *p_y)
 {
-    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
-    if (result != OK)
+    const HAL_INTERFACE_RESULT l_result = lcd_id_check(p_id);
+    if (l_result != OK)
     {
-        return result;
+        return l_result;
     }
 
-    *x = (uint16_t) BSP_LCD_GetXSize();
-    *y = (uint16_t) BSP_LCD_GetYSize();
+    *p_x = (uint16_t) BSP_LCD_GetXSize();
+    *p_y = (uint16_t) BSP_LCD_GetYSize();
 
     return OK;
 }
@@ -576,27 +576,27 @@ HAL_INTERFACE_RESULT get_lcd_size(const uint8_t id, uint16_t *x, uint16_t *y)
  * to the specified layer. It ensures the interface ID corresponds to an LCD interface
  * and that the provided parameters are compatible.
  *
- * @param id The ID of the LCD interface to check.
- * @param layer The layer number for which the frame buffer address is requested.
- * @param addr Pointer to a variable where the frame buffer address will be stored.
+ * @param p_id The ID of the LCD interface to check.
+ * @param p_layer The layer number for which the frame buffer address is requested.
+ * @param p_addr Pointer to a variable where the frame buffer address will be stored.
  *
  * @return Returns a result of type HAL_INTERFACE_RESULT indicating the outcome:
  *         - OK: The operation was successful, and the frame buffer address is available.
  *         - ERR_WRONG_INTERFACE_ID: The specified ID is outside the valid range.
  *         - ERR_INCOMPATIBLE_ACTION: The interface ID does not correspond to an LCD.
  */
-HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint32_t *addr)
+HAL_INTERFACE_RESULT get_fb_address(const uint8_t p_id, const uint8_t p_layer, uint32_t *p_addr)
 {
-    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
-    if (result != OK)
+    const HAL_INTERFACE_RESULT l_result = lcd_id_check(p_id);
+    if (l_result != OK)
     {
-        return result;
+        return l_result;
     }
 
-    switch (layer)
+    switch (p_layer)
     {
         case 1:
-            *addr = LCD_FB_START_ADDRESS;
+            *p_addr = LCD_FB_START_ADDRESS;
             break;
         default:
             break;
@@ -614,9 +614,9 @@ HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint3
  * validation fails, it returns an appropriate error code. Otherwise, it
  * updates the specified layer's address.
  *
- * @param id The identifier of the LCD driver to modify.
- * @param layer The layer index for which the frame buffer address is to be set.
- * @param addr The new frame buffer address to be assigned.
+ * @param p_id The identifier of the LCD driver to modify.
+ * @param p_layer The layer index for which the frame buffer address is to be set.
+ * @param p_addr The new frame buffer address to be assigned.
  *
  * @return An instance of HAL_INTERFACE_RESULT indicating the result of
  *         the operation. Possible return values are:
@@ -625,15 +625,15 @@ HAL_INTERFACE_RESULT get_fb_address(const uint8_t id, const uint8_t layer, uint3
  *         - ERR_INCOMPATIBLE_ACTION: The driver ID does not correspond
  *           to an LCD interface.
  */
-HAL_INTERFACE_RESULT set_fb_address(const uint8_t id, const uint8_t layer, const uint32_t addr)
+HAL_INTERFACE_RESULT set_fb_address(const uint8_t p_id, const uint8_t p_layer, const uint32_t p_addr)
 {
-    const HAL_INTERFACE_RESULT result = lcd_id_check(id);
-    if (result != OK)
+    const HAL_INTERFACE_RESULT l_result = lcd_id_check(p_id);
+    if (l_result != OK)
     {
-        return result;
+        return l_result;
     }
 
-    BSP_LCD_SetLayerAddress(layer, addr);
+    BSP_LCD_SetLayerAddress(p_layer, p_addr);
     return OK;
 }
 #endif

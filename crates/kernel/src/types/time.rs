@@ -27,8 +27,8 @@ impl Display for Milliseconds {
     /// followed by the " ms" suffix into the provided formatter. The `self.0` refers to
     /// the inner value assumed to be a numeric type representing milliseconds.
     ///
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{} ms", self.0)
+    fn fmt(&self, p_formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(p_formatter, "{} ms", self.0)
     }
 }
 
@@ -44,8 +44,8 @@ impl Milliseconds {
     /// # Returns
     /// - A `Milliseconds` type representing the equivalent value of the input in milliseconds.
     ///
-    pub fn from_seconds(seconds: Seconds) -> Self {
-        Milliseconds(seconds.0 * 1000)
+    pub fn from_seconds(p_seconds: Seconds) -> Self {
+        Milliseconds(p_seconds.0 * 1000)
     }
     /// Converts the value of the current instance into a `u32`.
     ///
@@ -93,8 +93,8 @@ impl Display for Seconds {
     /// This method writes the string representation of the first element of the struct
     /// (`self.0`) followed by a space and the letter "s" into the provided formatter.
     ///
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{} s", self.0)
+    fn fmt(&self, p_formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(p_formatter, "{} s", self.0)
     }
 }
 
@@ -158,8 +158,8 @@ impl Display for Mhz {
     /// into the provided formatter. For example, if the value of `self.0` is `100`,
     /// this will produce the string "100 MHz".
     ///
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{} MHz", self.0)
+    fn fmt(&self, p_formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(p_formatter, "{} MHz", self.0)
     }
 }
 

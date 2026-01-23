@@ -29,14 +29,14 @@ pub enum UartWriteActions<'a> {
 }
 
 impl UartWriteActions<'_> {
-    pub(crate) fn action(&self, id: u8) -> HalInterfaceResult {
+    pub(crate) fn action(&self, p_id: u8) -> HalInterfaceResult {
         match self {
-            SendChar(c) => {
-                let data_arr = [*c];
-                unsafe { usart_write(id, &data_arr as *const u8, 1) }
+            SendChar(l_c) => {
+                let l_data_arr = [*l_c];
+                unsafe { usart_write(p_id, &l_data_arr as *const u8, 1) }
             }
-            SendString(str) => unsafe {
-                usart_write(id, str.as_bytes().as_ptr(), str.len() as u16)
+            SendString(l_str) => unsafe {
+                usart_write(p_id, l_str.as_bytes().as_ptr(), l_str.len() as u16)
             },
         }
     }
@@ -79,12 +79,12 @@ impl PixelColorARGB {
         ((self.a as u32) << 24) | ((self.r as u32) << 16) | ((self.g as u32) << 8) | (self.b as u32)
     }
 
-    pub fn from_u32(color: u32) -> Self {
+    pub fn from_u32(p_color: u32) -> Self {
         PixelColorARGB {
-            a: ((color >> 24) & 0xFF) as u8,
-            r: ((color >> 16) & 0xFF) as u8,
-            g: ((color >> 8) & 0xFF) as u8,
-            b: (color & 0xFF) as u8,
+            a: ((p_color >> 24) & 0xFF) as u8,
+            r: ((p_color >> 16) & 0xFF) as u8,
+            g: ((p_color >> 8) & 0xFF) as u8,
+            b: (p_color & 0xFF) as u8,
         }
     }
 }
@@ -98,14 +98,16 @@ pub enum LcdActions {
 }
 
 impl LcdActions {
-    pub(crate) fn action(&self, id: u8) -> HalInterfaceResult {
+    pub(crate) fn action(&self, p_id: u8) -> HalInterfaceResult {
         match self {
-            Enable(enable) => unsafe { lcd_enable(id, *enable) },
-            Clear(layer, color) => unsafe { lcd_clear(id, *layer, color.as_u32()) },
-            DrawPixel(layer, pixel) => unsafe {
-                lcd_draw_pixel(id, *layer, pixel.x, pixel.y, pixel.color.as_u32())
+            Enable(l_enable) => unsafe { lcd_enable(p_id, *l_enable) },
+            Clear(l_layer, l_color) => unsafe { lcd_clear(p_id, *l_layer, l_color.as_u32()) },
+            DrawPixel(l_layer, l_pixel) => unsafe {
+                lcd_draw_pixel(p_id, *l_layer, l_pixel.x, l_pixel.y, l_pixel.color.as_u32())
             },
-            SetFbAddress(layer, fb_address) => unsafe { set_fb_address(id, *layer, *fb_address) },
+            SetFbAddress(l_layer, l_fb_address) => unsafe {
+                set_fb_address(p_id, *l_layer, *l_fb_address)
+            },
         }
     }
 }

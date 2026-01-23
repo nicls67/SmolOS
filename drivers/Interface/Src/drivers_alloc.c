@@ -28,23 +28,23 @@
 /*********************/
 /* Private constants */
 /*********************/
-uint8_t USART1_BUFFER_BUF[USART_BUFFER_SIZE];
-RX_BUFFER USART1_BUFFER = {
-    .buffer = USART1_BUFFER_BUF,
+uint8_t G_USART1_BUFFER_BUF[K_USART_BUFFER_SIZE];
+RX_BUFFER G_USART1_BUFFER = {
+    .buffer = G_USART1_BUFFER_BUF,
     .size = 0,
 };
-const GPIO_ALLOC GPIO_PJ5 = {
+const GPIO_ALLOC K_GPIO_PJ5 = {
     .gpio = GPIOJ,
     .pin = GPIO_PIN_5,
 };
-const GPIO_ALLOC GPIO_PJ13 = {
+const GPIO_ALLOC K_GPIO_PJ13 = {
     .gpio = GPIOJ,
     .pin = GPIO_PIN_13,
 };
-const DRIVER_ALLOC DRIVERS_ALLOC[] = {
-    { (uint8_t*)"SERIAL_MAIN", USART, INOUT, (void*) &huart1, (void*) &USART1_BUFFER, 0 },
-    { (uint8_t*)"ACT_LED", GPIO, OUT, (void*) &GPIO_PJ5, (void*) 0, 1 },
-    { (uint8_t*)"ERR_LED", GPIO, OUT, (void*) &GPIO_PJ13, (void*) 0, 2 },
+const DRIVER_ALLOC K_DRIVERS_ALLOC[] = {
+    { (uint8_t*)"SERIAL_MAIN", USART, INOUT, (void*) &huart1, (void*) &G_USART1_BUFFER, 0 },
+    { (uint8_t*)"ACT_LED", GPIO, OUT, (void*) &K_GPIO_PJ5, (void*) 0, 1 },
+    { (uint8_t*)"ERR_LED", GPIO, OUT, (void*) &K_GPIO_PJ13, (void*) 0, 2 },
     { (uint8_t*)"LCD", LCD, INOUT, (void*) 0, (void*) 0, 3 },
 };
 
@@ -69,7 +69,7 @@ void drivers_init()
     MX_USART1_UART_Init();
 
     // USART1 initialization
-    HAL_UART_Receive_IT(&huart1, USART1_BUFFER.buffer, 1);
+    HAL_UART_Receive_IT(&huart1, G_USART1_BUFFER.buffer, 1);
 
     // GPIO initialization
     MX_GPIO_Init();

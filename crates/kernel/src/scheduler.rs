@@ -26,53 +26,6 @@ use heapless::Vec;
 ///
 pub type App = fn() -> KernelResult<()>;
 
-/// A type alias for a function pointer that takes an unsigned 32-bit integer (`u32`)
-/// as an input parameter and returns a `KernelResult<()>`.
-///
-/// # Type Definition
-/// ```
-/// pub type AppParam = fn(u32) -> KernelResult<()>;
-/// ```
-///
-/// # Usage
-/// This type alias represents a callback or function interface that can be used within
-/// the kernel or application context. The function is expected to perform an operation
-/// based on the given `u32` parameter and return a `KernelResult<()>`.
-///
-/// The `KernelResult<()>` typically indicates whether the operation was
-/// successful or encountered an error, following the convention of `Result<T, E>`
-/// where `()` represents a unit type for successful results.
-///
-/// # Notes
-/// - The `KernelResult` and potential return types (`Ok` or `Err`) need to be
-///   appropriately defined in your context.
-/// - This alias helps standardize function signatures across different modules.
-pub type AppParam = fn(u32) -> KernelResult<()>;
-
-/// Represents different types of application calls within a system.
-///
-/// This enum encapsulates various variants of calls to an app, with or without parameters.
-///
-/// # Variants
-///
-/// - `AppNoParam`:
-///   - Represents a call to an app that does not require any parameters.
-///   - Fields:
-///     - `App`: The primary application to be called.
-///     - `Option<App>`: An optional secondary application reference.
-///
-/// - `AppParam`:
-///   - Represents a call to an app that requires parameters.
-///   - Fields:
-///     - `AppParam`: The parameter structure associated with the application call.
-///     - `u32`: A numeric identifier or parameter for the call.
-///     - `Option<App>`: An optional secondary application reference.
-///
-pub enum AppCall {
-    AppNoParam(App, Option<App>),
-    AppParam(AppParam, u32, Option<App>),
-}
-
 /// `AppWrapper` is a structure that encapsulates metadata and state for an application
 /// or service within a system. It provides details such as the application name,
 /// its initialization state, runtime period, lifecycle, and active status.
@@ -83,7 +36,7 @@ pub enum AppCall {
 ///   The static name identifier for the application. This name remains constant
 ///   throughout the lifecycle of the application.
 ///
-/// * `app` (`AppCall`) -
+/// * `app` (`App`) -
 ///   Represents the core application logic or callable function associated with the application.
 ///   This is the primary entry point for executing application-specific logic.
 ///
@@ -118,8 +71,9 @@ pub enum AppCall {
 ///
 struct AppWrapper {
     name: &'static str,
-    app: AppCall,
+    app: App,
     app_init: Option<App>,
+    app_closure: Option<App>,
     app_period: u32,
     ends_in: Option<u32>,
     active: bool,
@@ -171,11 +125,11 @@ impl Scheduler {
     /// - `current_task_has_error`: Set to `false`, indicating no task errors have been encountered.
     ///
     /// Use this constructor to create a new instance of the `Scheduler` and begin adding tasks or configuring it based on specified requirements.
-    pub fn new(period: Milliseconds) -> Scheduler {
+    pub fn new(p_period: Milliseconds) -> Scheduler {
         Scheduler {
             tasks: Vec::new(),
             cycle_counter: 0,
-            sched_period: period,
+            sched_period: p_period,
             started: false,
             current_task_id: None,
             current_task_has_error: false,
@@ -205,84 +159,68 @@ impl Scheduler {
     /// interrupt to its lowest value (0xFF), and initializes periodic interrupts by setting the scheduler ticks target.
     /// The unsafe block must ensure safe interaction with shared hardware resources to avoid undefined behavior.
     ///
-    pub fn start(&mut self, systick_period: Milliseconds) -> KernelResult<()> {
-        let cortex_p = Kernel::cortex_peripherals();
+    pub fn start(&mut self, p_systick_period: Milliseconds) -> KernelResult<()> {
+        let l_cortex_p = Kernel::cortex_peripherals();
 
         // Initialize scheduler periodic IT
         unsafe {
-            cortex_p.SCB.set_priority(SystemHandler::PendSV, 0xFF);
-            set_ticks_target(self.sched_period.to_u32() / systick_period.to_u32())
+            l_cortex_p.SCB.set_priority(SystemHandler::PendSV, 0xFF);
+            set_ticks_target(self.sched_period.to_u32() / p_systick_period.to_u32())
         }
 
         self.started = true;
         Kernel::terminal().write(&ConsoleFormatting::StrNewLineBoth("Scheduler started !"))
     }
 
-    /// Adds a periodic application to the scheduler.
+    /// Registers a new periodic application with the scheduler.
     ///
-    /// This function allows for the registration of a periodic application that will
-    /// run based on the specified period. It includes optional initialization and a configurable
-    /// duration for how long the application will remain active.
+    /// This method adds an application to the scheduler's task list, configuring it to run
+    /// at a specified interval. The application can optionally have initialization and
+    /// cleanup callbacks, as well as a finite lifetime.
     ///
-    /// ### Parameters:
-    /// - `name`: A static string slice representing the unique name of the application.
-    /// - `app`: An instance of `AppCall`, defining the function or process to execute.
-    ///   It can either be a callable application without parameters (`AppCall::AppNoParam`)
-    ///   or one with parameters (`AppCall::AppParam`).
-    /// - `app_init`: An optional initialization routine or state for the application (can be `None`).
-    /// - `period`: The desired period (in milliseconds) at which the application should execute.
-    /// - `ends_in`: An optional duration (in milliseconds) after which the application will no longer
-    ///   execute periodically. If `None`, the application will run indefinitely according to its period.
+    /// # Parameters
     ///
-    /// ### Returns:
-    /// - `Ok(u32)`: Returns the unique ID of the newly added application on a successful addition.
-    /// - `Err(KernelError)`: Returns an error if:
-    ///   - The application with the same name and parameters already exists
-    ///     (`KernelError::AppAlreadyExists`).
-    ///   - A new periodic application cannot be added due to internal constraints
-    ///     (`KernelError::CannotAddNewPeriodicApp`).
+    /// * `name` - A static string identifier for the application. Must be unique within
+    ///   the scheduler.
     ///
-    /// ### Errors:
-    /// - **`KernelError::AppAlreadyExists`**: This error is raised when an application with the
-    ///   same name and parameters is already registered in the scheduler.
-    /// - **`KernelError::CannotAddNewPeriodicApp`**: This error occurs if the scheduler
-    ///   fails to add the new application due to internal capacity or system-level restrictions.
+    /// * `app` - The application entry point.
     ///
-    /// ### Internal Workflow:
-    /// 1. **Duplicate Check**: First, checks whether the application already exists by using
-    ///    `self.app_exists()`. This considers both the name and parameters of the application.
-    /// 2. **Scheduler Registration**: If the application is unique, registers it in the scheduler's
-    ///    task queue with the provided configurations.
-    /// 3. **ID Tracking**: Assigns a unique identifier to the new application and increments
-    ///    the internal counter `self.next_id`.
-    /// 4. **Return Value**: Returns the assigned application ID or an error.
+    /// * `app_init` - Optional initialization function called once before the first
+    ///   execution of the application. If initialization fails, the app is skipped
+    ///   until the next cycle and init is retried.
     ///
-    /// ### Notes:
-    /// - The periodic execution is calculated as fractions of the scheduler's `sched_period`.
-    /// - Proper handling of initialization (`app_init`) and termination conditions
-    ///   (`app_period` and `ends_in`) should be ensured for accurate functioning.
-    /// - This function modifies the internal state of the scheduler; make sure it's used in a
-    ///   thread-safe context if applicable.
+    /// * `app_closure` - Optional cleanup function called when the application's lifetime
+    ///   expires (i.e., when `ends_in` reaches zero). Useful for releasing resources.
     ///
-    /// ### See Also:
-    /// - [`AppCall`] for application execution configurations.
-    /// - [`KernelError`] for different error types that may be returned.
+    /// * `period` - The interval between consecutive executions of the application,
+    ///   expressed in milliseconds. Internally converted to scheduler cycles.
+    ///
+    /// * `ends_in` - Optional finite lifetime for the application. When specified, the
+    ///   application will be automatically removed after this duration elapses.
+    ///   If `None`, the application runs indefinitely until explicitly removed.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(u32)` - The unique identifier assigned to the newly registered application.
+    ///   This ID can be used for tracking or removing the application later.
+    ///
+    /// * `Err(KernelError::AppAlreadyScheduled)` - If an application with the same name
+    ///   is already registered.
+    ///
+    /// * `Err(KernelError::CannotAddNewPeriodicApp)` - If the task list is full and
+    ///   cannot accommodate additional applications.
     pub fn add_periodic_app(
         &mut self,
-        name: &'static str,
-        app: AppCall,
-        app_init: Option<App>,
-        period: Milliseconds,
-        ends_in: Option<Milliseconds>,
+        p_name: &'static str,
+        p_app: App,
+        p_app_init: Option<App>,
+        p_app_closure: Option<App>,
+        p_period: Milliseconds,
+        p_ends_in: Option<Milliseconds>,
     ) -> KernelResult<u32> {
         // Check if the app already exists
-        if (match app {
-            AppCall::AppNoParam(_, _) => self.app_exists(name, None),
-            AppCall::AppParam(_, p, _) => self.app_exists(name, Some(p)),
-        })
-        .is_some()
-        {
-            return Err(KernelError::AppAlreadyScheduled(name));
+        if (self.app_exists(p_name)).is_some() {
+            return Err(KernelError::AppAlreadyScheduled(p_name));
         }
 
         // Increment app ID
@@ -291,15 +229,16 @@ impl Scheduler {
         // Register app in the scheduler
         self.tasks
             .push(AppWrapper {
-                name,
-                app,
-                app_init,
-                app_period: period.to_u32() / self.sched_period.to_u32(),
+                name: p_name,
+                app: p_app,
+                app_init: p_app_init,
+                app_closure: p_app_closure,
+                app_period: p_period.to_u32() / self.sched_period.to_u32(),
                 active: true,
-                ends_in: ends_in.map(|e| e.to_u32() / period.to_u32()),
+                ends_in: p_ends_in.map(|l_e| l_e.to_u32() / p_period.to_u32()),
                 app_id: self.next_id,
             })
-            .map_err(|_| CannotAddNewPeriodicApp(name))?;
+            .map_err(|_| CannotAddNewPeriodicApp(p_name))?;
 
         // Return ID
         Ok(self.next_id)
@@ -307,20 +246,17 @@ impl Scheduler {
 
     /// Removes a periodic application from the task list.
     ///
-    /// This function searches for a task by its name and an optional parameter.
-    /// If the task exists, it is removed from the internal task list. Otherwise,
+    /// This function searches for a task by its name. If the task exists, it is removed
+    /// from the internal task list. Otherwise,
     /// an error is returned indicating that the application was not found.
     ///
     /// # Parameters
     /// - `name`: A static string slice that specifies the name of the application
     ///   to be removed.
-    /// - `param`: An optional parameter of type `u32` that can be used to
-    ///   refine the search for the application.
-    ///
     /// # Returns
     /// - `Ok(())`: If the application was successfully removed.
     /// - `Err(KernelError::AppNotFound)`: If no application with the specified
-    ///   name (and parameter, if provided) exists.
+    ///   name exists.
     ///
     /// # Errors
     /// This function returns a `KernelError::AppNotFound` error if the application
@@ -331,121 +267,97 @@ impl Scheduler {
     ///   which removes the item at the specified index by swapping it with the
     ///   last element and then removing it.
     /// - If the task does not exist, no changes are made to the list.
-    pub fn remove_periodic_app(
-        &mut self,
-        name: &'static str,
-        param: Option<u32>,
-    ) -> KernelResult<()> {
-        if let Some(index) = self.app_exists(name, param) {
-            Kernel::apps().stop_app(self.tasks[index].app_id)?;
-            self.tasks.swap_remove(index);
+    pub fn remove_periodic_app(&mut self, p_name: &'static str) -> KernelResult<()> {
+        if let Some(l_index) = self.app_exists(p_name) {
+            Kernel::apps().stop_app(self.tasks[l_index].app_id)?;
+            self.tasks.swap_remove(l_index);
             Ok(())
         } else {
-            Err(KernelError::AppNotScheduled(name))
+            Err(KernelError::AppNotScheduled(p_name))
         }
     }
 
-    /// Executes periodic tasks based on their scheduling requirements, manages their lifecycle,
-    /// handles errors, and ensures that completed tasks are removed properly.
+    /// Executes all due periodic tasks for the current scheduler cycle.
     ///
-    /// This method performs the following actions:
-    /// 1. Iterates through the list of tasks and checks if a task should be executed based on the current cycle count and task period.
-    /// 2. Initializes the task using an optional initialization function (`app_init`) if it's the first time the task runs.
-    /// 3. Executes the main function of the task:
-    ///    - This can either be a function with no parameters (`AppNoParam`) or one with parameters (`AppParam`).
-    ///    - Any errors encountered during execution are handled by invoking the provided error handler.
-    /// 4. Manages the end-of-life scenario for tasks:
-    ///    - If a task is configured to end after a specific number of cycles (`ends_in`), it decrements the remaining cycle count.
-    ///    - When the count reaches zero, the task is marked for removal and any cleanup closure associated with the task is executed.
-    /// 5. Removes tasks that have completed their lifecycle from the task list.
-    /// 6. Increments the global cycle counter after processing all tasks.
+    /// This method is the core scheduling loop, typically invoked from the PendSV interrupt
+    /// handler. It iterates through all registered tasks and executes those whose period
+    /// aligns with the current cycle counter.
     ///
-    /// # Task Lifecycle
-    /// - Tasks can be periodic, running at scheduled intervals defined by their `app_period`.
-    /// - Tasks can optionally initialize themselves during their first execution.
-    /// - Tasks may have an optional end condition determined by the `ends_in` field. If a task ends,
-    ///   a closure may execute to perform custom cleanup logic.
-    /// - Tasks that have completed their lifecycle are safely removed from the task list.
+    /// # Behavior
     ///
-    /// # Error Management
-    /// - Errors encountered during task initialization or execution are handled by invoking `Kernel::errors().error_handler(&e)`.
-    /// - The system ensures error handling is invoked only once per erroneous execution per task.
+    /// For each active task whose execution period has elapsed:
+    ///
+    /// 1. **Initialization**: If the task has a pending `app_init` function, it is called
+    ///    first. On success, the init function is cleared (runs only once). On failure,
+    ///    the error is handled and the task is skipped for this cycle.
+    ///
+    /// 2. **Execution**: The main application function is invoked. Errors are routed through
+    ///    the kernel error handler unless an error was already flagged for this task.
+    ///
+    /// 3. **Lifetime management**: If the task has a finite lifetime (`ends_in`), the
+    ///    remaining count is decremented. When it reaches zero:
+    ///    - The `app_closure` callback is invoked (if configured) for cleanup.
+    ///    - The task is marked for removal.
+    ///
+    /// 4. **Cleanup**: All tasks marked for removal are unregistered from the scheduler.
+    ///
+    /// 5. **Cycle increment**: The global cycle counter is incremented.
+    ///
+    /// # Error handling
+    ///
+    /// Errors during task execution are passed to [`Kernel::errors().error_handler()`].
+    /// The `current_task_has_error` flag prevents duplicate error handling if the error
+    /// handler itself triggers additional errors for the same task.
     ///
     /// # Panics
-    /// This function may panic if:
-    /// - The task to be removed cannot be found.
-    /// - Adding a task to the `tasks_to_remove` list exceeds its fixed capacity.
     ///
-    /// This will run the tasks scheduled for the current cycle, handle any errors, and clean up completed tasks.
-    ///
-    /// # Note
-    /// - This function works with a mutable reference to itself to allow modifications to the task list.
-    /// - The capacity of `tasks_to_remove` is fixed at 8. If more than 8 tasks are to be removed in a single cycle,
-    ///   the method will panic.
+    /// May panic if the internal `tasks_to_remove` buffer overflows (more than 8 tasks
+    /// ending in a single cycle) or if `remove_periodic_app` fails unexpectedly.
     pub fn periodic_task(&mut self) {
-        let mut tasks_to_remove: Vec<(&'static str, Option<u32>), 8> = Vec::new();
+        let mut l_tasks_to_remove: Vec<&'static str, 8> = Vec::new();
 
         // Run all tasks
-        for (id, task) in self.tasks.iter_mut().enumerate() {
-            if self.cycle_counter.is_multiple_of(task.app_period) && task.active {
-                self.current_task_id = Some(id);
+        for (l_id, l_task) in self.tasks.iter_mut().enumerate() {
+            if self.cycle_counter.is_multiple_of(l_task.app_period) && l_task.active {
+                self.current_task_id = Some(l_id);
                 self.current_task_has_error = false;
 
                 // Try to initialize the app at the first call
-                if let Some(init_func) = task.app_init {
-                    match init_func() {
-                        Ok(..) => task.app_init = None,
-                        Err(e) => {
-                            Kernel::errors().error_handler(&e);
+                if let Some(l_init_func) = l_task.app_init {
+                    match l_init_func() {
+                        Ok(..) => l_task.app_init = None,
+                        Err(l_e) => {
+                            Kernel::errors().error_handler(&l_e);
                             continue;
                         }
                     }
                 }
 
                 // Execute the task
-                match task.app {
-                    AppCall::AppNoParam(app, _) => match app() {
-                        Ok(..) => {}
-                        Err(e) => {
-                            if !self.current_task_has_error {
-                                Kernel::errors().error_handler(&e);
-                            }
+                match (l_task.app)() {
+                    Ok(..) => {}
+                    Err(l_e) => {
+                        if !self.current_task_has_error {
+                            Kernel::errors().error_handler(&l_e);
                         }
-                    },
-                    AppCall::AppParam(app, param, _) => match app(param) {
-                        Ok(..) => {}
-                        Err(e) => {
-                            if !self.current_task_has_error {
-                                Kernel::errors().error_handler(&e);
-                            }
-                        }
-                    },
+                    }
                 }
                 self.current_task_has_error = false;
                 self.current_task_id = None;
 
                 // Check if the task has ended
-                if task.ends_in.is_some() {
-                    task.ends_in = task.ends_in.map(|e| e - 1);
-                    if task.ends_in.unwrap() == 0 {
-                        let closure_to_apply = match task.app {
-                            AppCall::AppNoParam(_, closure) => {
-                                tasks_to_remove.push((task.name, None)).unwrap();
-                                closure
-                            }
-                            AppCall::AppParam(_, p, closure) => {
-                                tasks_to_remove.push((task.name, Some(p))).unwrap();
-                                closure
-                            }
-                        };
+                if l_task.ends_in.is_some() {
+                    l_task.ends_in = l_task.ends_in.map(|l_e| l_e - 1);
+                    if l_task.ends_in.unwrap() == 0 {
+                        l_tasks_to_remove.push(l_task.name).unwrap();
 
                         // Apply closure
-                        if let Some(c) = closure_to_apply {
-                            match c() {
+                        if let Some(l_c) = l_task.app_closure {
+                            match l_c() {
                                 Ok(..) => {}
-                                Err(e) => {
+                                Err(l_e) => {
                                     if !self.current_task_has_error {
-                                        Kernel::errors().error_handler(&e);
+                                        Kernel::errors().error_handler(&l_e);
                                     }
                                 }
                             }
@@ -456,8 +368,8 @@ impl Scheduler {
         }
 
         // Remove tasks that have ended
-        for (task_name, param) in tasks_to_remove {
-            self.remove_periodic_app(task_name, param).unwrap();
+        for l_task_name in l_tasks_to_remove {
+            self.remove_periodic_app(l_task_name).unwrap();
         }
 
         // Increment cycle counter
@@ -487,58 +399,39 @@ impl Scheduler {
     pub fn abort_task_on_error(&mut self) {
         if SCB::vect_active() == VectActive::Exception(Exception::PendSV) {
             // Set the current task as inactive
-            if let Some(id) = self.current_task_id {
-                self.tasks[id].active = false;
+            if let Some(l_id) = self.current_task_id {
+                self.tasks[l_id].active = false;
                 self.current_task_has_error = true;
             }
         }
     }
 
-    /// Checks if an application with the given name and an optional parameter exists within the task list.
+    /// Checks if an application with the given name exists within the task list.
     ///
     /// This function iterates through the internal list of tasks and checks if a task with the specified
-    /// `name` exists. If a `param` is passed, the function further checks if the optional parameter of the
-    /// task matches the provided value. If either of these conditions is met, the index of the matching
-    /// task is returned; otherwise, the function returns `None`.
+    /// `name` exists. If a matching task is found, the index is returned; otherwise, the function returns `None`.
     ///
     /// # Arguments
     ///
     /// * `name` - A string slice representing the name of the application to search for.
-    /// * `param` - An `Option<u32>` representing the optional parameter to match against.
-    ///   If `None` is provided, the function ignores parameter-based matching.
-    ///
     /// # Returns
     ///
-    /// * `Some(usize)` - The index of the first task in the list that matches the given name and optional parameter.
+    /// * `Some(usize)` - The index of the first task in the list that matches the given name.
     /// * `None` - If no such application is found.
     ///
     /// # Behavior
     ///
-    /// * If the task's name matches but the specific task has no associated parameter (i.e., the `AppCall` variant is not `AppParam`),
-    ///   the function will return the index of that task.
-    /// * If a `param` is provided, both the name and parameter must match for the index to be returned.
-    /// * If no `param` is provided, only the name needs to match for the index to be returned.
-    ///
-    pub fn app_exists(&self, name: &str, param: Option<u32>) -> Option<usize> {
-        for (index, task) in self.tasks.iter().enumerate() {
-            if task.name == name {
-                if let AppCall::AppParam(_, app_param, _) = task.app {
-                    if let Some(p) = param {
-                        if p == app_param {
-                            return Some(index);
-                        }
-                    } else {
-                        return Some(index);
-                    }
-                } else {
-                    return Some(index);
-                }
+    /// * If the task's name matches, the function returns the index of that task.
+    pub fn app_exists(&self, p_name: &str) -> Option<usize> {
+        for (l_index, l_task) in self.tasks.iter().enumerate() {
+            if l_task.name == p_name {
+                return Some(l_index);
             }
         }
         None
     }
 
-    /// Updates the duration for a task specified by its name and optional parameter.
+    /// Updates the duration for a task specified by its name.
     ///
     /// This function modifies the `ends_in` field of a task, recalculating its
     /// value based on the provided duration (`time`), the scheduler period, and
@@ -547,15 +440,13 @@ impl Scheduler {
     ///
     /// # Parameters
     /// - `name`: A static string slice representing the name of the task to update.
-    /// - `param`: An optional 32-bit unsigned integer parameter to further identify
-    ///   the task. This can differentiate between tasks with the same name.
     /// - `time`: A `Milliseconds` instance representing the new duration for the
     ///   task, usually measured in milliseconds.
     ///
     /// # Returns
     /// - `Ok(())`: If the task's duration was successfully updated.
     /// - `Err(KernelError::AppNotFound)`: If no task matching the specified `name`
-    ///   and `param` is found.
+    ///   is found.
     ///
     /// # Panics
     /// This function does not explicitly panic under normal conditions. However,
@@ -569,16 +460,15 @@ impl Scheduler {
     /// prevent division-related errors.
     pub fn set_new_task_duration(
         &mut self,
-        name: &'static str,
-        param: Option<u32>,
-        time: Milliseconds,
+        p_name: &'static str,
+        p_time: Milliseconds,
     ) -> KernelResult<()> {
-        if let Some(index) = self.app_exists(name, param) {
-            self.tasks[index].ends_in =
-                Some(time.to_u32() / self.sched_period.to_u32() / self.tasks[index].app_period);
+        if let Some(l_index) = self.app_exists(p_name) {
+            self.tasks[l_index].ends_in =
+                Some(p_time.to_u32() / self.sched_period.to_u32() / self.tasks[l_index].app_period);
             Ok(())
         } else {
-            Err(KernelError::AppNotScheduled(name))
+            Err(KernelError::AppNotScheduled(p_name))
         }
     }
 
@@ -594,26 +484,5 @@ impl Scheduler {
     ///
     pub fn get_period(&self) -> Milliseconds {
         self.sched_period
-    }
-
-    /// Checks whether a task with the given application ID is currently active.
-    ///
-    /// This helper scans the scheduler's internal task list and returns `true` if it
-    /// finds a task whose `app_id` matches `id` **and** whose `active` flag is set.
-    ///
-    /// # Parameters
-    /// - `id`: The application ID previously returned by [`Scheduler::add_periodic_app`].
-    ///
-    /// # Returns
-    /// - `true` if a task with this ID exists and is active.
-    /// - `false` if no matching task exists or if the task is present but inactive.
-    ///
-    /// # Notes
-    /// - Inactive tasks can occur when a task is aborted due to an error via
-    ///   [`Scheduler::abort_task_on_error`].
-    pub(crate) fn is_id_active(&self, id: u32) -> bool {
-        self.tasks
-            .iter()
-            .any(|task| task.app_id == id && task.active)
     }
 }

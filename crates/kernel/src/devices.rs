@@ -1,4 +1,4 @@
-use crate::{KernelError, KernelResult, data::Kernel, ident::KERNEL_MASTER_ID};
+use crate::{KernelError, KernelResult, data::Kernel, ident::K_KERNEL_MASTER_ID};
 
 /// Device locking and authorization utilities.
 ///
@@ -9,7 +9,7 @@ use crate::{KernelError, KernelResult, data::Kernel, ident::KERNEL_MASTER_ID};
 ///   delegates peripheral lock management to the HAL.
 ///
 /// Lock ownership is represented by a caller identifier (`caller_id: u32`). The
-/// [`KERNEL_MASTER_ID`] is treated as a privileged owner that can take over (lock) and release
+/// [`K_KERNEL_MASTER_ID`] is treated as a privileged owner that can take over (lock) and release
 /// (unlock) devices regardless of current ownership.
 pub enum DeviceType {
     /// The system terminal device.
@@ -33,8 +33,8 @@ impl DeviceType {
         match self {
             DeviceType::Terminal => Ok("Terminal"),
             DeviceType::Display => Ok("Display"),
-            DeviceType::Peripheral(id) => {
-                hal_interface::interface_name(*id).map_err(KernelError::HalError)
+            DeviceType::Peripheral(l_id) => {
+                hal_interface::interface_name(*l_id).map_err(KernelError::HalError)
             }
         }
     }
@@ -113,12 +113,12 @@ impl DevicesManager {
     /// # Errors
     /// - For [`DeviceType::Peripheral`], returns `Err(KernelError::HalError(_))` if the HAL query
     ///   fails.
-    pub fn is_locked(&self, device_type: DeviceType) -> KernelResult<bool> {
-        match device_type {
+    pub fn is_locked(&self, p_device_type: DeviceType) -> KernelResult<bool> {
+        match p_device_type {
             DeviceType::Terminal => Ok(self.terminal_state.is_locked()),
             DeviceType::Display => Ok(self.display_state.is_locked()),
-            DeviceType::Peripheral(id) => Ok(Kernel::hal()
-                .is_interface_locked(id)
+            DeviceType::Peripheral(l_id) => Ok(Kernel::hal()
+                .is_interface_locked(l_id)
                 .map_err(KernelError::HalError)?
                 .is_some()),
         }
@@ -130,7 +130,7 @@ impl DevicesManager {
     /// - If the device is unlocked, it becomes locked by `caller_id`.
     /// - If the device is already locked by `caller_id`, this is a no-op (`Ok(())`).
     /// - If the device is locked by someone else:
-    ///   - `caller_id == KERNEL_MASTER_ID` takes ownership (lock takeover) and returns `Ok(())`.
+    ///   - `caller_id == K_KERNEL_MASTER_ID` takes ownership (lock takeover) and returns `Ok(())`.
     ///   - otherwise returns [`KernelError::DeviceLocked`].
     ///
     /// For peripherals, the operation is delegated to the HAL.
@@ -144,45 +144,45 @@ impl DevicesManager {
     ///
     /// # Errors
     /// - `Err(KernelError::DeviceLocked(_))` if the device is locked by a different owner and the
-    ///   caller is not [`KERNEL_MASTER_ID`]. The error message uses [`DeviceType::name`].
+    ///   caller is not [`K_KERNEL_MASTER_ID`]. The error message uses [`DeviceType::name`].
     /// - `Err(KernelError::HalError(_))` for HAL failures when locking peripherals or when resolving
     ///   a peripheral name for error reporting.
-    pub fn lock(&mut self, device_type: DeviceType, caller_id: u32) -> KernelResult<()> {
-        match device_type {
+    pub fn lock(&mut self, p_device_type: DeviceType, p_caller_id: u32) -> KernelResult<()> {
+        match p_device_type {
             DeviceType::Terminal => match self.terminal_state {
                 LockState::Unlocked => {
-                    self.terminal_state = LockState::Locked(caller_id);
+                    self.terminal_state = LockState::Locked(p_caller_id);
                     Ok(())
                 }
-                LockState::Locked(id) => {
-                    if caller_id == id {
+                LockState::Locked(l_id) => {
+                    if p_caller_id == l_id {
                         Ok(())
-                    } else if caller_id == KERNEL_MASTER_ID {
-                        self.terminal_state = LockState::Locked(caller_id);
+                    } else if p_caller_id == K_KERNEL_MASTER_ID {
+                        self.terminal_state = LockState::Locked(p_caller_id);
                         Ok(())
                     } else {
-                        Err(KernelError::DeviceLocked(device_type.name()?))
+                        Err(KernelError::DeviceLocked(p_device_type.name()?))
                     }
                 }
             },
             DeviceType::Display => match self.display_state {
                 LockState::Unlocked => {
-                    self.display_state = LockState::Locked(caller_id);
+                    self.display_state = LockState::Locked(p_caller_id);
                     Ok(())
                 }
-                LockState::Locked(id) => {
-                    if caller_id == id {
+                LockState::Locked(l_id) => {
+                    if p_caller_id == l_id {
                         Ok(())
-                    } else if caller_id == KERNEL_MASTER_ID {
-                        self.display_state = LockState::Locked(caller_id);
+                    } else if p_caller_id == K_KERNEL_MASTER_ID {
+                        self.display_state = LockState::Locked(p_caller_id);
                         Ok(())
                     } else {
-                        Err(KernelError::DeviceLocked(device_type.name()?))
+                        Err(KernelError::DeviceLocked(p_device_type.name()?))
                     }
                 }
             },
-            DeviceType::Peripheral(id) => Kernel::hal()
-                .lock_interface(id, caller_id)
+            DeviceType::Peripheral(l_id) => Kernel::hal()
+                .lock_interface(l_id, p_caller_id)
                 .map_err(KernelError::HalError),
         }
     }
@@ -190,7 +190,7 @@ impl DevicesManager {
     /// Unlocks the given device if `caller_id` is authorized to do so.
     ///
     /// For terminal/display:
-    /// - If the device is locked by `caller_id` or `caller_id == KERNEL_MASTER_ID`, it is unlocked.
+    /// - If the device is locked by `caller_id` or `caller_id == K_KERNEL_MASTER_ID`, it is unlocked.
     /// - If the device is locked by someone else, returns [`KernelError::DeviceNotOwned`].
     /// - If already unlocked, this is a no-op (`Ok(())`).
     ///
@@ -205,35 +205,35 @@ impl DevicesManager {
     ///
     /// # Errors
     /// - `Err(KernelError::DeviceNotOwned(_))` if the device is locked by a different owner and the
-    ///   caller is not [`KERNEL_MASTER_ID`]. The error message uses [`DeviceType::name`].
+    ///   caller is not [`K_KERNEL_MASTER_ID`]. The error message uses [`DeviceType::name`].
     /// - `Err(KernelError::HalError(_))` for HAL failures when unlocking peripherals or when
     ///   resolving a peripheral name for error reporting.
-    pub fn unlock(&mut self, device_type: DeviceType, caller_id: u32) -> KernelResult<()> {
-        match device_type {
+    pub fn unlock(&mut self, p_device_type: DeviceType, p_caller_id: u32) -> KernelResult<()> {
+        match p_device_type {
             DeviceType::Terminal => match self.terminal_state {
-                LockState::Locked(id) => {
-                    if caller_id == id || caller_id == KERNEL_MASTER_ID {
+                LockState::Locked(l_id) => {
+                    if p_caller_id == l_id || p_caller_id == K_KERNEL_MASTER_ID {
                         self.terminal_state = LockState::Unlocked;
                         Ok(())
                     } else {
-                        Err(KernelError::DeviceNotOwned(device_type.name()?))
+                        Err(KernelError::DeviceNotOwned(p_device_type.name()?))
                     }
                 }
                 LockState::Unlocked => Ok(()),
             },
             DeviceType::Display => match self.display_state {
-                LockState::Locked(id) => {
-                    if caller_id == id || caller_id == KERNEL_MASTER_ID {
+                LockState::Locked(l_id) => {
+                    if p_caller_id == l_id || p_caller_id == K_KERNEL_MASTER_ID {
                         self.display_state = LockState::Unlocked;
                         Ok(())
                     } else {
-                        Err(KernelError::DeviceNotOwned(device_type.name()?))
+                        Err(KernelError::DeviceNotOwned(p_device_type.name()?))
                     }
                 }
                 LockState::Unlocked => Ok(()),
             },
-            DeviceType::Peripheral(id) => Kernel::hal()
-                .unlock_interface(id, caller_id)
+            DeviceType::Peripheral(l_id) => Kernel::hal()
+                .unlock_interface(l_id, p_caller_id)
                 .map_err(KernelError::HalError),
         }
     }
@@ -242,7 +242,7 @@ impl DevicesManager {
     ///
     /// For terminal/display:
     /// - If locked: authorization succeeds only if `caller_id` is the owner or is
-    ///   [`KERNEL_MASTER_ID`].
+    ///   [`K_KERNEL_MASTER_ID`].
     /// - If unlocked: always succeeds.
     ///
     /// For peripherals, authorization is delegated to the HAL.
@@ -256,33 +256,33 @@ impl DevicesManager {
     ///
     /// # Errors
     /// - `Err(KernelError::DeviceNotOwned(_))` if the device is locked by a different owner and the
-    ///   caller is not [`KERNEL_MASTER_ID`]. The error message uses [`DeviceType::name`].
+    ///   caller is not [`K_KERNEL_MASTER_ID`]. The error message uses [`DeviceType::name`].
     /// - `Err(KernelError::HalError(_))` for HAL failures when authorizing peripherals or when
     ///   resolving a peripheral name for error reporting.
-    pub fn authorize(&mut self, device_type: DeviceType, caller_id: u32) -> KernelResult<()> {
-        match device_type {
+    pub fn authorize(&mut self, p_device_type: DeviceType, p_caller_id: u32) -> KernelResult<()> {
+        match p_device_type {
             DeviceType::Terminal => match self.terminal_state {
-                LockState::Locked(id) => {
-                    if caller_id == id || caller_id == KERNEL_MASTER_ID {
+                LockState::Locked(l_id) => {
+                    if p_caller_id == l_id || p_caller_id == K_KERNEL_MASTER_ID {
                         Ok(())
                     } else {
-                        Err(KernelError::DeviceNotOwned(device_type.name()?))
+                        Err(KernelError::DeviceNotOwned(p_device_type.name()?))
                     }
                 }
                 LockState::Unlocked => Ok(()),
             },
             DeviceType::Display => match self.display_state {
-                LockState::Locked(id) => {
-                    if caller_id == id || caller_id == KERNEL_MASTER_ID {
+                LockState::Locked(l_id) => {
+                    if p_caller_id == l_id || p_caller_id == K_KERNEL_MASTER_ID {
                         Ok(())
                     } else {
-                        Err(KernelError::DeviceNotOwned(device_type.name()?))
+                        Err(KernelError::DeviceNotOwned(p_device_type.name()?))
                     }
                 }
                 LockState::Unlocked => Ok(()),
             },
-            DeviceType::Peripheral(id) => Kernel::hal()
-                .authorize_action(id, caller_id)
+            DeviceType::Peripheral(l_id) => Kernel::hal()
+                .authorize_action(l_id, p_caller_id)
                 .map_err(KernelError::HalError),
         }
     }

@@ -8,7 +8,7 @@ use cortex_m::Peripherals;
 use display::Display;
 use hal_interface::Hal;
 
-pub static mut KERNEL_DATA: Kernel = Kernel {
+pub static mut G_KERNEL_DATA: Kernel = Kernel {
     cortex_peripherals: None,
     hal: None,
     kernel_time_data: None,
@@ -123,24 +123,24 @@ impl Kernel {
     /// components for kernel operation.
     ///
     pub fn init_kernel_data(
-        hal: Hal,
-        display: Display,
-        kernel_time_data: KernelTimeData,
-        terminal: Terminal,
-        scheduler: Scheduler,
-        errors: ErrorsManager,
-        apps_manager: AppsManager,
-        devices: DevicesManager,
+        p_hal: Hal,
+        p_display: Display,
+        p_kernel_time_data: KernelTimeData,
+        p_terminal: Terminal,
+        p_scheduler: Scheduler,
+        p_errors: ErrorsManager,
+        p_apps_manager: AppsManager,
+        p_devices: DevicesManager,
     ) {
         unsafe {
-            KERNEL_DATA.hal = Some(hal);
-            KERNEL_DATA.display = Some(display);
-            KERNEL_DATA.kernel_time_data = Some(kernel_time_data);
-            KERNEL_DATA.terminal = Some(terminal);
-            KERNEL_DATA.scheduler = Some(scheduler);
-            KERNEL_DATA.errors = Some(errors);
-            KERNEL_DATA.apps = Some(apps_manager);
-            KERNEL_DATA.devices = Some(devices);
+            G_KERNEL_DATA.hal = Some(p_hal);
+            G_KERNEL_DATA.display = Some(p_display);
+            G_KERNEL_DATA.kernel_time_data = Some(p_kernel_time_data);
+            G_KERNEL_DATA.terminal = Some(p_terminal);
+            G_KERNEL_DATA.scheduler = Some(p_scheduler);
+            G_KERNEL_DATA.errors = Some(p_errors);
+            G_KERNEL_DATA.apps = Some(p_apps_manager);
+            G_KERNEL_DATA.devices = Some(p_devices);
         }
     }
 
@@ -171,8 +171,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn hal() -> &'static mut Hal {
         unsafe {
-            if KERNEL_DATA.hal.is_some() {
-                KERNEL_DATA.hal.as_mut().unwrap()
+            if G_KERNEL_DATA.hal.is_some() {
+                G_KERNEL_DATA.hal.as_mut().unwrap()
             } else {
                 panic!("Hal not initialized");
             }
@@ -194,8 +194,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn display() -> &'static mut Display {
         unsafe {
-            if KERNEL_DATA.display.is_some() {
-                KERNEL_DATA.display.as_mut().unwrap()
+            if G_KERNEL_DATA.display.is_some() {
+                G_KERNEL_DATA.display.as_mut().unwrap()
             } else {
                 panic!("Display driver not initialized");
             }
@@ -223,8 +223,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn cortex_peripherals() -> &'static mut Peripherals {
         unsafe {
-            if KERNEL_DATA.cortex_peripherals.is_some() {
-                KERNEL_DATA.cortex_peripherals.as_mut().unwrap()
+            if G_KERNEL_DATA.cortex_peripherals.is_some() {
+                G_KERNEL_DATA.cortex_peripherals.as_mut().unwrap()
             } else {
                 panic!("Cortex-M peripherals not initialized");
             }
@@ -253,8 +253,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn terminal() -> &'static mut Terminal {
         unsafe {
-            if KERNEL_DATA.terminal.is_some() {
-                KERNEL_DATA.terminal.as_mut().unwrap()
+            if G_KERNEL_DATA.terminal.is_some() {
+                G_KERNEL_DATA.terminal.as_mut().unwrap()
             } else {
                 panic!("Terminal not initialized");
             }
@@ -280,8 +280,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn scheduler() -> &'static mut Scheduler {
         unsafe {
-            if KERNEL_DATA.scheduler.is_some() {
-                KERNEL_DATA.scheduler.as_mut().unwrap()
+            if G_KERNEL_DATA.scheduler.is_some() {
+                G_KERNEL_DATA.scheduler.as_mut().unwrap()
             } else {
                 panic!("Scheduler not initialized");
             }
@@ -306,8 +306,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn time_data() -> &'static KernelTimeData {
         unsafe {
-            if KERNEL_DATA.kernel_time_data.is_some() {
-                KERNEL_DATA.kernel_time_data.as_mut().unwrap()
+            if G_KERNEL_DATA.kernel_time_data.is_some() {
+                G_KERNEL_DATA.kernel_time_data.as_mut().unwrap()
             } else {
                 panic!("Time data not initialized");
             }
@@ -339,8 +339,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn errors() -> &'static mut ErrorsManager {
         unsafe {
-            if KERNEL_DATA.errors.is_some() {
-                KERNEL_DATA.errors.as_mut().unwrap()
+            if G_KERNEL_DATA.errors.is_some() {
+                G_KERNEL_DATA.errors.as_mut().unwrap()
             } else {
                 panic!("Errors manager is not initialized");
             }
@@ -370,14 +370,14 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn apps() -> &'static mut AppsManager {
         unsafe {
-            if KERNEL_DATA.apps.is_some() {
-                KERNEL_DATA.apps.as_mut().unwrap()
+            if G_KERNEL_DATA.apps.is_some() {
+                G_KERNEL_DATA.apps.as_mut().unwrap()
             } else {
                 panic!("Apps manager is not initialized");
             }
         }
     }
-    
+
     /// Provides mutable access to the global `DevicesManager` instance.
     ///
     /// This function retrieves a mutable reference to the global instance of the
@@ -401,8 +401,8 @@ impl Kernel {
     #[allow(static_mut_refs)]
     pub fn devices() -> &'static mut DevicesManager {
         unsafe {
-            if KERNEL_DATA.devices.is_some() {
-                KERNEL_DATA.devices.as_mut().unwrap()
+            if G_KERNEL_DATA.devices.is_some() {
+                G_KERNEL_DATA.devices.as_mut().unwrap()
             } else {
                 panic!("Devices manager is not initialized");
             }
@@ -432,6 +432,6 @@ impl Kernel {
 ///
 pub fn cortex_init() {
     unsafe {
-        KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
+        G_KERNEL_DATA.cortex_peripherals = Some(Peripherals::take().unwrap());
     }
 }

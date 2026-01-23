@@ -20,9 +20,9 @@ use crate::lock::Locker;
 pub use bindings::interface_name;
 pub use errors::*;
 
-pub const BUFFER_SIZE: usize = 32;
+pub const K_BUFFER_SIZE: usize = 32;
 
-static HAL_INIT: AtomicBool = AtomicBool::new(false);
+static G_HAL_INIT: AtomicBool = AtomicBool::new(false);
 
 pub struct Hal {
     locker: Option<Locker>,
@@ -57,9 +57,9 @@ impl Hal {
     /// Returns [`HalError`] via [`HalResult`] if initialization fails (as reported by the
     /// underlying implementation).
     pub fn new() -> HalResult<Self> {
-        if !HAL_INIT.load(Ordering::Relaxed) {
+        if !G_HAL_INIT.load(Ordering::Relaxed) {
             unsafe { hal_init() }
-            HAL_INIT.store(true, Ordering::Relaxed);
+            G_HAL_INIT.store(true, Ordering::Relaxed);
             Ok(Self { locker: None })
         } else {
             Ok(Self { locker: None })
@@ -79,9 +79,9 @@ impl Hal {
     /// # Errors
     /// This function returns an error if the locker is already configured to prevent reconfiguration.
     ///
-    pub fn configure_locker(&mut self, master_lock_id: u32) -> HalResult<()> {
+    pub fn configure_locker(&mut self, p_master_lock_id: u32) -> HalResult<()> {
         if self.locker.is_none() {
-            self.locker = Some(Locker::new(master_lock_id));
+            self.locker = Some(Locker::new(p_master_lock_id));
             Ok(())
         } else {
             Err(HalError::LockerAlreadyConfigured)
@@ -120,16 +120,16 @@ impl Hal {
     /// This function may fail if:
     /// * The requested interface does not exist.
     /// * An unknown error occurs during the ID lookup.
-    pub fn get_interface_id(&mut self, name: &'static str) -> HalResult<usize> {
-        let mut id = 0;
-        match unsafe { get_interface_id(name.as_ptr(), &mut id) } {
+    pub fn get_interface_id(&mut self, p_name: &'static str) -> HalResult<usize> {
+        let mut l_id = 0;
+        match unsafe { get_interface_id(p_name.as_ptr(), &mut l_id) } {
             HalInterfaceResult::OK => {
-                if let Some(locker) = &mut self.locker {
-                    locker.add_interface(id as usize);
+                if let Some(l_locker) = &mut self.locker {
+                    l_locker.add_interface(l_id as usize);
                 }
-                Ok(id as usize)
+                Ok(l_id as usize)
             }
-            HalInterfaceResult::ErrInterfaceNotFound => Err(HalError::InterfaceNotFound(name)),
+            HalInterfaceResult::ErrInterfaceNotFound => Err(HalError::InterfaceNotFound(p_name)),
             _ => Err(HalError::UnknownError),
         }
     }
@@ -155,9 +155,9 @@ impl Hal {
     /// # Notes
     /// - If the internal `locker` is not initialized (`None`), this function will simply
     ///   return `Ok(())` without performing any lock operation.
-    pub fn lock_interface(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
-        if let Some(locker) = &mut self.locker {
-            locker.lock_interface(id, locker_id)?;
+    pub fn lock_interface(&mut self, p_id: usize, p_locker_id: u32) -> HalResult<()> {
+        if let Some(l_locker) = &mut self.locker {
+            l_locker.lock_interface(p_id, p_locker_id)?;
         }
         Ok(())
     }
@@ -181,9 +181,9 @@ impl Hal {
     /// - This function returns a propagated error from the `locker.unlock_interface` method if the unlocking
     ///   process fails.
     ///
-    pub fn unlock_interface(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
-        if let Some(locker) = &mut self.locker {
-            locker.unlock_interface(id, locker_id)?;
+    pub fn unlock_interface(&mut self, p_id: usize, p_locker_id: u32) -> HalResult<()> {
+        if let Some(l_locker) = &mut self.locker {
+            l_locker.unlock_interface(p_id, p_locker_id)?;
         }
         Ok(())
     }
@@ -213,9 +213,9 @@ impl Hal {
     /// # Note
     /// If the `locker` is `None`, this function will return `Ok(())` without performing
     /// any authorization.
-    pub fn authorize_action(&mut self, id: usize, locker_id: u32) -> HalResult<()> {
-        if let Some(locker) = &mut self.locker {
-            locker.authorize_action(id, locker_id)?;
+    pub fn authorize_action(&mut self, p_id: usize, p_locker_id: u32) -> HalResult<()> {
+        if let Some(l_locker) = &mut self.locker {
+            l_locker.authorize_action(p_id, p_locker_id)?;
         }
         Ok(())
     }
@@ -236,9 +236,9 @@ impl Hal {
     /// - `Ok(Some(u32))` if the interface is locked, with the locker ID.
     /// - `Ok(None)` if the interface is not locked, or if no locker is configured.
     /// - `Err(HalError)` if the underlying locker reports an error while querying the lock state.
-    pub fn is_interface_locked(&mut self, id: usize) -> HalResult<Option<u32>> {
-        if let Some(locker) = &mut self.locker {
-            locker.is_locked(id)
+    pub fn is_interface_locked(&mut self, p_id: usize) -> HalResult<Option<u32>> {
+        if let Some(l_locker) = &mut self.locker {
+            l_locker.is_locked(p_id)
         } else {
             Ok(None)
         }
@@ -274,35 +274,32 @@ impl Hal {
     ///
     pub fn interface_write(
         &mut self,
-        ressource_id: usize,
-        caller_id: u32,
-        action: InterfaceWriteActions,
+        p_ressource_id: usize,
+        p_caller_id: u32,
+        p_action: InterfaceWriteActions,
     ) -> HalResult<()> {
         // Check for lock on interface
-        if let Some(locker) = &mut self.locker {
-            locker.authorize_action(ressource_id, caller_id)?;
+        if let Some(l_locker) = &mut self.locker {
+            l_locker.authorize_action(p_ressource_id, p_caller_id)?;
         }
 
         // Perform action
-        match action {
-            InterfaceWriteActions::GpioWrite(act) => unsafe {
-                gpio_write(ressource_id as u8, act).to_result(
-                    Some(ressource_id),
+        match p_action {
+            InterfaceWriteActions::GpioWrite(l_act) => unsafe {
+                gpio_write(p_ressource_id as u8, l_act).to_result(
+                    Some(p_ressource_id),
                     None,
-                    Some(action),
+                    Some(p_action),
                     None,
                 )
             },
-            InterfaceWriteActions::UartWrite(act) => act.action(ressource_id as u8).to_result(
-                Some(ressource_id),
+            InterfaceWriteActions::UartWrite(l_act) => l_act
+                .action(p_ressource_id as u8)
+                .to_result(Some(p_ressource_id), None, Some(p_action), None),
+            InterfaceWriteActions::Lcd(l_act) => l_act.action(p_ressource_id as u8).to_result(
+                Some(p_ressource_id),
                 None,
-                Some(action),
-                None,
-            ),
-            InterfaceWriteActions::Lcd(act) => act.action(ressource_id as u8).to_result(
-                Some(ressource_id),
-                None,
-                Some(action),
+                Some(p_action),
                 None,
             ),
         }
@@ -345,51 +342,53 @@ impl Hal {
     /// * Any locking or resource management is delegated to the `locker`'s `authorize_action` method.
     pub fn interface_read(
         &mut self,
-        ressource_id: usize,
-        caller_id: u32,
-        read_action: InterfaceReadAction,
+        p_ressource_id: usize,
+        p_caller_id: u32,
+        p_read_action: InterfaceReadAction,
     ) -> HalResult<InterfaceReadResult> {
         // Check for lock on interface
-        if let Some(locker) = &mut self.locker {
-            locker.authorize_action(ressource_id, caller_id)?;
+        if let Some(l_locker) = &mut self.locker {
+            l_locker.authorize_action(p_ressource_id, p_caller_id)?;
         }
 
         // Perform action
-        let read_result;
-        let interface_res;
+        let l_read_result;
+        let l_interface_res;
 
-        match read_action {
-            InterfaceReadAction::LcdRead(act) => {
-                let mut lcd_result = LcdRead::LcdSize(0, 0);
-                interface_res = act.read(ressource_id, &mut lcd_result);
-                read_result = InterfaceReadResult::LcdRead(lcd_result);
+        match p_read_action {
+            InterfaceReadAction::LcdRead(l_act) => {
+                let mut l_lcd_result = LcdRead::LcdSize(0, 0);
+                l_interface_res = l_act.read(p_ressource_id, &mut l_lcd_result);
+                l_read_result = InterfaceReadResult::LcdRead(l_lcd_result);
             }
             InterfaceReadAction::BufferRead => {
                 // Initialize the buffer pointer
-                let mut buffer: &mut RxBuffer = &mut RxBuffer {
+                let mut l_buffer: &mut RxBuffer = &mut RxBuffer {
                     buffer: core::ptr::null_mut(),
                     size: 0,
                 };
 
                 // Get buffer address
                 unsafe {
-                    interface_res = get_read_buffer(ressource_id as u8, &mut buffer);
+                    l_interface_res = get_read_buffer(p_ressource_id as u8, &mut l_buffer);
                 }
                 // Copy buffer content into Vec
-                let mut vec: Vec<u8, BUFFER_SIZE> = Vec::new();
-                for i in 0..buffer.size {
+                let mut l_vec: Vec<u8, K_BUFFER_SIZE> = Vec::new();
+                for l_i in 0..l_buffer.size {
                     unsafe {
-                        vec.push(*buffer.buffer.wrapping_add(i as usize)).unwrap();
+                        l_vec
+                            .push(*l_buffer.buffer.wrapping_add(l_i as usize))
+                            .unwrap();
                     }
                 }
-                read_result = InterfaceReadResult::BufferRead(vec);
+                l_read_result = InterfaceReadResult::BufferRead(l_vec);
                 // Re-initialize buffer
-                buffer.size = 0;
+                l_buffer.size = 0;
             }
         };
-        match interface_res.to_result(Some(ressource_id), None, None, Some(read_action)) {
-            Ok(_) => Ok(read_result),
-            Err(e) => Err(e),
+        match l_interface_res.to_result(Some(p_ressource_id), None, None, Some(p_read_action)) {
+            Ok(_) => Ok(l_read_result),
+            Err(l_e) => Err(l_e),
         }
     }
 
@@ -423,18 +422,18 @@ impl Hal {
     ///
     pub fn configure_callback(
         &mut self,
-        ressource_id: usize,
-        caller_id: u32,
-        callback: InterfaceCallback,
+        p_ressource_id: usize,
+        p_caller_id: u32,
+        p_callback: InterfaceCallback,
     ) -> HalResult<()> {
         // Check for lock on interface
-        if let Some(locker) = &mut self.locker {
-            locker.authorize_action(ressource_id, caller_id)?;
+        if let Some(l_locker) = &mut self.locker {
+            l_locker.authorize_action(p_ressource_id, p_caller_id)?;
         }
 
         // Configure callback
-        unsafe { configure_callback(ressource_id as u8, callback) }.to_result(
-            Some(ressource_id),
+        unsafe { configure_callback(p_ressource_id as u8, p_callback) }.to_result(
+            Some(p_ressource_id),
             None,
             None,
             None,

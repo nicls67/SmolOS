@@ -100,118 +100,129 @@ impl HalError {
     /// - The method assumes that `self.severity().as_str()` correctly maps the severity levels to a string representation.
     /// - Enforces a string capacity limit of 256 characters for safety.
     pub fn to_string(&self) -> String<256> {
-        let mut msg = String::new();
+        let mut l_msg = String::new();
         match self {
             HalAlreadyInitialized => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str("HAL already initialized").unwrap();
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str("HAL already initialized").unwrap();
             }
-            InterfaceNotFound(name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(30; "Interface {} not found", name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            WrongInterfaceId(id) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(30; "Interface ID {} does not exist", id)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            ReadOnlyInterface(name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(30; "Interface {} is read-only", name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            WriteOnlyInterface(name) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(30; "Interface {} is write-only", name)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            IncompatibleAction(action, interface) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(70; "Action {} is not compatible with interface {}", action, interface)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            WriteError(ift) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(256; "Error during write on interface {} ", ift)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            ReadError(ift) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(256; "Error during read on interface {}", ift)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
-            }
-            UnknownError => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(format!(256; "Unknown HAL error").unwrap().as_str())
+            InterfaceNotFound(l_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(30; "Interface {} not found", l_name)
+                            .unwrap()
+                            .as_str(),
+                    )
                     .unwrap();
             }
-            LockedInterface(ift) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(256; "Interface {} is locked", ift)
+            WrongInterfaceId(l_id) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(30; "Interface ID {} does not exist", l_id)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            ReadOnlyInterface(l_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(30; "Interface {} is read-only", l_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            WriteOnlyInterface(l_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(30; "Interface {} is write-only", l_name)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            IncompatibleAction(l_action, l_interface) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str(
+                    format!(70; "Action {} is not compatible with interface {}", l_action, l_interface)
                         .unwrap()
                         .as_str(),
                 )
                 .unwrap();
             }
-            InterfaceAlreadyLocked(ift) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(256; "Interface {} is locked by another app", ift)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
+            WriteError(l_ift) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(256; "Error during write on interface {} ", l_ift)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            ReadError(l_ift) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(256; "Error during read on interface {}", l_ift)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            UnknownError => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(format!(256; "Unknown HAL error").unwrap().as_str())
+                    .unwrap();
+            }
+            LockedInterface(l_ift) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(256; "Interface {} is locked", l_ift)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            InterfaceAlreadyLocked(l_ift) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(256; "Interface {} is locked by another app", l_ift)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
             }
             LockerAlreadyConfigured => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(256; "Locker is already configured")
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(256; "Locker is already configured")
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
             }
-            InterfaceBadConfig(ift, err) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(
-                    format!(256; "Wrong configuration for interface {}: {}", ift, err)
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap();
+            InterfaceBadConfig(l_ift, l_err) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(256; "Wrong configuration for interface {}: {}", l_ift, l_err)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
             }
         }
-        msg
+        l_msg
     }
 
     /// Returns the severity level of the `HalError` instance.

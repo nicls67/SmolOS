@@ -1,6 +1,6 @@
 use crate::console_output::ConsoleOutputType::{Display, Usart};
 use crate::data::Kernel;
-use crate::ident::KERNEL_MASTER_ID;
+use crate::ident::K_KERNEL_MASTER_ID;
 use crate::{KernelError, syscall_devices};
 
 use crate::{KernelResult, SysCallDisplayArgs, SysCallHalActions, syscall_display, syscall_hal};
@@ -49,7 +49,7 @@ pub enum ConsoleOutputType {
 ///
 /// `ConsoleOutput` represents an exclusive handle to a concrete output destination.
 /// It is created via [`ConsoleOutput::new`] which locks the underlying resource
-/// (a named HAL UART/USART interface or the display device) using `KERNEL_MASTER_ID`.
+/// (a named HAL UART/USART interface or the display device) using `K_KERNEL_MASTER_ID`.
 ///
 /// The struct also tracks the `current_color` used for display rendering (ignored for USART).
 ///
@@ -74,11 +74,11 @@ impl ConsoleOutput {
     ///
     /// # Returns
     /// - `ConsoleOutput`.
-    pub fn new(output: ConsoleOutputType, current_color: Colors) -> Self {
+    pub fn new(p_output: ConsoleOutputType, p_current_color: Colors) -> Self {
         ConsoleOutput {
             interface_id: None,
-            output,
-            current_color,
+            output: p_output,
+            current_color: p_current_color,
         }
     }
 
@@ -86,10 +86,10 @@ impl ConsoleOutput {
     ///
     /// For [`ConsoleOutputType::Usart`], this resolves the HAL interface ID from the interface
     /// name, stores it in [`ConsoleOutput::interface_id`], and acquires an exclusive lock on
-    /// that interface using [`KERNEL_MASTER_ID`].
+    /// that interface using [`K_KERNEL_MASTER_ID`].
     ///
     /// For [`ConsoleOutputType::Display`], this acquires an exclusive lock on the display
-    /// device using [`KERNEL_MASTER_ID`].
+    /// device using [`K_KERNEL_MASTER_ID`].
     ///
     /// # Returns
     /// - `Ok(())` if the destination is successfully resolved (USART only) and locked.
@@ -98,21 +98,21 @@ impl ConsoleOutput {
     /// - Returns [`KernelError::HalError`] if resolving or locking the USART interface fails.
     /// - Propagates any error returned by [`Kernel::devices().lock`] when locking the display.
     pub fn initialize(&mut self) -> KernelResult<()> {
-        if let ConsoleOutputType::Usart(name) = self.output {
+        if let ConsoleOutputType::Usart(l_name) = self.output {
             // Get id for interface
             self.interface_id = Some(
                 Kernel::hal()
-                    .get_interface_id(name)
+                    .get_interface_id(l_name)
                     .map_err(KernelError::HalError)?,
             );
 
             // Try to lock the interface
             Kernel::hal()
-                .lock_interface(self.interface_id.unwrap(), KERNEL_MASTER_ID)
+                .lock_interface(self.interface_id.unwrap(), K_KERNEL_MASTER_ID)
                 .map_err(KernelError::HalError)?;
         } else {
             // Try to lock the display device
-            Kernel::devices().lock(crate::DeviceType::Display, KERNEL_MASTER_ID)?;
+            Kernel::devices().lock(crate::DeviceType::Display, K_KERNEL_MASTER_ID)?;
         }
 
         Ok(())
@@ -147,18 +147,18 @@ impl ConsoleOutput {
     /// Returns an error if the underlying syscall fails:
     /// - For USART: errors from `syscall_hal(...)` are propagated.
     /// - For Display: errors from `syscall_display(...)` are propagated.
-    pub(crate) fn write_char(&self, data: char) -> KernelResult<()> {
+    pub(crate) fn write_char(&self, p_data: char) -> KernelResult<()> {
         match self.output {
             Usart(_) => syscall_hal(
                 self.interface_id.unwrap(),
                 SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
-                    UartWriteActions::SendChar(data as u8),
+                    UartWriteActions::SendChar(p_data as u8),
                 )),
-                KERNEL_MASTER_ID,
+                K_KERNEL_MASTER_ID,
             )?,
             Display => syscall_display(
-                SysCallDisplayArgs::WriteCharAtCursor(data, Some(self.current_color)),
-                KERNEL_MASTER_ID,
+                SysCallDisplayArgs::WriteCharAtCursor(p_data, Some(self.current_color)),
+                K_KERNEL_MASTER_ID,
             )?,
         }
 
@@ -181,18 +181,18 @@ impl ConsoleOutput {
     /// Returns an error if the underlying syscall fails:
     /// - For USART: errors from `syscall_hal(...)` are propagated.
     /// - For Display: errors from `syscall_display(...)` are propagated.
-    pub(crate) fn write_str(&self, data: &str) -> KernelResult<()> {
+    pub(crate) fn write_str(&self, p_data: &str) -> KernelResult<()> {
         match self.output {
             Usart(_) => syscall_hal(
                 self.interface_id.unwrap(),
                 SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
-                    UartWriteActions::SendString(data),
+                    UartWriteActions::SendString(p_data),
                 )),
-                KERNEL_MASTER_ID,
+                K_KERNEL_MASTER_ID,
             )?,
             Display => syscall_display(
-                SysCallDisplayArgs::WriteStrAtCursor(data, Some(self.current_color)),
-                KERNEL_MASTER_ID,
+                SysCallDisplayArgs::WriteStrAtCursor(p_data, Some(self.current_color)),
+                K_KERNEL_MASTER_ID,
             )?,
         }
 
@@ -219,9 +219,11 @@ impl ConsoleOutput {
                 SysCallHalActions::Write(InterfaceWriteActions::UartWrite(
                     UartWriteActions::SendString("\x1B[2J\x1B[H"),
                 )),
-                KERNEL_MASTER_ID,
+                K_KERNEL_MASTER_ID,
             )?,
-            Display => syscall_display(SysCallDisplayArgs::Clear(Colors::Black), KERNEL_MASTER_ID)?,
+            Display => {
+                syscall_display(SysCallDisplayArgs::Clear(Colors::Black), K_KERNEL_MASTER_ID)?
+            }
         }
 
         Ok(())
@@ -234,7 +236,7 @@ impl ConsoleOutput {
     /// - For [`ConsoleOutputType::Display`], returns `"Display"`.
     pub fn name(&self) -> &'static str {
         match self.output {
-            Usart(n) => n,
+            Usart(l_n) => l_n,
             Display => "Display",
         }
     }
@@ -259,12 +261,12 @@ impl ConsoleOutput {
             Usart(_) => syscall_devices(
                 crate::DeviceType::Peripheral(self.interface_id.unwrap()),
                 crate::SysCallDevicesArgs::Unlock,
-                KERNEL_MASTER_ID,
+                K_KERNEL_MASTER_ID,
             ),
             Display => syscall_devices(
                 crate::DeviceType::Display,
                 crate::SysCallDevicesArgs::Unlock,
-                KERNEL_MASTER_ID,
+                K_KERNEL_MASTER_ID,
             ),
         }
     }

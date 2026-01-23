@@ -16,12 +16,12 @@ use crate::KernelErrorLevel::Error;
 
 use crate::console_output::{ConsoleFormatting, ConsoleOutput};
 use crate::data::Kernel;
-use crate::ident::KERNEL_MASTER_ID;
+use crate::ident::K_KERNEL_MASTER_ID;
 use crate::terminal::TerminalState::{Display, Prompt};
 use crate::{KernelResult, SysCallHalActions, syscall_hal};
 
 use display::Colors;
-use hal_interface::{BUFFER_SIZE, InterfaceReadAction, InterfaceReadResult};
+use hal_interface::{InterfaceReadAction, InterfaceReadResult, K_BUFFER_SIZE};
 use heapless::{String, Vec, format};
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -57,10 +57,10 @@ impl Terminal {
     /// # Returns
     /// - `Ok(Terminal)` on success.
     /// - `Err(_)` if creating the underlying [`ConsoleOutput`] fails.
-    pub fn new(name: &'static str) -> KernelResult<Terminal> {
+    pub fn new(p_name: &'static str) -> KernelResult<Terminal> {
         Ok(Terminal {
             output: ConsoleOutput::new(
-                crate::console_output::ConsoleOutputType::Usart(name),
+                crate::console_output::ConsoleOutputType::Usart(p_name),
                 Colors::White,
             ),
             line_buffer: String::new(),
@@ -91,17 +91,17 @@ impl Terminal {
     /// # Errors
     /// - Propagates any error produced by [`ConsoleOutput::new`] when enabling.
     /// - Propagates any error produced by [`ConsoleOutput::release`] when disabling.
-    pub fn set_display_mirror(&mut self, display_mirror: bool) -> KernelResult<()> {
-        if display_mirror && self.display_mirror.is_none() {
+    pub fn set_display_mirror(&mut self, p_display_mirror: bool) -> KernelResult<()> {
+        if p_display_mirror && self.display_mirror.is_none() {
             self.display_mirror = Some(ConsoleOutput::new(
                 crate::console_output::ConsoleOutputType::Display,
                 Colors::White,
             ));
             self.display_mirror.as_mut().unwrap().initialize()?;
-        } else if let Some(mirror) = self.display_mirror.as_mut()
-            && !display_mirror
+        } else if let Some(l_mirror) = self.display_mirror.as_mut()
+            && !p_display_mirror
         {
-            mirror.release()?;
+            l_mirror.release()?;
             self.display_mirror = None;
         }
         Ok(())
@@ -132,7 +132,7 @@ impl Terminal {
         syscall_hal(
             self.output.interface_id.unwrap(),
             SysCallHalActions::ConfigureCallback(terminal_prompt_callback),
-            KERNEL_MASTER_ID,
+            K_KERNEL_MASTER_ID,
         )?;
 
         // Set mode to prompt
@@ -192,46 +192,46 @@ impl Terminal {
     /// Propagates any error returned by the underlying [`ConsoleOutput`] methods
     /// (e.g., `write_str`, `write_char`, `new_line`, or `clear_terminal`) for either
     /// the primary output or the optional mirror output.
-    pub fn write(&self, format: &ConsoleFormatting) -> KernelResult<()> {
-        match format {
-            ConsoleFormatting::StrNoFormatting(text) => self.output.write_str(text)?,
-            ConsoleFormatting::StrNewLineAfter(text) => {
-                self.output.write_str(text)?;
+    pub fn write(&self, p_format: &ConsoleFormatting) -> KernelResult<()> {
+        match p_format {
+            ConsoleFormatting::StrNoFormatting(l_text) => self.output.write_str(l_text)?,
+            ConsoleFormatting::StrNewLineAfter(l_text) => {
+                self.output.write_str(l_text)?;
                 self.output.new_line()?;
             }
-            ConsoleFormatting::StrNewLineBefore(text) => {
+            ConsoleFormatting::StrNewLineBefore(l_text) => {
                 self.output.new_line()?;
-                self.output.write_str(text)?;
+                self.output.write_str(l_text)?;
             }
-            ConsoleFormatting::StrNewLineBoth(text) => {
+            ConsoleFormatting::StrNewLineBoth(l_text) => {
                 self.output.new_line()?;
-                self.output.write_str(text)?;
+                self.output.write_str(l_text)?;
                 self.output.new_line()?;
             }
             ConsoleFormatting::Newline => self.output.new_line()?,
-            ConsoleFormatting::Char(c) => self.output.write_char(*c)?,
+            ConsoleFormatting::Char(l_c) => self.output.write_char(*l_c)?,
             ConsoleFormatting::Clear => self.output.clear_terminal()?,
         }
 
-        if let Some(mirror) = self.display_mirror.as_ref() {
-            match format {
-                ConsoleFormatting::StrNoFormatting(text) => mirror.write_str(text)?,
-                ConsoleFormatting::StrNewLineAfter(text) => {
-                    mirror.write_str(text)?;
-                    mirror.new_line()?;
+        if let Some(l_mirror) = self.display_mirror.as_ref() {
+            match p_format {
+                ConsoleFormatting::StrNoFormatting(l_text) => l_mirror.write_str(l_text)?,
+                ConsoleFormatting::StrNewLineAfter(l_text) => {
+                    l_mirror.write_str(l_text)?;
+                    l_mirror.new_line()?;
                 }
-                ConsoleFormatting::StrNewLineBefore(text) => {
-                    mirror.new_line()?;
-                    mirror.write_str(text)?;
+                ConsoleFormatting::StrNewLineBefore(l_text) => {
+                    l_mirror.new_line()?;
+                    l_mirror.write_str(l_text)?;
                 }
-                ConsoleFormatting::StrNewLineBoth(text) => {
-                    mirror.new_line()?;
-                    mirror.write_str(text)?;
-                    mirror.new_line()?;
+                ConsoleFormatting::StrNewLineBoth(l_text) => {
+                    l_mirror.new_line()?;
+                    l_mirror.write_str(l_text)?;
+                    l_mirror.new_line()?;
                 }
-                ConsoleFormatting::Newline => mirror.new_line()?,
-                ConsoleFormatting::Char(c) => mirror.write_char(*c)?,
-                ConsoleFormatting::Clear => mirror.clear_terminal()?,
+                ConsoleFormatting::Newline => l_mirror.new_line()?,
+                ConsoleFormatting::Char(l_c) => l_mirror.write_char(*l_c)?,
+                ConsoleFormatting::Clear => l_mirror.clear_terminal()?,
             }
         }
 
@@ -253,9 +253,9 @@ impl Terminal {
     /// # Errors
     /// Propagates any error returned by the underlying console output when
     /// applying the color change.
-    pub fn set_color(&mut self, color: Colors) -> KernelResult<()> {
-        if let Some(mirror) = self.display_mirror.as_mut() {
-            mirror.current_color = color;
+    pub fn set_color(&mut self, p_color: Colors) -> KernelResult<()> {
+        if let Some(l_mirror) = self.display_mirror.as_mut() {
+            l_mirror.current_color = p_color;
         }
         Ok(())
     }
@@ -284,23 +284,23 @@ impl Terminal {
     /// - Returns a terminal error if the internal line buffer overflows.
     /// - Propagates any I/O error from writing to the underlying console output.
     /// - Propagates any error from locking the terminal device after starting an app.
-    pub fn process_input(&mut self, buffer: Vec<u8, BUFFER_SIZE>) -> KernelResult<()> {
+    pub fn process_input(&mut self, p_buffer: Vec<u8, K_BUFFER_SIZE>) -> KernelResult<()> {
         // If the terminal is in prompt mode
         if self.mode == Prompt {
             // If the received character is a return character, process the line
-            if buffer[0] == '\r' as u8 {
+            if p_buffer[0] == '\r' as u8 {
                 // If the line buffer is not empty
                 if self.line_buffer.len() > 1 {
                     // Start the requested command
                     match Kernel::apps().start_app(&self.line_buffer) {
-                        Ok(app_id) => {
-                            self.app_exe_in_progress = Some(app_id);
+                        Ok(l_app_id) => {
+                            self.app_exe_in_progress = Some(l_app_id);
                             // Lock terminal for this app
-                            Kernel::devices().lock(crate::DeviceType::Terminal, app_id)?;
+                            Kernel::devices().lock(crate::DeviceType::Terminal, l_app_id)?;
                         }
-                        Err(err) => {
+                        Err(l_err) => {
                             self.output.write_str(
-                                format!(256;"\r\n{}",err.to_string()).unwrap().as_str(),
+                                format!(256;"\r\n{}",l_err.to_string()).unwrap().as_str(),
                             )?;
                             self.cursor_pos = 0;
                             self.output.new_line()?;
@@ -315,11 +315,11 @@ impl Terminal {
                 self.line_buffer.clear();
             } else {
                 // Echo the received character
-                self.output.write_char(buffer[0] as char)?;
+                self.output.write_char(p_buffer[0] as char)?;
 
                 // Store it into the line buffer
                 self.line_buffer
-                    .push(buffer[0] as char)
+                    .push(p_buffer[0] as char)
                     .map_err(|_| TerminalError(Error, "Line buffer overflow"))?;
                 self.cursor_pos += 1;
             }
@@ -328,11 +328,11 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn app_exit_notifier(&mut self, app_exit_id: u32) -> KernelResult<()> {
-        if let Some(id) = self.app_exe_in_progress {
-            if id == app_exit_id {
+    pub fn app_exit_notifier(&mut self, p_app_exit_id: u32) -> KernelResult<()> {
+        if let Some(l_id) = self.app_exe_in_progress {
+            if l_id == p_app_exit_id {
                 self.app_exe_in_progress = None;
-                Kernel::devices().unlock(crate::DeviceType::Terminal, id)?;
+                Kernel::devices().unlock(crate::DeviceType::Terminal, l_id)?;
                 self.cursor_pos = 0;
                 self.output.new_line()?;
                 self.output.write_char('>')?;
@@ -357,21 +357,21 @@ impl Terminal {
 /// # Errors
 /// This function does not return errors directly. Any error from [`syscall_hal`]
 /// or [`Terminal::process_input`] is forwarded to `Kernel::errors().error_handler(&e)`.
-pub extern "C" fn terminal_prompt_callback(id: u8) {
-    let mut result = InterfaceReadResult::BufferRead(Vec::new());
+pub extern "C" fn terminal_prompt_callback(p_id: u8) {
+    let mut l_result = InterfaceReadResult::BufferRead(Vec::new());
     match syscall_hal(
-        id as usize,
-        SysCallHalActions::Read(InterfaceReadAction::BufferRead, &mut result),
-        KERNEL_MASTER_ID,
+        p_id as usize,
+        SysCallHalActions::Read(InterfaceReadAction::BufferRead, &mut l_result),
+        K_KERNEL_MASTER_ID,
     ) {
         Ok(()) => {
-            if let InterfaceReadResult::BufferRead(buffer) = result {
-                match Kernel::terminal().process_input(buffer) {
+            if let InterfaceReadResult::BufferRead(l_buffer) = l_result {
+                match Kernel::terminal().process_input(l_buffer) {
                     Ok(_) => {}
-                    Err(e) => Kernel::errors().error_handler(&e),
+                    Err(l_e) => Kernel::errors().error_handler(&l_e),
                 }
             }
         }
-        Err(e) => Kernel::errors().error_handler(&e),
+        Err(l_e) => Kernel::errors().error_handler(&l_e),
     }
 }
