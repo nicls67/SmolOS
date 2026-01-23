@@ -5,8 +5,8 @@ use cortex_m::peripheral::SCB;
 use cortex_m::peripheral::syst::SystClkSource;
 use cortex_m_rt::exception;
 
-static SCHED_TICKS_COUNTER: AtomicU32 = AtomicU32::new(0);
-static SCHED_TICKS_TARGET: AtomicU32 = AtomicU32::new(0);
+static G_SCHED_TICKS_COUNTER: AtomicU32 = AtomicU32::new(0);
+static G_SCHED_TICKS_TARGET: AtomicU32 = AtomicU32::new(0);
 
 /// Initializes the system timer (Systick) with a specified or default period.
 ///
@@ -39,23 +39,23 @@ static SCHED_TICKS_TARGET: AtomicU32 = AtomicU32::new(0);
 ///   matches the actual system clock frequency for correct timer behavior.
 /// - Ensure that `Kernel::cortex_peripherals()` is properly set up before invoking this function.
 ///
-pub fn init_systick(period: Option<Milliseconds>) {
+pub fn init_systick(p_period: Option<Milliseconds>) {
     // Initialize Systick at 1ms
-    let cortex_p = Kernel::cortex_peripherals();
-    cortex_p.SYST.set_clock_source(SystClkSource::Core);
-    cortex_p.SYST.clear_current();
+    let l_cortex_p = Kernel::cortex_peripherals();
+    l_cortex_p.SYST.set_clock_source(SystClkSource::Core);
+    l_cortex_p.SYST.clear_current();
 
-    if let Some(period) = period {
-        cortex_p
+    if let Some(l_period) = p_period {
+        l_cortex_p
             .SYST
-            .set_reload(Kernel::time_data().core_frequency.to_u32() * period.0 / 1000);
+            .set_reload(Kernel::time_data().core_frequency.to_u32() * l_period.0 / 1000);
     } else {
         // The default core frequency is 16 MHz, so 1 ms is 16,000 ticks
-        cortex_p.SYST.set_reload(16_000);
+        l_cortex_p.SYST.set_reload(16_000);
     }
 
-    cortex_p.SYST.enable_interrupt();
-    cortex_p.SYST.enable_counter();
+    l_cortex_p.SYST.enable_interrupt();
+    l_cortex_p.SYST.enable_counter();
 }
 
 /// Sets the target value for scheduling ticks.
@@ -69,8 +69,8 @@ pub fn init_systick(period: Option<Milliseconds>) {
 ///
 /// Note: Ensure that the chosen `target` value is suitable for your application's
 /// scheduling requirements.
-pub fn set_ticks_target(target: u32) {
-    SCHED_TICKS_TARGET.store(target, Ordering::Relaxed);
+pub fn set_ticks_target(p_target: u32) {
+    G_SCHED_TICKS_TARGET.store(p_target, Ordering::Relaxed);
 }
 
 /// Handles the SysTick exception (system timer interrupt).
@@ -108,8 +108,8 @@ pub fn set_ticks_target(target: u32) {
 ///   minimal in execution to avoid delaying other system-critical interrupts.
 #[exception]
 fn SysTick() {
-    if SCHED_TICKS_TARGET.load(Ordering::Relaxed) != 0
-        && HAL_GetTick() % SCHED_TICKS_TARGET.load(Ordering::Relaxed) == 0
+    if G_SCHED_TICKS_TARGET.load(Ordering::Relaxed) != 0
+        && HAL_GetTick() % G_SCHED_TICKS_TARGET.load(Ordering::Relaxed) == 0
     {
         SCB::set_pendsv();
     }
@@ -150,7 +150,7 @@ fn SysTick() {
 /// counter elsewhere without proper synchronization could lead to undefined behavior.
 #[unsafe(no_mangle)]
 pub extern "C" fn HAL_IncTick() {
-    SCHED_TICKS_COUNTER.fetch_add(1, Ordering::Relaxed);
+    G_SCHED_TICKS_COUNTER.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -182,7 +182,7 @@ pub extern "C" fn HAL_IncTick() {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn HAL_GetTick() -> u32 {
-    SCHED_TICKS_COUNTER.load(Ordering::Relaxed)
+    G_SCHED_TICKS_COUNTER.load(Ordering::Relaxed)
 }
 
 ///
@@ -206,12 +206,12 @@ pub extern "C" fn HAL_GetTick() -> u32 {
 /// - The `#[no_mangle]` attribute disables name mangling to make the function accessible by C and other ABI-compatible languages.
 /// - It operates in an infinite busy loop until the target tick count is achieved, which may cause high CPU utilization and block other tasks from running (e.g
 #[unsafe(no_mangle)]
-pub extern "C" fn HAL_Delay(mut ms: u32) {
-    if ms == 0 {
-        ms = 1;
+pub extern "C" fn HAL_Delay(mut p_ms: u32) {
+    if p_ms == 0 {
+        p_ms = 1;
     }
-    let ticks = HAL_GetTick() + ms;
-    while HAL_GetTick() < ticks {}
+    let l_ticks = HAL_GetTick() + p_ms;
+    while HAL_GetTick() < l_ticks {}
 }
 
 /// The PendSV (Pendable Service Call) exception handler.

@@ -3,49 +3,74 @@ use heapless::Vec;
 
 mod app_config;
 
-pub use self::app_config::{AppConfig, AppStatus, CallMethod, CallPeriodicity};
+pub use self::app_config::{AppConfig, AppStatus, CallPeriodicity};
 
-const MAX_APPS: usize = 32;
+const K_MAX_APPS: usize = 32;
 
 pub struct AppsManager {
-    apps: Vec<AppConfig, MAX_APPS>,
+    apps: Vec<AppConfig, K_MAX_APPS>,
 }
 
 impl AppsManager {
+    /// Creates a new `AppsManager` instance with an empty application registry.
+    ///
+    /// # Returns
+    ///
+    /// A new `AppsManager` with no registered applications.
     pub fn new() -> AppsManager {
         Self { apps: Vec::new() }
     }
 
-    pub fn add_app(&mut self, mut app: AppConfig) -> KernelResult<()> {
-        app.app_status = AppStatus::Stopped;
-        app.id = None;
+    /// Registers a new application with the manager.
+    ///
+    /// The application is added to the internal registry in a stopped state, ready to be
+    /// started later via [`AppsManager::start_app`]. Any existing `app_status` and `id`
+    /// values in the provided configuration are reset.
+    ///
+    /// # Parameters
+    ///
+    /// * `app` - The application configuration to register. The `app_status` will be
+    ///   set to [`AppStatus::Stopped`] and `id` will be cleared to `None`.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - If the application was successfully registered.
+    ///
+    /// * `Err(KernelError::CannotAddNewPeriodicApp)` - If the application registry is
+    ///   full (maximum of 32 applications).
+    pub fn add_app(&mut self, mut p_app: AppConfig) -> KernelResult<()> {
+        p_app.app_status = AppStatus::Stopped;
+        p_app.id = None;
 
-        match self.apps.push(app) {
+        match self.apps.push(p_app) {
             Ok(_) => Ok(()),
-            Err(_) => Err(crate::KernelError::CannotAddNewPeriodicApp(app.name)),
+            Err(_) => Err(crate::KernelError::CannotAddNewPeriodicApp(p_app.name)),
         }
     }
 
     /// Start a registered app by name.
     ///
     /// This searches the internal apps list for an app whose [`AppConfig::name`]
-    /// matches `app_name` and invokes [`AppConfig::start`] on it.
+    /// matches the first token of `p_app` and invokes [`AppConfig::start`] on it.
     ///
     /// # Arguments
-    /// * `app_name` - The name of the app to start.
+    /// * `p_app` - The full app invocation string (name plus optional parameters).
     ///
     /// # Returns
     /// On success, returns the started app's ID (as returned by [`AppConfig::start`]).
     ///
     /// # Errors
-    /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `app_name`,
+    /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches the parsed name,
     /// or propagates any error returned by [`AppConfig::start`].
-    pub fn start_app(&mut self, app_name: &str) -> KernelResult<u32> {
+    pub fn start_app(&mut self, p_app: &str) -> KernelResult<u32> {
+        // App name is the first argument
+        let l_app_name = p_app.split_ascii_whitespace().next().unwrap_or_default();
+
         self.apps
             .iter_mut()
-            .find(|app| app.name == app_name)
+            .find(|l_app| l_app.name == l_app_name)
             .ok_or(crate::KernelError::AppNotFound)?
-            .start()
+            .start(p_app)
     }
 
     /// Stop a running registered app by its ID.
@@ -62,10 +87,10 @@ impl AppsManager {
     /// # Errors
     /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `app_id`,
     /// or propagates any error returned by [`AppConfig::stop`].
-    pub fn stop_app(&mut self, app_id: u32) -> KernelResult<()> {
+    pub fn stop_app(&mut self, p_app_id: u32) -> KernelResult<()> {
         self.apps
             .iter_mut()
-            .find(|app| app.id == Some(app_id))
+            .find(|l_app| l_app.id == Some(p_app_id))
             .ok_or(crate::KernelError::AppNotFound)?
             .stop()
     }

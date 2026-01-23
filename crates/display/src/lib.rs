@@ -11,7 +11,7 @@ use hal_interface::{
 };
 
 use crate::FontSize::Font16;
-use crate::fonts::{FIRST_ASCII_CHAR, LAST_ASCII_CHAR};
+use crate::fonts::{K_FIRST_ASCII_CHAR, K_LAST_ASCII_CHAR};
 use crate::frame_buffer::FrameBuffer;
 pub use colors::Colors;
 use hal_interface::InterfaceReadResult::LcdRead;
@@ -55,11 +55,11 @@ impl Display {
     ///
     /// # Errors
     /// This function does not return errors.
-    pub fn new(kernel_master_id: u32) -> Self {
+    pub fn new(p_kernel_master_id: u32) -> Self {
         Self {
             hal_id: None,
             hal: None,
-            kernel_master_id,
+            kernel_master_id: p_kernel_master_id,
             size: None,
             frame_buffer: None,
             initialized: false,
@@ -93,26 +93,28 @@ impl Display {
     ///   [`DisplayError::DisplayDriverNotInitialized`] (should not occur if init flow succeeds).
     pub fn init(
         &mut self,
-        lcd_name: &'static str,
-        hal: &'static mut Hal,
-        background_color: Colors,
+        p_lcd_name: &'static str,
+        p_hal: &'static mut Hal,
+        p_background_color: Colors,
     ) -> DisplayResult<()> {
         // Get LCD interface ID
         self.hal_id = Some(
-            hal.get_interface_id(lcd_name)
+            p_hal
+                .get_interface_id(p_lcd_name)
                 .map_err(DisplayError::HalError)?,
         );
 
         // Enable display
-        hal.interface_write(
-            self.hal_id.unwrap(),
-            0,
-            InterfaceWriteActions::Lcd(LcdActions::Enable(true)),
-        )
-        .map_err(DisplayError::HalError)?;
+        p_hal
+            .interface_write(
+                self.hal_id.unwrap(),
+                0,
+                InterfaceWriteActions::Lcd(LcdActions::Enable(true)),
+            )
+            .map_err(DisplayError::HalError)?;
 
         // Get screen size
-        self.size = match hal
+        self.size = match p_hal
             .interface_read(
                 self.hal_id.unwrap(),
                 0,
@@ -120,12 +122,12 @@ impl Display {
             )
             .map_err(DisplayError::HalError)?
         {
-            LcdRead(LcdSize(x, y)) => Some((x, y)),
+            LcdRead(LcdSize(l_x, l_y)) => Some((l_x, l_y)),
             _ => None,
         };
 
         // Store HAL reference
-        self.hal = Some(hal);
+        self.hal = Some(p_hal);
 
         // Initialize the frame buffer
         self.frame_buffer = Some(FrameBuffer::new());
@@ -141,7 +143,7 @@ impl Display {
             .map_err(DisplayError::HalError)?;
 
         // Clean the buffer
-        self.clear(background_color)?;
+        self.clear(p_background_color)?;
 
         Ok(())
     }
@@ -157,7 +159,7 @@ impl Display {
     /// # Errors
     /// - [`DisplayError::DisplayDriverNotInitialized`] if called before [`Display::init`].
     /// - [`DisplayError::HalError`] if the underlying HAL write fails.
-    pub fn clear(&mut self, color: Colors) -> DisplayResult<()> {
+    pub fn clear(&mut self, p_color: Colors) -> DisplayResult<()> {
         if self.initialized {
             self.hal
                 .as_mut()
@@ -167,7 +169,7 @@ impl Display {
                     self.kernel_master_id,
                     InterfaceWriteActions::Lcd(LcdActions::Clear(
                         LcdLayer::FOREGROUND,
-                        color.to_argb(),
+                        p_color.to_argb(),
                     )),
                 )
                 .map_err(DisplayError::HalError)?;
@@ -195,7 +197,7 @@ impl Display {
             return Err(DisplayError::DisplayDriverNotInitialized);
         }
 
-        let fb_addr = self.frame_buffer.as_mut().unwrap().switch();
+        let l_fb_addr = self.frame_buffer.as_mut().unwrap().switch();
 
         self.hal
             .as_mut()
@@ -203,7 +205,10 @@ impl Display {
             .interface_write(
                 self.hal_id.unwrap(),
                 self.kernel_master_id,
-                InterfaceWriteActions::Lcd(LcdActions::SetFbAddress(LcdLayer::FOREGROUND, fb_addr)),
+                InterfaceWriteActions::Lcd(LcdActions::SetFbAddress(
+                    LcdLayer::FOREGROUND,
+                    l_fb_addr,
+                )),
             )
             .map_err(DisplayError::HalError)?;
 
@@ -233,10 +238,10 @@ impl Display {
     /// - Any error propagated from internal drawing routines.
     pub fn draw_string(
         &mut self,
-        string: &str,
-        x: u16,
-        y: u16,
-        color: Option<Colors>,
+        p_string: &str,
+        p_x: u16,
+        p_y: u16,
+        p_color: Option<Colors>,
     ) -> DisplayResult<()> {
         // Returns error if not initialized
         if !self.initialized {
@@ -244,28 +249,33 @@ impl Display {
         }
 
         // Initialize variables
-        let char_size = self.font.get_char_size();
-        let mut current_x = x;
+        let l_char_size = self.font.get_char_size();
+        let mut l_current_x = p_x;
 
         // Get display color
-        let color_argb = if let Some(c) = color {
-            c.to_argb().as_u32()
+        let l_color_argb = if let Some(l_c) = p_color {
+            l_c.to_argb().as_u32()
         } else {
             self.color.to_argb().as_u32()
         };
 
         // Compute frame buffer address
-        let mut fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
-            + 4 * (y as u32 * self.size.unwrap().0 as u32 + x as u32);
+        let mut l_fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
+            + 4 * (p_y as u32 * self.size.unwrap().0 as u32 + p_x as u32);
 
-        for char_to_display in string.as_bytes() {
-            self.draw_char_in_fb(*char_to_display, fb_write_address, char_size, color_argb)?;
+        for l_char_to_display in p_string.as_bytes() {
+            self.draw_char_in_fb(
+                *l_char_to_display,
+                l_fb_write_address,
+                l_char_size,
+                l_color_argb,
+            )?;
 
             // Compute next char position
-            current_x += char_size.0 as u16;
+            l_current_x += l_char_size.0 as u16;
             // Increment frame buffer address
-            fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
-                + 4 * (y as u32 * self.size.unwrap().0 as u32 + current_x as u32);
+            l_fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
+                + 4 * (p_y as u32 * self.size.unwrap().0 as u32 + l_current_x as u32);
         }
 
         Ok(())
@@ -289,31 +299,36 @@ impl Display {
     ///   `FIRST_ASCII_CHAR..=LAST_ASCII_CHAR`.
     pub fn draw_char(
         &mut self,
-        char_to_display: u8,
-        x: u16,
-        y: u16,
-        color: Option<Colors>,
+        p_char_to_display: u8,
+        p_x: u16,
+        p_y: u16,
+        p_color: Option<Colors>,
     ) -> DisplayResult<()> {
         // Returns error if not initialized
         if !self.initialized {
             return Err(DisplayError::DisplayDriverNotInitialized);
         }
 
-        let char_size = self.font.get_char_size();
+        let l_char_size = self.font.get_char_size();
 
         // Get display color
-        let color_argb = if let Some(c) = color {
-            c.to_argb().as_u32()
+        let l_color_argb = if let Some(l_c) = p_color {
+            l_c.to_argb().as_u32()
         } else {
             self.color.to_argb().as_u32()
         };
 
         // Compute frame buffer address
-        let fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
-            + 4 * (y as u32 * self.size.unwrap().0 as u32 + x as u32);
+        let l_fb_write_address = self.frame_buffer.as_mut().unwrap().address_displayed()
+            + 4 * (p_y as u32 * self.size.unwrap().0 as u32 + p_x as u32);
 
         // Draw char in fb
-        self.draw_char_in_fb(char_to_display, fb_write_address, char_size, color_argb)?;
+        self.draw_char_in_fb(
+            p_char_to_display,
+            l_fb_write_address,
+            l_char_size,
+            l_color_argb,
+        )?;
 
         Ok(())
     }
@@ -341,34 +356,34 @@ impl Display {
     /// This function performs raw pointer writes into the frame buffer memory.
     fn draw_char_in_fb(
         &mut self,
-        char_to_display: u8,
-        mut fb_write_address: u32,
-        char_size: (u8, u8),
-        color_argb: u32,
+        p_char_to_display: u8,
+        mut p_fb_write_address: u32,
+        p_char_size: (u8, u8),
+        p_color_argb: u32,
     ) -> DisplayResult<()> {
         // Check if the character to display is valid
-        if !(FIRST_ASCII_CHAR..=LAST_ASCII_CHAR).contains(&char_to_display) {
-            return Err(DisplayError::UnknownCharacter(char_to_display));
+        if !(K_FIRST_ASCII_CHAR..=K_LAST_ASCII_CHAR).contains(&p_char_to_display) {
+            return Err(DisplayError::UnknownCharacter(p_char_to_display));
         } else {
             // Display chat at the current position
-            for line in 0..char_size.1 {
-                for col in 0..char_size.0 {
-                    if self.font.is_pixel_set(char_to_display, col, line) {
+            for l_line in 0..p_char_size.1 {
+                for l_col in 0..p_char_size.0 {
+                    if self.font.is_pixel_set(p_char_to_display, l_col, l_line) {
                         unsafe {
-                            *(fb_write_address as *mut u32) = color_argb;
+                            *(p_fb_write_address as *mut u32) = p_color_argb;
                         }
                     } else {
                         unsafe {
-                            *(fb_write_address as *mut u32) = 0;
+                            *(p_fb_write_address as *mut u32) = 0;
                         }
                     }
 
                     // Increment frame buffer address
-                    fb_write_address += 4;
+                    p_fb_write_address += 4;
                 }
 
                 // Increment frame buffer address
-                fb_write_address += self.size.unwrap().0 as u32 * 4 - char_size.0 as u32 * 4;
+                p_fb_write_address += self.size.unwrap().0 as u32 * 4 - p_char_size.0 as u32 * 4;
             }
         }
 
@@ -398,12 +413,12 @@ impl Display {
     ///   of the screen.
     pub fn draw_string_at_cursor(
         &mut self,
-        string: &str,
-        color: Option<Colors>,
+        p_string: &str,
+        p_color: Option<Colors>,
     ) -> DisplayResult<()> {
         // Draw the string at the current cursor position
-        for char_to_display in string.as_bytes() {
-            self.draw_char_at_cursor(*char_to_display, color)?;
+        for l_char_to_display in p_string.as_bytes() {
+            self.draw_char_at_cursor(*l_char_to_display, p_color)?;
         }
         Ok(())
     }
@@ -431,15 +446,20 @@ impl Display {
     /// - [`DisplayError::OutOfScreenBounds`] if cursor movement would exceed screen bounds.
     pub fn draw_char_at_cursor(
         &mut self,
-        char_to_display: u8,
-        color: Option<Colors>,
+        p_char_to_display: u8,
+        p_color: Option<Colors>,
     ) -> DisplayResult<()> {
-        if char_to_display == b'\n' {
+        if p_char_to_display == b'\n' {
             self.set_cursor_line_feed()?;
-        } else if char_to_display == b'\r' {
+        } else if p_char_to_display == b'\r' {
             self.set_cursor_return()?;
         } else {
-            self.draw_char(char_to_display, self.cursor_pos.0, self.cursor_pos.1, color)?;
+            self.draw_char(
+                p_char_to_display,
+                self.cursor_pos.0,
+                self.cursor_pos.1,
+                p_color,
+            )?;
             self.move_cursor()?;
         }
         Ok(())
@@ -464,16 +484,16 @@ impl Display {
         }
 
         // Move cursor
-        let mut next_cursor_pos = self.cursor_pos;
-        next_cursor_pos.0 += self.font.get_char_size().0 as u16;
-        if next_cursor_pos.0 > self.size.unwrap().0 - self.font.get_char_size().0 as u16 {
-            next_cursor_pos.0 = 0;
-            next_cursor_pos.1 += self.font.get_char_size().1 as u16;
-            if next_cursor_pos.1 > self.size.unwrap().1 - self.font.get_char_size().1 as u16 {
+        let mut l_next_cursor_pos = self.cursor_pos;
+        l_next_cursor_pos.0 += self.font.get_char_size().0 as u16;
+        if l_next_cursor_pos.0 > self.size.unwrap().0 - self.font.get_char_size().0 as u16 {
+            l_next_cursor_pos.0 = 0;
+            l_next_cursor_pos.1 += self.font.get_char_size().1 as u16;
+            if l_next_cursor_pos.1 > self.size.unwrap().1 - self.font.get_char_size().1 as u16 {
                 return Err(DisplayError::OutOfScreenBounds);
             }
         }
-        self.cursor_pos = next_cursor_pos;
+        self.cursor_pos = l_next_cursor_pos;
         Ok(())
     }
 
@@ -487,8 +507,8 @@ impl Display {
     ///
     /// # Errors
     /// This function does not currently return errors.
-    pub fn set_font(&mut self, font: FontSize) -> DisplayResult<()> {
-        self.font = font;
+    pub fn set_font(&mut self, p_font: FontSize) -> DisplayResult<()> {
+        self.font = p_font;
         Ok(())
     }
 
@@ -537,14 +557,14 @@ impl Display {
     /// # Errors
     /// - [`DisplayError::DisplayDriverNotInitialized`] if called before [`Display::init`].
     /// - [`DisplayError::OutOfScreenBounds`] if `x` or `y` lies outside the screen size.
-    pub fn set_cursor_pos(&mut self, x: u16, y: u16) -> DisplayResult<()> {
+    pub fn set_cursor_pos(&mut self, p_x: u16, p_y: u16) -> DisplayResult<()> {
         if !self.initialized {
             return Err(DisplayError::DisplayDriverNotInitialized);
         }
 
-        if x < self.size.unwrap().0 && y < self.size.unwrap().1 {
-            self.cursor_pos.0 = x;
-            self.cursor_pos.1 = y;
+        if p_x < self.size.unwrap().0 && p_y < self.size.unwrap().1 {
+            self.cursor_pos.0 = p_x;
+            self.cursor_pos.1 = p_y;
             Ok(())
         } else {
             Err(DisplayError::OutOfScreenBounds)
@@ -561,8 +581,8 @@ impl Display {
     ///
     /// # Errors
     /// This function does not currently return errors.
-    pub fn set_color(&mut self, color: Colors) -> DisplayResult<()> {
-        self.color = color;
+    pub fn set_color(&mut self, p_color: Colors) -> DisplayResult<()> {
+        self.color = p_color;
         Ok(())
     }
 }

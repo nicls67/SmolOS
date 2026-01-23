@@ -1,5 +1,5 @@
-const FRAME_BUFFER_1_ADDRESS: u32 = 0xC0000000;
-const FRAME_BUFFER_2_ADDRESS: u32 = 0xC0200000;
+const K_FRAME_BUFFER_1_ADDRESS: u32 = 0xC0000000;
+const K_FRAME_BUFFER_2_ADDRESS: u32 = 0xC0200000;
 
 pub enum FrameBufferSelector {
     FrameBuffer1,
@@ -30,8 +30,8 @@ impl FrameBuffer {
     /// determines the active frame buffer.
     ///
     /// # Returns
-    /// * `FRAME_BUFFER_1_ADDRESS` if `self.selected` is `FrameBufferSelector::FrameBuffer1`.
-    /// * `FRAME_BUFFER_2_ADDRESS` if `self.selected` is `FrameBufferSelector::FrameBuffer2`.
+    /// * `K_FRAME_BUFFER_1_ADDRESS` if `self.selected` is `FrameBufferSelector::FrameBuffer1`.
+    /// * `K_FRAME_BUFFER_2_ADDRESS` if `self.selected` is `FrameBufferSelector::FrameBuffer2`.
     ///
     /// # Assumptions
     /// This function assumes that the `self.selected` field is properly initialized
@@ -42,12 +42,12 @@ impl FrameBuffer {
     /// always maps to a valid address.
     ///
     /// # Requirements
-    /// Ensure that the constants `FRAME_BUFFER_1_ADDRESS` and `FRAME_BUFFER_2_ADDRESS`
+    /// Ensure that the constants `K_FRAME_BUFFER_1_ADDRESS` and `K_FRAME_BUFFER_2_ADDRESS`
     /// are defined in the same scope or accessible to this function.
     pub fn address_active(&self) -> u32 {
         match self.selected {
-            FrameBufferSelector::FrameBuffer1 => FRAME_BUFFER_1_ADDRESS,
-            FrameBufferSelector::FrameBuffer2 => FRAME_BUFFER_2_ADDRESS,
+            FrameBufferSelector::FrameBuffer1 => K_FRAME_BUFFER_1_ADDRESS,
+            FrameBufferSelector::FrameBuffer2 => K_FRAME_BUFFER_2_ADDRESS,
         }
     }
 
@@ -60,8 +60,8 @@ impl FrameBuffer {
     /// the other is displayed.
     ///
     /// # Returns
-    /// * `FRAME_BUFFER_2_ADDRESS` - If the selected frame buffer is `FrameBuffer1`.
-    /// * `FRAME_BUFFER_1_ADDRESS` - If the selected frame buffer is `FrameBuffer2`.
+    /// * `K_FRAME_BUFFER_2_ADDRESS` - If the selected frame buffer is `FrameBuffer1`.
+    /// * `K_FRAME_BUFFER_1_ADDRESS` - If the selected frame buffer is `FrameBuffer2`.
     ///
     /// # Note
     /// Ensure that the `selected` field is set correctly to represent the current
@@ -69,11 +69,11 @@ impl FrameBuffer {
     ///
     /// # Dependencies
     /// This function relies on the `FrameBufferSelector` enum and the constants
-    /// `FRAME_BUFFER_1_ADDRESS` and `FRAME_BUFFER_2_ADDRESS` being defined.
+    /// `K_FRAME_BUFFER_1_ADDRESS` and `K_FRAME_BUFFER_2_ADDRESS` being defined.
     pub fn address_displayed(&self) -> u32 {
         match self.selected {
-            FrameBufferSelector::FrameBuffer1 => FRAME_BUFFER_2_ADDRESS,
-            FrameBufferSelector::FrameBuffer2 => FRAME_BUFFER_1_ADDRESS,
+            FrameBufferSelector::FrameBuffer1 => K_FRAME_BUFFER_2_ADDRESS,
+            FrameBufferSelector::FrameBuffer2 => K_FRAME_BUFFER_1_ADDRESS,
         }
     }
 

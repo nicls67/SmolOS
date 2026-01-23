@@ -1,6 +1,6 @@
 [
   {
     "label": "Build and Run",
-    "command": "cargo run --release"
-  }
+    "command": "cargo flash --chip STM32F769NIHx --release",
+  },
 ]

@@ -60,8 +60,7 @@ typedef enum
 /**********************/
 /* Exported functions */
 /**********************/
-void HAL_Delay(uint32_t ms);
+void HAL_Delay(uint32_t p_ms);
 
 #endif //LIB_INTERFACE_H
-
 

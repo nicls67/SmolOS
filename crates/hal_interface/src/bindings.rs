@@ -59,39 +59,39 @@ impl HalInterfaceResult {
     ///
     pub fn to_result(
         &self,
-        id: Option<usize>,
-        name: Option<&'static str>,
-        action_write: Option<InterfaceWriteActions>,
-        action_read: Option<InterfaceReadAction>,
+        p_id: Option<usize>,
+        p_name: Option<&'static str>,
+        p_action_write: Option<InterfaceWriteActions>,
+        p_action_read: Option<InterfaceReadAction>,
     ) -> HalResult<()> {
         match self {
             HalInterfaceResult::OK => Ok(()),
-            HalInterfaceResult::ErrInterfaceNotFound => Err(InterfaceNotFound(name.unwrap())),
-            HalInterfaceResult::ErrWrongInterfaceId => Err(WrongInterfaceId(id.unwrap_or(0))),
+            HalInterfaceResult::ErrInterfaceNotFound => Err(InterfaceNotFound(p_name.unwrap())),
+            HalInterfaceResult::ErrWrongInterfaceId => Err(WrongInterfaceId(p_id.unwrap_or(0))),
             HalInterfaceResult::ErrReadOnlyInterface => {
-                Err(ReadOnlyInterface(interface_name(id.unwrap())?))
+                Err(ReadOnlyInterface(interface_name(p_id.unwrap())?))
             }
             HalInterfaceResult::ErrWriteOnlyInterface => {
-                Err(WriteOnlyInterface(interface_name(id.unwrap())?))
+                Err(WriteOnlyInterface(interface_name(p_id.unwrap())?))
             }
 
             HalInterfaceResult::ErrIncompatibleAction => Err(IncompatibleAction(
                 {
-                    if let Some(action) = action_write {
-                        action.name()
-                    } else if let Some(action) = action_read {
-                        action.name()
+                    if let Some(l_action) = p_action_write {
+                        l_action.name()
+                    } else if let Some(l_action) = p_action_read {
+                        l_action.name()
                     } else {
                         "Unknown"
                     }
                 },
-                interface_name(id.unwrap())?,
+                interface_name(p_id.unwrap())?,
             )),
             HalInterfaceResult::ErrWriteError => {
-                Err(HalError::WriteError(interface_name(id.unwrap())?))
+                Err(HalError::WriteError(interface_name(p_id.unwrap())?))
             }
             HalInterfaceResult::ErrNoBuffer => Err(HalError::InterfaceBadConfig(
-                interface_name(id.unwrap())?,
+                interface_name(p_id.unwrap())?,
                 "No buffer provided for read operation",
             )),
         }
@@ -101,37 +101,41 @@ impl HalInterfaceResult {
 unsafe extern "C" {
     pub fn hal_init();
 
-    pub fn get_interface_id(name: *const u8, id: *mut u8) -> HalInterfaceResult;
+    pub fn get_interface_id(p_name: *const u8, p_id: *mut u8) -> HalInterfaceResult;
 
-    pub fn get_interface_name(id: u8, name: *mut u8) -> HalInterfaceResult;
+    pub fn get_interface_name(p_id: u8, p_name: *mut u8) -> HalInterfaceResult;
 
-    pub fn configure_callback(id: u8, callback: InterfaceCallback) -> HalInterfaceResult;
+    pub fn configure_callback(p_id: u8, p_callback: InterfaceCallback) -> HalInterfaceResult;
 
-    pub fn gpio_write(id: u8, action: GpioWriteAction) -> HalInterfaceResult;
+    pub fn gpio_write(p_id: u8, p_action: GpioWriteAction) -> HalInterfaceResult;
 
-    pub fn usart_write(id: u8, str: *const u8, len: u16) -> HalInterfaceResult;
+    pub fn usart_write(p_id: u8, p_str: *const u8, p_len: u16) -> HalInterfaceResult;
 
-    pub fn get_read_buffer(id: u8, buffer: &mut &mut RxBuffer) -> HalInterfaceResult;
+    pub fn get_read_buffer(p_id: u8, p_buffer: &mut &mut RxBuffer) -> HalInterfaceResult;
 
     pub fn get_core_clk() -> u32;
 
-    pub fn lcd_enable(id: u8, enable: bool) -> HalInterfaceResult;
+    pub fn lcd_enable(p_id: u8, p_enable: bool) -> HalInterfaceResult;
 
-    pub fn lcd_clear(id: u8, layer: LcdLayer, color: u32) -> HalInterfaceResult;
+    pub fn lcd_clear(p_id: u8, p_layer: LcdLayer, p_color: u32) -> HalInterfaceResult;
 
     pub fn lcd_draw_pixel(
-        id: u8,
-        layer: LcdLayer,
-        x: u16,
-        y: u16,
-        color: u32,
+        p_id: u8,
+        p_layer: LcdLayer,
+        p_x: u16,
+        p_y: u16,
+        p_color: u32,
     ) -> HalInterfaceResult;
 
-    pub fn get_lcd_size(id: u8, x: *mut u16, y: *mut u16) -> HalInterfaceResult;
+    pub fn get_lcd_size(p_id: u8, p_x: *mut u16, p_y: *mut u16) -> HalInterfaceResult;
 
-    pub fn get_fb_address(id: u8, layer: LcdLayer, fb_address: *mut u32) -> HalInterfaceResult;
+    pub fn get_fb_address(
+        p_id: u8,
+        p_layer: LcdLayer,
+        p_fb_address: *mut u32,
+    ) -> HalInterfaceResult;
 
-    pub fn set_fb_address(id: u8, layer: LcdLayer, fb_address: u32) -> HalInterfaceResult;
+    pub fn set_fb_address(p_id: u8, p_layer: LcdLayer, p_fb_address: u32) -> HalInterfaceResult;
 }
 
 /**
@@ -159,15 +163,15 @@ unsafe extern "C" {
  * # Errors
  * - Returns `Err(WrongInterfaceId)` if `get_interface_name` indicates an invalid interface ID or other failure.
  */
-pub fn interface_name(id: usize) -> HalResult<&'static str> {
-    let mut name = [0; 32];
-    match unsafe { get_interface_name(id as u8, &mut name[0]) } {
+pub fn interface_name(p_id: usize) -> HalResult<&'static str> {
+    let mut l_name = [0; 32];
+    match unsafe { get_interface_name(p_id as u8, &mut l_name[0]) } {
         HalInterfaceResult::OK => {
-            let static_bytes: &'static [u8] =
-                unsafe { core::slice::from_raw_parts(name.as_ptr(), name.len()) };
-            let static_str = unsafe { core::str::from_utf8_unchecked(static_bytes) };
-            Ok(static_str)
+            let l_static_bytes: &'static [u8] =
+                unsafe { core::slice::from_raw_parts(l_name.as_ptr(), l_name.len()) };
+            let l_static_str = unsafe { core::str::from_utf8_unchecked(l_static_bytes) };
+            Ok(l_static_str)
         }
-        _ => Err(WrongInterfaceId(id)),
+        _ => Err(WrongInterfaceId(p_id)),
     }
 }

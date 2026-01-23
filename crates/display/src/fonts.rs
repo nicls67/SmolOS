@@ -1,7 +1,7 @@
-pub const FIRST_ASCII_CHAR: u8 = 0x20;
-pub const LAST_ASCII_CHAR: u8 = 0x7E;
+pub const K_FIRST_ASCII_CHAR: u8 = 0x20;
+pub const K_LAST_ASCII_CHAR: u8 = 0x7E;
 
-const FONT_ASCII_12: [u8; 1140] = [
+const K_FONT_ASCII_12: [u8; 1140] = [
     // @0 ' ' (7 pixels wide)
     0x00, //
     0x00, //
@@ -1239,7 +1239,7 @@ const FONT_ASCII_12: [u8; 1140] = [
     0x00, //
 ];
 
-const FONT_ASCII_16: [u16; 1520] = [
+const K_FONT_ASCII_16: [u16; 1520] = [
     // @0 ' ' (11 pixels wide)
     0x0000, //
     0x0000, //
@@ -2857,7 +2857,7 @@ const FONT_ASCII_16: [u16; 1520] = [
     0x0000, //
 ];
 
-const FONT_ASCII_20: [u16; 1900] = [
+const K_FONT_ASCII_20: [u16; 1900] = [
     // @0 ' ' (14 pixels wide)
     0x0000, //
     0x0000, //
@@ -4855,7 +4855,7 @@ const FONT_ASCII_20: [u16; 1900] = [
     0x0000, //
 ];
 
-const FONT_ASCII_24: [u32; 2280] = [
+const K_FONT_ASCII_24: [u32; 2280] = [
     // @0 ' ' (17 pixels wide)
     0x00000000, //
     0x00000000, //
@@ -7242,27 +7242,31 @@ pub enum FontSize {
 }
 
 impl FontSize {
-    pub(crate) fn is_pixel_set(&self, ascii_char: u8, x: u8, y: u8) -> bool {
+    pub(crate) fn is_pixel_set(&self, p_ascii_char: u8, p_x: u8, p_y: u8) -> bool {
         match self {
             FontSize::Font12 => {
-                let col_data = FONT_ASCII_12
-                    [(ascii_char - 0x20) as usize * self.get_char_size().1 as usize + y as usize];
-                col_data & (1 << (7 - x)) != 0
+                let l_col_data = K_FONT_ASCII_12[(p_ascii_char - 0x20) as usize
+                    * self.get_char_size().1 as usize
+                    + p_y as usize];
+                l_col_data & (1 << (7 - p_x)) != 0
             }
             FontSize::Font16 => {
-                let col_data = FONT_ASCII_16
-                    [(ascii_char - 0x20) as usize * self.get_char_size().1 as usize + y as usize];
-                col_data & (1 << (15 - x)) != 0
+                let l_col_data = K_FONT_ASCII_16[(p_ascii_char - 0x20) as usize
+                    * self.get_char_size().1 as usize
+                    + p_y as usize];
+                l_col_data & (1 << (15 - p_x)) != 0
             }
             FontSize::Font20 => {
-                let col_data = FONT_ASCII_20
-                    [(ascii_char - 0x20) as usize * self.get_char_size().1 as usize + y as usize];
-                col_data & (1 << (15 - x)) != 0
+                let l_col_data = K_FONT_ASCII_20[(p_ascii_char - 0x20) as usize
+                    * self.get_char_size().1 as usize
+                    + p_y as usize];
+                l_col_data & (1 << (15 - p_x)) != 0
             }
             FontSize::Font24 => {
-                let col_data = FONT_ASCII_24
-                    [(ascii_char - 0x20) as usize * self.get_char_size().1 as usize + y as usize];
-                col_data & (1 << (31 - x)) != 0
+                let l_col_data = K_FONT_ASCII_24[(p_ascii_char - 0x20) as usize
+                    * self.get_char_size().1 as usize
+                    + p_y as usize];
+                l_col_data & (1 << (31 - p_x)) != 0
             }
         }
     }

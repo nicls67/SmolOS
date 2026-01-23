@@ -33,33 +33,34 @@ pub enum DisplayError {
 
 impl DisplayError {
     pub fn to_string(&self) -> String<256> {
-        let mut msg = String::new();
+        let mut l_msg = String::new();
         match self {
-            HalError(e) => msg.push_str(e.to_string().as_str()).unwrap(),
+            HalError(l_e) => l_msg.push_str(l_e.to_string().as_str()).unwrap(),
             DisplayError::DisplayDriverNotInitialized => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str("Display driver not initialized").unwrap()
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str("Display driver not initialized").unwrap()
             }
             DisplayError::UnknownError => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str("Unknown error").unwrap()
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str("Unknown error").unwrap()
             }
             DisplayError::OutOfScreenBounds => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str("Out of screen bounds").unwrap()
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str("Out of screen bounds").unwrap()
             }
-            DisplayError::UnknownCharacter(c) => {
-                msg.push_str(self.severity().as_str()).unwrap();
-                msg.push_str(format!(25; "Unknown character: {}", c).unwrap().as_str())
+            DisplayError::UnknownCharacter(l_c) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(format!(25; "Unknown character: {}", l_c).unwrap().as_str())
                     .unwrap()
             }
         }
-        msg
+        l_msg
     }
 
     pub fn severity(&self) -> DisplayErrorLevel {
         match self {
-            HalError(err) => match err.severity() {
+            HalError(l_err) => match l_err.severity() {
                 HalErrorLevel::Fatal => Fatal,
                 HalErrorLevel::Critical => Critical,
                 HalErrorLevel::Error => Error,
