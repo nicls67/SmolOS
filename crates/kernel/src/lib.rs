@@ -16,7 +16,7 @@ use crate::apps::AppsManager;
 pub use crate::console_output::ConsoleOutput;
 use crate::data::Kernel;
 pub use crate::data::KernelTimeData;
-pub use apps::{AppConfig, AppStatus, CallPeriodicity};
+pub use apps::{AppConfig, AppStatus, CallPeriodicity, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS};
 pub use boot::{BootConfig, boot};
 pub use console_output::ConsoleFormatting;
 pub use data::cortex_init;

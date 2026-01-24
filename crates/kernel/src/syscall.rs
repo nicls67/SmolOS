@@ -1,7 +1,6 @@
 use crate::console_output::ConsoleFormatting;
 use crate::data::Kernel;
-use crate::scheduler::App;
-use crate::{DeviceType, KernelError, KernelResult, Milliseconds};
+use crate::{DeviceType, KernelError, KernelResult};
 use display::Colors;
 use hal_interface::{
     InterfaceCallback, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions,
@@ -136,93 +135,6 @@ pub fn syscall_display(p_args: SysCallDisplayArgs, p_caller_id: u32) -> KernelRe
         }
     }
     .map_err(KernelError::DisplayError);
-
-    match l_result {
-        Ok(..) => Ok(()),
-        Err(l_err) => {
-            Kernel::errors().error_handler(&l_err);
-            Err(l_err)
-        }
-    }
-}
-
-pub enum SysCallSchedulerArgs<'a> {
-    AddPeriodicTask(
-        &'static str,
-        App,
-        Option<App>,
-        Option<App>,
-        Milliseconds,
-        Option<Milliseconds>,
-        &'a mut u32,
-    ),
-    RemovePeriodicTask(&'static str),
-    NewTaskDuration(&'static str, Milliseconds),
-}
-
-/// Dispatches scheduler-related syscalls (periodic task creation/removal/configuration).
-///
-/// This is a thin wrapper around [`Kernel::scheduler()`] methods, and ensures any error
-/// is passed through the kernel error handler before being returned.
-///
-/// # Parameters
-/// - `args`: The scheduler operation to perform:
-///   - `AddPeriodicTask(name, app, init, closure, period, ends_in, id_out)`
-///     - `name`: Task name/identifier.
-///     - `app`: The app entry/call to schedule.
-///     - `init`: Optional initialization function called once before first execution.
-///     - `closure`: Optional cleanup function called when the task's lifetime expires.
-///     - `period`: The periodic interval in milliseconds.
-///     - `ends_in`: Optional duration after which the task should stop.
-///     - `id_out`: Output parameter; on success receives the newly created task id.
-///   - `RemovePeriodicTask(name)`
-///     - `name`: Task name/identifier.
-///   - `NewTaskDuration(name, time)`
-///     - `name`: Task name/identifier.
-///     - `time`: New duration/limit in milliseconds.
-///
-/// # Returns
-/// - `Ok(())` if the scheduler operation succeeds.
-/// - `Err(KernelError)` if the scheduler operation fails.
-///
-/// # Errors
-/// - Propagates any error returned by:
-///   - `Kernel::scheduler().add_periodic_app(...)`
-///   - `Kernel::scheduler().remove_periodic_app(...)`
-///   - `Kernel::scheduler().set_new_task_duration(...)`
-///
-/// In all error cases, `Kernel::errors().error_handler(&err)` is called before returning the error.
-///
-/// # Side effects
-/// - For `AddPeriodicTask`, writes the created task id into the provided `&mut u32`.
-pub fn syscall_scheduler(p_args: SysCallSchedulerArgs) -> KernelResult<()> {
-    let l_result = match p_args {
-        SysCallSchedulerArgs::AddPeriodicTask(
-            l_name,
-            l_app,
-            l_init,
-            l_closure,
-            l_period,
-            l_ends_in,
-            l_id,
-        ) => {
-            match Kernel::scheduler()
-                .add_periodic_app(l_name, l_app, l_init, l_closure, l_period, l_ends_in)
-            {
-                Ok(l_new_id) => {
-                    *l_id = l_new_id;
-                    Ok(())
-                }
-                Err(l_e) => Err(l_e),
-            }
-        }
-        SysCallSchedulerArgs::RemovePeriodicTask(l_name) => {
-            Kernel::scheduler().remove_periodic_app(l_name)
-        }
-        SysCallSchedulerArgs::NewTaskDuration(l_name, l_time) => {
-            Kernel::scheduler().set_new_task_duration(l_name, l_time)
-        }
-    };
 
     match l_result {
         Ok(..) => Ok(()),

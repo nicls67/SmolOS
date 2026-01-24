@@ -7,5 +7,7 @@ unsafe extern "C" {
 #[allow(non_snake_case)]
 #[interrupt]
 fn USART1() {
-    unsafe { USART1_it_handler(); }
+    unsafe {
+        USART1_it_handler();
+    }
 }

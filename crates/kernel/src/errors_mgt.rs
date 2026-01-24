@@ -18,7 +18,7 @@ use crate::data::Kernel;
 use crate::ident::{K_KERNEL_MASTER_ID, K_KERNEL_NAME};
 use crate::{
     KernelError, KernelErrorLevel, KernelResult, Milliseconds, SysCallHalActions, syscall_devices,
-    syscall_hal, syscall_scheduler,
+    syscall_hal,
 };
 use core::panic::PanicInfo;
 use cortex_m_rt::{ExceptionFrame, exception};
@@ -215,23 +215,20 @@ impl ErrorsManager {
                         .app_exists(Self::K_LED_BLINK_APP_NAME)
                         .is_none()
                     {
-                        let mut l_err_app_id = 0;
-                        syscall_scheduler(crate::SysCallSchedulerArgs::AddPeriodicTask(
-                            Self::K_LED_BLINK_APP_NAME,
-                            blink_err_led,
-                            None,
-                            Some(reset_err_led),
-                            Milliseconds(100),
-                            Some(Milliseconds(10000)),
-                            &mut l_err_app_id,
-                        ))
-                        .unwrap_or(());
+                        // Try to add the error LED app in scheduler, no action if it fails
+                        Kernel::scheduler()
+                            .add_periodic_app(
+                                Self::K_LED_BLINK_APP_NAME,
+                                blink_err_led,
+                                Some(reset_err_led),
+                                Milliseconds(100),
+                                Some(Milliseconds(10000)),
+                            )
+                            .unwrap_or(0);
                     } else {
-                        syscall_scheduler(crate::SysCallSchedulerArgs::NewTaskDuration(
-                            Self::K_LED_BLINK_APP_NAME,
-                            Milliseconds(10000),
-                        ))
-                        .unwrap_or(())
+                        Kernel::scheduler()
+                            .set_new_task_duration(Self::K_LED_BLINK_APP_NAME, Milliseconds(10000))
+                            .unwrap_or(());
                     }
                 }
 

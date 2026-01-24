@@ -1,8 +1,10 @@
 use crate::KernelError::{
-    AppAlreadyScheduled, AppInitError, AppNotFound, AppNotScheduled, CannotAddNewPeriodicApp,
-    DeviceLocked, DeviceNotOwned, DisplayError, HalError, TerminalError, WrongSyscallArgs,
+    AppAlreadyScheduled, AppInitError, AppNotFound, AppNotScheduled, AppParamTooLong,
+    CannotAddNewPeriodicApp, DeviceLocked, DeviceNotOwned, DisplayError, HalError, TerminalError,
+    TooManyAppParams, WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
+use crate::{K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS};
 use display::{DisplayError as DisplayErrorDef, DisplayErrorLevel};
 use hal_interface::{HalError as HalErrorDef, HalErrorLevel};
 use heapless::{String, format};
@@ -32,6 +34,7 @@ pub enum KernelError {
     DisplayError(DisplayErrorDef),
     TerminalError(KernelErrorLevel, &'static str),
     CannotAddNewPeriodicApp(&'static str),
+    /// Initialization failure with a captured error message and app name.
     AppInitError(&'static str),
     WrongSyscallArgs(&'static str),
     AppNotScheduled(&'static str),
@@ -39,6 +42,10 @@ pub enum KernelError {
     AppNotFound,
     DeviceLocked(&'static str),
     DeviceNotOwned(&'static str),
+    /// App was invoked with too many parameters.
+    TooManyAppParams,
+    /// App parameter exceeded the maximum allowed size.
+    AppParamTooLong,
 }
 
 impl KernelError {
@@ -67,11 +74,11 @@ impl KernelError {
                     )
                     .unwrap();
             }
-            AppInitError(l_name) => {
+            AppInitError(l_app_name) => {
                 l_msg.push_str(self.severity().as_str()).unwrap();
                 l_msg
                     .push_str(
-                        format!(200; "Cannot initialize app {}", l_name)
+                        format!(200; "Cannot initialize app {}", l_app_name)
                             .unwrap()
                             .as_str(),
                     )
@@ -133,6 +140,30 @@ impl KernelError {
                     )
                     .unwrap();
             }
+            TooManyAppParams => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(200; "App can have only {} parameters", K_MAX_APP_PARAMS)
+                            .unwrap()
+                            .as_str(),
+                    )
+                    .unwrap();
+            }
+            AppParamTooLong => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(
+                            200;
+                            "App parameter can have a size of at most {} characters",
+                            K_MAX_APP_PARAM_SIZE
+                        )
+                        .unwrap()
+                        .as_str(),
+                    )
+                    .unwrap();
+            }
         }
         l_msg
     }
@@ -165,6 +196,8 @@ impl KernelError {
             AppNotFound => Error,
             DeviceLocked(_) => Error,
             DeviceNotOwned(_) => Error,
+            TooManyAppParams => Error,
+            AppParamTooLong => Error,
         }
     }
 }

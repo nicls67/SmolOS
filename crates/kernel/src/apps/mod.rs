@@ -2,8 +2,11 @@ use crate::KernelResult;
 use heapless::Vec;
 
 mod app_config;
+mod app_ctrl;
 
-pub use self::app_config::{AppConfig, AppStatus, CallPeriodicity};
+pub use self::app_config::{
+    AppConfig, AppStatus, CallPeriodicity, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS,
+};
 
 const K_MAX_APPS: usize = 32;
 
@@ -93,5 +96,20 @@ impl AppsManager {
             .find(|l_app| l_app.id == Some(p_app_id))
             .ok_or(crate::KernelError::AppNotFound)?
             .stop()
+    }
+
+    /// Returns the list of registered app names.
+    pub(crate) fn list_apps(&self) -> Vec<&str, K_MAX_APPS> {
+        self.apps.iter().map(|l_app| l_app.name).collect()
+    }
+
+    /// Returns the current status for a given app name.
+    pub(crate) fn get_app_status(&self, p_app: &str) -> KernelResult<AppStatus> {
+        Ok(self
+            .apps
+            .iter()
+            .find(|l_app| l_app.name == p_app)
+            .ok_or(crate::KernelError::AppNotFound)?
+            .app_status)
     }
 }

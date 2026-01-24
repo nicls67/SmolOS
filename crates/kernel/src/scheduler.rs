@@ -40,9 +40,8 @@ pub type App = fn() -> KernelResult<()>;
 ///   Represents the core application logic or callable function associated with the application.
 ///   This is the primary entry point for executing application-specific logic.
 ///
-/// * `app_init` (`Option<App>`) -
-///   Optional initialization structure or state for the application. It may hold
-///   configuration or pre-instantiation data necessary for the application startup.
+/// * `app_closure` (`Option<App>`) -
+///   Optional cleanup function called when the application's lifetime expires.
 ///
 /// * `app_period` (`u32`) -
 ///   Specifies the periodic interval or runtime duration for the application's operations,
@@ -72,7 +71,6 @@ pub type App = fn() -> KernelResult<()>;
 struct AppWrapper {
     name: &'static str,
     app: App,
-    app_init: Option<App>,
     app_closure: Option<App>,
     app_period: u32,
     ends_in: Option<u32>,
@@ -175,8 +173,8 @@ impl Scheduler {
     /// Registers a new periodic application with the scheduler.
     ///
     /// This method adds an application to the scheduler's task list, configuring it to run
-    /// at a specified interval. The application can optionally have initialization and
-    /// cleanup callbacks, as well as a finite lifetime.
+    /// at a specified interval. The application can optionally have a cleanup callback,
+    /// as well as a finite lifetime.
     ///
     /// # Parameters
     ///
@@ -184,10 +182,6 @@ impl Scheduler {
     ///   the scheduler.
     ///
     /// * `app` - The application entry point.
-    ///
-    /// * `app_init` - Optional initialization function called once before the first
-    ///   execution of the application. If initialization fails, the app is skipped
-    ///   until the next cycle and init is retried.
     ///
     /// * `app_closure` - Optional cleanup function called when the application's lifetime
     ///   expires (i.e., when `ends_in` reaches zero). Useful for releasing resources.
@@ -213,7 +207,6 @@ impl Scheduler {
         &mut self,
         p_name: &'static str,
         p_app: App,
-        p_app_init: Option<App>,
         p_app_closure: Option<App>,
         p_period: Milliseconds,
         p_ends_in: Option<Milliseconds>,
@@ -231,7 +224,6 @@ impl Scheduler {
             .push(AppWrapper {
                 name: p_name,
                 app: p_app,
-                app_init: p_app_init,
                 app_closure: p_app_closure,
                 app_period: p_period.to_u32() / self.sched_period.to_u32(),
                 active: true,
@@ -321,17 +313,6 @@ impl Scheduler {
             if self.cycle_counter.is_multiple_of(l_task.app_period) && l_task.active {
                 self.current_task_id = Some(l_id);
                 self.current_task_has_error = false;
-
-                // Try to initialize the app at the first call
-                if let Some(l_init_func) = l_task.app_init {
-                    match l_init_func() {
-                        Ok(..) => l_task.app_init = None,
-                        Err(l_e) => {
-                            Kernel::errors().error_handler(&l_e);
-                            continue;
-                        }
-                    }
-                }
 
                 // Execute the task
                 match (l_task.app)() {
