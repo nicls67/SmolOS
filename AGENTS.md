@@ -8,7 +8,6 @@ This file orients coding agents working in this repo. Keep changes focused, avoi
   * `crates/display` contains the library for screen display.
   * `crates/hal_interface` contains the interface with the HAL written in C in `drivers/Interface`.
   * `crates/kernel` contains the main OS functions.
-  * `crates/kernel_apps` contains the applications for the kernel.
   * `crates/smolos` is the entry point for the application.
 
 2. `drivers/` contains platform-specific drivers written in C. Only `drivers/Interface` can be updated, others folders are auto-generated.

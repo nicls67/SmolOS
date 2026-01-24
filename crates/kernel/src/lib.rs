@@ -6,6 +6,7 @@ mod data;
 mod devices;
 mod errors_mgt;
 mod ident;
+mod kernel_apps;
 mod scheduler;
 mod syscall;
 mod systick;

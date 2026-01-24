@@ -1,7 +1,8 @@
 use core::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 use hal_interface::InterfaceWriteActions;
-use kernel::{
+
+use crate::{
     DeviceType, KernelResult, SysCallDevicesArgs, SysCallHalActions, syscall_devices, syscall_hal,
 };
 

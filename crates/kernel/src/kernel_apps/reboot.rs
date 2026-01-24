@@ -1,6 +1,8 @@
 use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
+
 use heapless::format;
-use kernel::{ConsoleFormatting, KernelResult, syscall_terminal};
+
+use crate::{ConsoleFormatting, KernelResult, syscall_terminal};
 
 /// Stores the app ID associated with the current command context.
 ///

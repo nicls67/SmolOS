@@ -129,16 +129,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel_apps"
-version = "0.1.0"
-dependencies = [
- "cortex-m",
- "hal_interface",
- "heapless",
- "kernel",
-]
-
-[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -218,7 +208,6 @@ dependencies = [
  "hal_interface",
  "heapless",
  "kernel",
- "kernel_apps",
  "stm32f7",
 ]
 

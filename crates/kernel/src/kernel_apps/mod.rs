@@ -1,8 +1,6 @@
-#![no_std]
+use crate::{AppConfig, AppStatus, CallPeriodicity, KernelResult, Milliseconds, apps};
 
-use kernel::{AppConfig, AppStatus, CallPeriodicity, KernelResult, Milliseconds};
-
-use crate::reboot::K_REBOOT_DELAY;
+use self::reboot::K_REBOOT_DELAY;
 
 mod led_blink;
 mod reboot;
@@ -49,11 +47,11 @@ const K_DEFAULT_APPS_START_LIST: [&str; 1] = ["led_blink"];
 /// Register default kernel apps and start those included in [`K_DEFAULT_APPS_START_LIST`].
 pub fn init_kernel_apps() -> KernelResult<()> {
     for l_app in K_DEFAULT_APPS.iter() {
-        kernel::apps().add_app(*l_app)?;
+        apps().add_app(*l_app)?;
 
         // Check if the app is in the start list
         if K_DEFAULT_APPS_START_LIST.contains(&l_app.name) {
-            kernel::apps().start_app(l_app.name)?;
+            apps().start_app(l_app.name)?;
         }
     }
 
