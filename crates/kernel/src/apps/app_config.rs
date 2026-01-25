@@ -74,8 +74,10 @@ impl AppConfig {
     /// # Errors
     /// Returns [`KernelError::AppAlreadyScheduled`] if the app is already running/scheduled.
     /// Returns [`KernelError::AppParamTooLong`] if any parameter exceeds
-    /// [`K_MAX_APP_PARAM_SIZE`], or [`KernelError::TooManyAppParams`] if the
-    /// parameter count exceeds [`K_MAX_APP_PARAMS`].
+    /// [`K_MAX_APP_PARAM_SIZE`], [`KernelError::TooManyAppParams`] if the
+    /// parameter count exceeds [`K_MAX_APP_PARAMS`], or
+    /// [`KernelError::AppNeedsNoParam`] if parameters are provided while no
+    /// `param_storage` hook is configured.
     pub fn start(&mut self, p_app_param: &str) -> KernelResult<u32> {
         if self.app_status == Stopped {
             let l_period;
@@ -105,28 +107,35 @@ impl AppConfig {
             self.id = Some(l_app_id);
             self.app_status = Running;
 
+            // Store app parameters in a Vec
+            let mut l_param_vec: Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS> = Vec::new();
+
+            for l_param in p_app_param.split_ascii_whitespace().skip(1) {
+                let mut l_entry = String::<K_MAX_APP_PARAM_SIZE>::new();
+                l_entry.push_str(l_param).map_err(|_| {
+                    Kernel::scheduler().remove_periodic_app(self.name).unwrap();
+                    self.id = None;
+                    self.app_status = Stopped;
+                    KernelError::AppParamTooLong
+                })?;
+                l_param_vec.push(l_entry).map_err(|_| {
+                    Kernel::scheduler().remove_periodic_app(self.name).unwrap();
+                    self.id = None;
+                    self.app_status = Stopped;
+                    KernelError::TooManyAppParams
+                })?;
+            }
+
             // Store the app parameters in the storage function if provided
             if let Some(l_param_storage) = self.param_storage {
-                let mut l_param_vec: Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS> =
-                    Vec::new();
-
-                for l_param in p_app_param.split_ascii_whitespace().skip(1) {
-                    let mut l_entry = String::<K_MAX_APP_PARAM_SIZE>::new();
-                    l_entry.push_str(l_param).map_err(|_| {
-                        Kernel::scheduler().remove_periodic_app(self.name).unwrap();
-                        self.id = None;
-                        self.app_status = Stopped;
-                        KernelError::AppParamTooLong
-                    })?;
-                    l_param_vec.push(l_entry).map_err(|_| {
-                        Kernel::scheduler().remove_periodic_app(self.name).unwrap();
-                        self.id = None;
-                        self.app_status = Stopped;
-                        KernelError::TooManyAppParams
-                    })?;
-                }
-
                 l_param_storage(l_param_vec);
+            }
+            // No param is expected but received some
+            else if !l_param_vec.is_empty() {
+                Kernel::scheduler().remove_periodic_app(self.name).unwrap();
+                self.id = None;
+                self.app_status = Stopped;
+                return Err(KernelError::AppNeedsNoParam(self.name));
             }
 
             // Store the app ID in the storage function if provided

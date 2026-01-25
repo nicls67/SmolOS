@@ -1,7 +1,7 @@
 use crate::KernelError::{
-    AppAlreadyScheduled, AppInitError, AppNotFound, AppNotScheduled, AppParamTooLong,
-    CannotAddNewPeriodicApp, DeviceLocked, DeviceNotOwned, DisplayError, HalError, TerminalError,
-    TooManyAppParams, WrongSyscallArgs,
+    AppAlreadyScheduled, AppInitError, AppNeedsNoParam, AppNotFound, AppNotScheduled,
+    AppParamTooLong, CannotAddNewPeriodicApp, DeviceLocked, DeviceNotOwned, DisplayError, HalError,
+    TerminalError, TooManyAppParams, WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use crate::{K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS};
@@ -46,6 +46,8 @@ pub enum KernelError {
     TooManyAppParams,
     /// App parameter exceeded the maximum allowed size.
     AppParamTooLong,
+    /// App should not receive any parameters.
+    AppNeedsNoParam(&'static str),
 }
 
 impl KernelError {
@@ -164,6 +166,20 @@ impl KernelError {
                     )
                     .unwrap();
             }
+            AppNeedsNoParam(l_app_name) => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg
+                    .push_str(
+                        format!(
+                            200;
+                            "App {} does not require any parameters",
+                            l_app_name
+                        )
+                        .unwrap()
+                        .as_str(),
+                    )
+                    .unwrap();
+            }
         }
         l_msg
     }
@@ -198,6 +214,7 @@ impl KernelError {
             DeviceNotOwned(_) => Error,
             TooManyAppParams => Error,
             AppParamTooLong => Error,
+            AppNeedsNoParam(_) => Error,
         }
     }
 }

@@ -247,11 +247,11 @@ impl Scheduler {
     ///   to be removed.
     /// # Returns
     /// - `Ok(())`: If the application was successfully removed.
-    /// - `Err(KernelError::AppNotFound)`: If no application with the specified
+    /// - `Err(KernelError::AppNotScheduled)`: If no application with the specified
     ///   name exists.
     ///
     /// # Errors
-    /// This function returns a `KernelError::AppNotFound` error if the application
+    /// This function returns a `KernelError::AppNotScheduled` error if the application
     /// to be removed is not found in the task list.
     ///
     /// # Behavior
@@ -261,7 +261,6 @@ impl Scheduler {
     /// - If the task does not exist, no changes are made to the list.
     pub fn remove_periodic_app(&mut self, p_name: &'static str) -> KernelResult<()> {
         if let Some(l_index) = self.app_exists(p_name) {
-            Kernel::apps().stop_app(self.tasks[l_index].app_id)?;
             self.tasks.swap_remove(l_index);
             Ok(())
         } else {
@@ -304,9 +303,9 @@ impl Scheduler {
     /// # Panics
     ///
     /// May panic if the internal `tasks_to_remove` buffer overflows (more than 8 tasks
-    /// ending in a single cycle) or if `remove_periodic_app` fails unexpectedly.
+    /// ending in a single cycle) or if `Kernel::apps().stop_app` fails unexpectedly.
     pub fn periodic_task(&mut self) {
-        let mut l_tasks_to_remove: Vec<&'static str, 8> = Vec::new();
+        let mut l_tasks_to_remove: Vec<u32, 8> = Vec::new();
 
         // Run all tasks
         for (l_id, l_task) in self.tasks.iter_mut().enumerate() {
@@ -330,7 +329,7 @@ impl Scheduler {
                 if l_task.ends_in.is_some() {
                     l_task.ends_in = l_task.ends_in.map(|l_e| l_e - 1);
                     if l_task.ends_in.unwrap() == 0 {
-                        l_tasks_to_remove.push(l_task.name).unwrap();
+                        l_tasks_to_remove.push(l_task.app_id).unwrap();
 
                         // Apply closure
                         if let Some(l_c) = l_task.app_closure {
@@ -349,8 +348,8 @@ impl Scheduler {
         }
 
         // Remove tasks that have ended
-        for l_task_name in l_tasks_to_remove {
-            self.remove_periodic_app(l_task_name).unwrap();
+        for l_task_id in l_tasks_to_remove {
+            Kernel::apps().stop_app(l_task_id).unwrap();
         }
 
         // Increment cycle counter
