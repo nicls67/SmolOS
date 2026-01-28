@@ -65,3 +65,23 @@ pub fn init_led_blink(
         p_app_id,
     )
 }
+
+/// Stop LED blinking by clearing the LED and unlocking the peripheral.
+///
+/// # Errors
+/// Returns any error from HAL writes or device unlock.
+pub fn stop_led_blink() -> KernelResult<()> {
+    // Ensure the LED is off, then release the peripheral lock.
+    syscall_hal(
+        G_LED_ID.load(Ordering::Relaxed),
+        SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(
+            hal_interface::GpioWriteAction::Clear,
+        )),
+        G_LED_APP_ID.load(Ordering::Relaxed),
+    )?;
+    syscall_devices(
+        DeviceType::Peripheral(G_LED_ID.load(Ordering::Relaxed)),
+        SysCallDevicesArgs::Unlock,
+        G_LED_APP_ID.load(Ordering::Relaxed),
+    )
+}

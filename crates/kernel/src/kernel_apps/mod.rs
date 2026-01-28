@@ -29,7 +29,7 @@ const K_DEFAULT_APPS: [AppConfig; 3] = [
         periodicity: CallPeriodicity::Periodic(Milliseconds(1000)),
         app_fn: led_blink::led_blink,
         init_fn: Some(led_blink::init_led_blink),
-        end_fn: None,
+        end_fn: Some(led_blink::stop_led_blink),
         app_status: AppStatus::Stopped,
         id: None,
     },

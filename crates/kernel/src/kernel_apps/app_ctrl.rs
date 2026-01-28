@@ -15,7 +15,12 @@ static G_APP_CTRL_ID_STORAGE: AtomicU32 = AtomicU32::new(0);
 static G_APP_CTRL_PARAM_STORAGE: Mutex<Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS>> =
     Mutex::new(Vec::new());
 
-/// Store the control app scheduler ID for later inspection.
+/// Kernel app entry point for the control command.
+///
+/// Supported actions:
+/// - `status`: list registered apps and their status.
+/// - `start <app>`: start a registered app by name.
+/// - `stop <app>`: stop a running app by name.
 pub fn app_ctrl() -> KernelResult<()> {
     let l_storage = G_APP_CTRL_PARAM_STORAGE.lock();
 
@@ -40,6 +45,57 @@ pub fn app_ctrl() -> KernelResult<()> {
                                 .unwrap()
                                 .as_str(),
                         ),
+                        G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                    )?;
+                }
+            }
+            "start" => {
+                // Start an app
+                if let Some(l_app) = l_storage.get(1) {
+                    match Kernel::apps().start_app(l_app) {
+                        Ok(_) => {
+                            syscall_terminal(
+                                ConsoleFormatting::StrNewLineBefore("App started"),
+                                G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                            )?;
+                        }
+                        Err(e) => match e {
+                            crate::KernelError::AppAlreadyScheduled(_) => {
+                                syscall_terminal(
+                                    ConsoleFormatting::StrNewLineBefore("App already running"),
+                                    G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                                )?;
+                            }
+                            _ => {
+                                return Err(e);
+                            }
+                        },
+                    }
+                } else {
+                    syscall_terminal(
+                        ConsoleFormatting::StrNewLineBefore("No app specified"),
+                        G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                    )?;
+                }
+            }
+            "stop" => {
+                // Stop an app
+                if let Some(l_app) = l_storage.get(1) {
+                    if let Some(l_id) = Kernel::apps().get_app_id(l_app)? {
+                        Kernel::apps().stop_app(l_id)?;
+                        syscall_terminal(
+                            ConsoleFormatting::StrNewLineBefore("App stopped"),
+                            G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                        )?;
+                    } else {
+                        syscall_terminal(
+                            ConsoleFormatting::StrNewLineBefore("App not running"),
+                            G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                        )?;
+                    }
+                } else {
+                    syscall_terminal(
+                        ConsoleFormatting::StrNewLineBefore("No app specified"),
                         G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
                     )?;
                 }

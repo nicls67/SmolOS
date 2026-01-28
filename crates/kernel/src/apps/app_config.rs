@@ -154,6 +154,7 @@ impl AppConfig {
     /// Stops (unschedules) this app if it is currently running.
     ///
     /// If the app is [`AppStatus::Running`], this function:
+    /// - invokes `end_fn` (if configured),
     /// - removes the corresponding periodic task from the scheduler,
     /// - notifies the terminal that the app exited (using the stored scheduler id),
     /// - updates `self.app_status` to [`AppStatus::Stopped`] and clears `self.id`.
@@ -161,9 +162,12 @@ impl AppConfig {
     /// If the app is already stopped, this is a no-op.
     ///
     /// # Errors
-    /// Returns any error produced by the terminal exit notifier.
+    /// Returns any error produced by the end hook or terminal exit notifier.
     pub fn stop(&mut self) -> KernelResult<()> {
         if self.app_status == Running {
+            if let Some(l_stop_fn) = self.end_fn {
+                l_stop_fn()?;
+            }
             Kernel::scheduler().remove_periodic_app(self.name)?;
             Kernel::terminal().app_exit_notifier(self.id.unwrap())?;
             self.app_status = Stopped;
