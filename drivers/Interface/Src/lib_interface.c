@@ -197,6 +197,7 @@ HAL_INTERFACE_RESULT get_interface_name(const uint8_t p_id, uint8_t *p_name)
         p_name[l_i] = K_DRIVERS_ALLOC[p_id].drv_name[l_i];
         l_i++;
     }
+    p_name[l_i] = '\0';
     return OK;
 }
 
