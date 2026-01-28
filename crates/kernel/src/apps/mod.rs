@@ -2,7 +2,6 @@ use crate::KernelResult;
 use heapless::Vec;
 
 mod app_config;
-mod app_ctrl;
 
 pub use self::app_config::{
     AppConfig, AppStatus, CallPeriodicity, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS,

@@ -37,13 +37,13 @@ pub struct AppConfig {
     pub name: &'static str,
     pub periodicity: CallPeriodicity,
     pub app_fn: App,
-    pub init_fn: Option<App>,
+    /// Optional initialization hook invoked before scheduling the app.
+    /// Receives the assigned scheduler id and parsed parameters.
+    pub init_fn:
+        Option<fn(u32, Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS>) -> KernelResult<()>>,
     pub end_fn: Option<App>,
     pub app_status: AppStatus,
     pub id: Option<u32>,
-    pub app_id_storage: Option<fn(u32)>,
-    /// Optional storage hook for parsed parameters (owned heapless strings, without the app name).
-    pub param_storage: Option<fn(Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS>)>,
 }
 
 impl AppConfig {
@@ -60,9 +60,8 @@ impl AppConfig {
     /// On success, this function:
     /// - stores the returned scheduler id in `self.id`,
     /// - updates `self.app_status` to [`AppStatus::Running`],
-    /// - calls `self.app_id_storage` (if provided) with the assigned id,
-    /// - calls `self.init_fn` (if provided) before scheduling the app,
-    /// - calls `self.param_storage` (if provided) with parsed parameters.
+    /// - calls `self.init_fn` (if provided) before scheduling the app, passing the assigned id
+    ///   and parsed parameters.
     ///
     /// # Arguments
     /// * `p_app_param` - The full app parameter string captured at launch time. Parameters are
@@ -77,7 +76,7 @@ impl AppConfig {
     /// [`K_MAX_APP_PARAM_SIZE`], [`KernelError::TooManyAppParams`] if the
     /// parameter count exceeds [`K_MAX_APP_PARAMS`], or
     /// [`KernelError::AppNeedsNoParam`] if parameters are provided while no
-    /// `param_storage` hook is configured.
+    /// no `init_fn` hook is configured.
     pub fn start(&mut self, p_app_param: &str) -> KernelResult<u32> {
         if self.app_status == Stopped {
             let l_period;
@@ -126,9 +125,17 @@ impl AppConfig {
                 })?;
             }
 
-            // Store the app parameters in the storage function if provided
-            if let Some(l_param_storage) = self.param_storage {
-                l_param_storage(l_param_vec);
+            // Call initialization function if provided
+            if let Some(l_init_func) = self.init_fn {
+                match l_init_func(l_app_id, l_param_vec) {
+                    Ok(_) => (),
+                    Err(_l_err) => {
+                        Kernel::scheduler().remove_periodic_app(self.name).unwrap();
+                        self.id = None;
+                        self.app_status = Stopped;
+                        return Err(KernelError::AppInitError(self.name));
+                    }
+                };
             }
             // No param is expected but received some
             else if !l_param_vec.is_empty() {
@@ -136,22 +143,6 @@ impl AppConfig {
                 self.id = None;
                 self.app_status = Stopped;
                 return Err(KernelError::AppNeedsNoParam(self.name));
-            }
-
-            // Store the app ID in the storage function if provided
-            if let Some(l_app_id_storage) = self.app_id_storage {
-                l_app_id_storage(l_app_id);
-            }
-
-            // Call initialization function if provided
-            if let Some(l_init_func) = self.init_fn {
-                match l_init_func() {
-                    Ok(_) => (),
-                    Err(l_err) => {
-                        let _ = l_err;
-                        return Err(KernelError::AppInitError(self.name));
-                    }
-                };
             }
 
             Ok(l_app_id)

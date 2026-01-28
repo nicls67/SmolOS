@@ -1,8 +1,10 @@
 use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 
-use heapless::format;
+use heapless::{String, Vec, format};
 
-use crate::{ConsoleFormatting, KernelResult, syscall_terminal};
+use crate::{
+    ConsoleFormatting, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS, KernelResult, syscall_terminal,
+};
 
 /// Stores the app ID associated with the current command context.
 ///
@@ -10,12 +12,17 @@ use crate::{ConsoleFormatting, KernelResult, syscall_terminal};
 /// to the correct application session.
 static G_REBOOT_APP_ID: AtomicU32 = AtomicU32::new(0);
 
-/// Persist the command application's ID for later terminal output.
+/// Initialize the reboot app by storing its scheduler id.
 ///
 /// # Parameters
-/// - `id`: The application identifier to store.
-pub fn reboot_app_id_storage(p_id: u32) {
-    G_REBOOT_APP_ID.store(p_id, Ordering::Relaxed);
+/// - `app_id`: Scheduler id assigned to this app.
+/// - `param`: Parsed parameters (unused).
+pub fn reboot_init(
+    p_app_id: u32,
+    _p_param: Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS>,
+) -> KernelResult<()> {
+    G_REBOOT_APP_ID.store(p_app_id, Ordering::Relaxed);
+    Ok(())
 }
 
 /// Perform the final reboot action by resetting the system.
