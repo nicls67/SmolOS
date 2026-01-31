@@ -540,7 +540,7 @@ def gen_rust_code(config: dict):
             generated_lines.append("#[interrupt]")
             generated_lines.append(f"fn {drv['peripheral']}() {{")
             generated_lines.append(
-                f"    unsafe {{ {drv['peripheral']}_it_handler(); }}"
+                f"    unsafe {{\n        {drv['peripheral']}_it_handler();\n    }}"
             )
             generated_lines.append("}")
 

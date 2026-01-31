@@ -1,12 +1,16 @@
 #![no_std]
 #![no_main]
 
+//! Smolos Application Entry Point
+//!
+//! This module contains the main entry point for the Smolos application.
+//! It initializes the hardware, kernel, and starts the system.
+
 mod interrupts;
 
 use cortex_m_rt::entry;
 use hal_interface::Hal;
 use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds};
-use kernel_apps::init_kernel_apps;
 
 #[entry]
 fn main() -> ! {
@@ -31,8 +35,6 @@ fn main() -> ! {
         err_led_name: Some("ERR_LED"),
         display_name: Some("LCD"),
     });
-
-    init_kernel_apps().unwrap();
 
     #[allow(clippy::empty_loop)]
     loop {}

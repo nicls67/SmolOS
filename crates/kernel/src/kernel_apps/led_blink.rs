@@ -1,8 +1,10 @@
 use core::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
-
 use hal_interface::InterfaceWriteActions;
-use kernel::{
-    DeviceType, KernelResult, SysCallDevicesArgs, SysCallHalActions, syscall_devices, syscall_hal,
+use heapless::{String, Vec};
+
+use crate::{
+    DeviceType, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS, KernelResult, SysCallDevicesArgs,
+    SysCallHalActions, syscall_devices, syscall_hal,
 };
 
 /// Name of the GPIO interface used as the activity LED.
@@ -36,12 +38,21 @@ pub fn led_blink() -> KernelResult<()> {
 /// This function:
 /// 1) Queries the HAL for the interface ID corresponding to [`K_LED_NAME`]
 /// 2) Stores the ID for later use by [`led_blink`]
-/// 3) Attempts to lock the device for the current [`G_LED_APP_ID`]
+/// 3) Stores the app id for later writes and locks the device for that app
+///
+/// # Parameters
+/// - `app_id`: Scheduler id assigned to this app.
+/// - `param`: Parsed parameters (unused).
 ///
 /// # Errors
 /// Returns an error if the interface ID cannot be resolved or the device lock
 /// cannot be obtained.
-pub fn init_led_blink() -> KernelResult<()> {
+pub fn init_led_blink(
+    p_app_id: u32,
+    _p_param: Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS>,
+) -> KernelResult<()> {
+    G_LED_APP_ID.store(p_app_id, Ordering::Relaxed);
+
     // Get LED interface ID
     let mut l_id = 0;
     syscall_hal(0, SysCallHalActions::GetID(K_LED_NAME, &mut l_id), 0)?;
@@ -51,11 +62,26 @@ pub fn init_led_blink() -> KernelResult<()> {
     syscall_devices(
         DeviceType::Peripheral(l_id),
         SysCallDevicesArgs::Lock,
-        G_LED_APP_ID.load(Ordering::Relaxed),
+        p_app_id,
     )
 }
 
-/// Store the app/owner ID used for subsequent LED operations.
-pub fn led_blink_id_storage(p_id: u32) {
-    G_LED_APP_ID.store(p_id, Ordering::Relaxed);
+/// Stop LED blinking by clearing the LED and unlocking the peripheral.
+///
+/// # Errors
+/// Returns any error from HAL writes or device unlock.
+pub fn stop_led_blink() -> KernelResult<()> {
+    // Ensure the LED is off, then release the peripheral lock.
+    syscall_hal(
+        G_LED_ID.load(Ordering::Relaxed),
+        SysCallHalActions::Write(InterfaceWriteActions::GpioWrite(
+            hal_interface::GpioWriteAction::Clear,
+        )),
+        G_LED_APP_ID.load(Ordering::Relaxed),
+    )?;
+    syscall_devices(
+        DeviceType::Peripheral(G_LED_ID.load(Ordering::Relaxed)),
+        SysCallDevicesArgs::Unlock,
+        G_LED_APP_ID.load(Ordering::Relaxed),
+    )
 }

@@ -304,6 +304,7 @@ impl Terminal {
                             )?;
                             self.cursor_pos = 0;
                             self.output.new_line()?;
+                            self.output.new_line()?;
                             self.output.write_char('>')?;
                         }
                     };
@@ -334,6 +335,7 @@ impl Terminal {
                 self.app_exe_in_progress = None;
                 Kernel::devices().unlock(crate::DeviceType::Terminal, l_id)?;
                 self.cursor_pos = 0;
+                self.output.new_line()?;
                 self.output.new_line()?;
                 self.output.write_char('>')?;
             }

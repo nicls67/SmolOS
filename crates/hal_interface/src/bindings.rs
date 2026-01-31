@@ -152,11 +152,11 @@ unsafe extern "C" {
  *
  * # Behavior
  * - This function internally calls the `get_interface_name` function.
- * - The retrieved name is stored in a buffer, which is then converted to a static slice.
- * - A static string slice is created from this buffer and returned for valid IDs.
+ * - The retrieved name is stored in a static buffer, trimmed at the first `0` byte,
+ *   and returned as a string slice.
  *
  * # Safety
- * - Uses unsafe code to convert a temporary buffer into a static reference.
+ * - Uses a shared static buffer; repeated calls overwrite previous results.
  * - Assumes that `get_interface_name` populates the buffer correctly, and its output follows valid UTF-8 encoding.
  * - The caller must ensure correctness of associated operations.
  *
@@ -164,11 +164,33 @@ unsafe extern "C" {
  * - Returns `Err(WrongInterfaceId)` if `get_interface_name` indicates an invalid interface ID or other failure.
  */
 pub fn interface_name(p_id: usize) -> HalResult<&'static str> {
-    let mut l_name = [0; 32];
-    match unsafe { get_interface_name(p_id as u8, &mut l_name[0]) } {
+    const K_INTERFACE_NAME_BUF_LEN: usize = 32;
+    static mut G_INTERFACE_NAME_BUF: [u8; K_INTERFACE_NAME_BUF_LEN] = [0; K_INTERFACE_NAME_BUF_LEN];
+
+    // Ensure trailing bytes are cleared so we can safely trim to content length.
+    unsafe {
+        let l_buf_ptr = core::ptr::addr_of_mut!(G_INTERFACE_NAME_BUF) as *mut u8;
+        core::ptr::write_bytes(l_buf_ptr, 0, K_INTERFACE_NAME_BUF_LEN);
+    }
+
+    match unsafe {
+        get_interface_name(
+            p_id as u8,
+            core::ptr::addr_of_mut!(G_INTERFACE_NAME_BUF) as *mut u8,
+        )
+    } {
         HalInterfaceResult::OK => {
+            let l_buf_ptr = core::ptr::addr_of!(G_INTERFACE_NAME_BUF) as *const u8;
+            let mut l_len = 0;
+            while l_len < K_INTERFACE_NAME_BUF_LEN {
+                let l_byte = unsafe { core::ptr::read(l_buf_ptr.add(l_len)) };
+                if l_byte == 0 {
+                    break;
+                }
+                l_len += 1;
+            }
             let l_static_bytes: &'static [u8] =
-                unsafe { core::slice::from_raw_parts(l_name.as_ptr(), l_name.len()) };
+                unsafe { core::slice::from_raw_parts(l_buf_ptr, l_len) };
             let l_static_str = unsafe { core::str::from_utf8_unchecked(l_static_bytes) };
             Ok(l_static_str)
         }

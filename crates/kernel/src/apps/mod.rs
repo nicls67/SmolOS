@@ -3,7 +3,9 @@ use heapless::Vec;
 
 mod app_config;
 
-pub use self::app_config::{AppConfig, AppStatus, CallPeriodicity};
+pub use self::app_config::{
+    AppConfig, AppStatus, CallPeriodicity, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS,
+};
 
 const K_MAX_APPS: usize = 32;
 
@@ -93,5 +95,51 @@ impl AppsManager {
             .find(|l_app| l_app.id == Some(p_app_id))
             .ok_or(crate::KernelError::AppNotFound)?
             .stop()
+    }
+
+    /// Returns the list of registered app names.
+    ///
+    /// # Returns
+    /// A vector of app name slices in registration order.
+    pub(crate) fn list_apps(&self) -> Vec<&str, K_MAX_APPS> {
+        self.apps.iter().map(|l_app| l_app.name).collect()
+    }
+
+    /// Returns the current status for a given app name.
+    ///
+    /// # Arguments
+    /// * `p_app` - App name to query.
+    ///
+    /// # Returns
+    /// The current [`AppStatus`] for the matching app.
+    ///
+    /// # Errors
+    /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `p_app`.
+    pub(crate) fn get_app_status(&self, p_app: &str) -> KernelResult<AppStatus> {
+        Ok(self
+            .apps
+            .iter()
+            .find(|l_app| l_app.name == p_app)
+            .ok_or(crate::KernelError::AppNotFound)?
+            .app_status)
+    }
+
+    /// Returns the current scheduler id for a given app name.
+    ///
+    /// # Arguments
+    /// * `p_app` - App name to query.
+    ///
+    /// # Returns
+    /// `Some(id)` if the app is running, `None` if it is stopped.
+    ///
+    /// # Errors
+    /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `p_app`.
+    pub(crate) fn get_app_id(&self, p_app: &str) -> KernelResult<Option<u32>> {
+        Ok(self
+            .apps
+            .iter()
+            .find(|l_app| l_app.name == p_app)
+            .ok_or(crate::KernelError::AppNotFound)?
+            .id)
     }
 }
