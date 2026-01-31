@@ -1,3 +1,8 @@
+//! Control application for managing other apps.
+//!
+//! This module provides a simple shell-like interface to list, start, and stop
+//! registered applications.
+
 use core::sync::atomic::{AtomicU32, Ordering};
 use heapless::format;
 use spin::Mutex;
@@ -41,7 +46,7 @@ pub fn app_ctrl() -> KernelResult<()> {
                     let l_status = Kernel::apps().get_app_status(l_app)?;
                     syscall_terminal(
                         ConsoleFormatting::StrNewLineBefore(
-                            format!(50;"{} -> {}", l_app, l_status.as_str())
+                            format!(50; "{} -> {}", l_app, l_status.as_str())
                                 .unwrap()
                                 .as_str(),
                         ),

@@ -1,6 +1,11 @@
 #![no_std]
 #![no_main]
 
+//! Smolos Application Entry Point
+//!
+//! This module contains the main entry point for the Smolos application.
+//! It initializes the hardware, kernel, and starts the system.
+
 mod interrupts;
 
 use cortex_m_rt::entry;

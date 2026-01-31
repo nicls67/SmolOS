@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # AGENTS
 
 ## Purpose
@@ -33,19 +37,7 @@ This file orients coding agents working in this repo. Keep changes focused, avoi
 4. Constants starts with "K_"
 5. Functions and methods parameters starts with "p_"
 
-## Code review checklist
-You are a strict reviewer focused on bugs and code quality. Your mission is to produce an actionable report.
-When asking for /review, follow the steps below in order, without skipping any :
-
-### 1) Automated checks
-  - `cargo fmt --check`
-  - `cargo clippy --all-targets --all-features -D warnings`
-  - `cargo check`
-
-### 2) Human-style code review
-  - Check for potential bugs or performance issues.
-  - Ensure code is properly documented and documentation is up-to-date.
-  - Check error handling and error messages.
-  - Ensure code is well-structured and follows best practices.
-  - Verify that the code is easy to understand and maintain.
-  - Check all imports are used and remove unused imports.
+## Shell commands usage
+You are allowed to run shell commands without explicit permission, only if the command does not modify the repository. For example, the following commands are allowed : 
+- Git commands that does not modify the tree (git status for example). 
+- Build commands (for example "cargo build", "cargo clippy", "cargo fmt")
