@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # AGENTS
 
 ## Purpose
@@ -8,7 +12,6 @@ This file orients coding agents working in this repo. Keep changes focused, avoi
   * `crates/display` contains the library for screen display.
   * `crates/hal_interface` contains the interface with the HAL written in C in `drivers/Interface`.
   * `crates/kernel` contains the main OS functions.
-  * `crates/kernel_apps` contains the applications for the kernel.
   * `crates/smolos` is the entry point for the application.
 
 2. `drivers/` contains platform-specific drivers written in C. Only `drivers/Interface` can be updated, others folders are auto-generated.
@@ -33,3 +36,8 @@ This file orients coding agents working in this repo. Keep changes focused, avoi
 3. Global variables starts with "G_"
 4. Constants starts with "K_"
 5. Functions and methods parameters starts with "p_"
+
+## Shell commands usage
+You are allowed to run shell commands without explicit permission, only if the command does not modify the repository. For example, the following commands are allowed : 
+- Git commands that does not modify the tree (git status for example). 
+- Build commands (for example "cargo build", "cargo clippy", "cargo fmt")

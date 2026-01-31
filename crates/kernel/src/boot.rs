@@ -4,6 +4,7 @@ use crate::data::Kernel;
 use crate::devices::DevicesManager;
 use crate::errors_mgt::ErrorsManager;
 use crate::ident::{K_KERNEL_MASTER_ID, K_KERNEL_NAME, K_KERNEL_VERSION};
+use crate::kernel_apps::init_kernel_apps;
 use crate::scheduler::Scheduler;
 use crate::terminal::Terminal;
 use crate::{KernelTimeData, Milliseconds, init_systick};
@@ -95,4 +96,7 @@ pub fn boot(p_config: BootConfig) {
     // Set terminal in prompt mode
     l_terminal.set_display_mirror(false).unwrap();
     l_terminal.set_prompt_mode().unwrap();
+
+    // Initialize kernel applications
+    init_kernel_apps().unwrap();
 }

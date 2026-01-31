@@ -40,9 +40,8 @@ pub type App = fn() -> KernelResult<()>;
 ///   Represents the core application logic or callable function associated with the application.
 ///   This is the primary entry point for executing application-specific logic.
 ///
-/// * `app_init` (`Option<App>`) -
-///   Optional initialization structure or state for the application. It may hold
-///   configuration or pre-instantiation data necessary for the application startup.
+/// * `app_closure` (`Option<App>`) -
+///   Optional cleanup function called when the application's lifetime expires.
 ///
 /// * `app_period` (`u32`) -
 ///   Specifies the periodic interval or runtime duration for the application's operations,
@@ -72,7 +71,6 @@ pub type App = fn() -> KernelResult<()>;
 struct AppWrapper {
     name: &'static str,
     app: App,
-    app_init: Option<App>,
     app_closure: Option<App>,
     app_period: u32,
     ends_in: Option<u32>,
@@ -175,8 +173,8 @@ impl Scheduler {
     /// Registers a new periodic application with the scheduler.
     ///
     /// This method adds an application to the scheduler's task list, configuring it to run
-    /// at a specified interval. The application can optionally have initialization and
-    /// cleanup callbacks, as well as a finite lifetime.
+    /// at a specified interval. The application can optionally have a cleanup callback,
+    /// as well as a finite lifetime.
     ///
     /// # Parameters
     ///
@@ -184,10 +182,6 @@ impl Scheduler {
     ///   the scheduler.
     ///
     /// * `app` - The application entry point.
-    ///
-    /// * `app_init` - Optional initialization function called once before the first
-    ///   execution of the application. If initialization fails, the app is skipped
-    ///   until the next cycle and init is retried.
     ///
     /// * `app_closure` - Optional cleanup function called when the application's lifetime
     ///   expires (i.e., when `ends_in` reaches zero). Useful for releasing resources.
@@ -213,7 +207,6 @@ impl Scheduler {
         &mut self,
         p_name: &'static str,
         p_app: App,
-        p_app_init: Option<App>,
         p_app_closure: Option<App>,
         p_period: Milliseconds,
         p_ends_in: Option<Milliseconds>,
@@ -231,7 +224,6 @@ impl Scheduler {
             .push(AppWrapper {
                 name: p_name,
                 app: p_app,
-                app_init: p_app_init,
                 app_closure: p_app_closure,
                 app_period: p_period.to_u32() / self.sched_period.to_u32(),
                 active: true,
@@ -255,11 +247,11 @@ impl Scheduler {
     ///   to be removed.
     /// # Returns
     /// - `Ok(())`: If the application was successfully removed.
-    /// - `Err(KernelError::AppNotFound)`: If no application with the specified
+    /// - `Err(KernelError::AppNotScheduled)`: If no application with the specified
     ///   name exists.
     ///
     /// # Errors
-    /// This function returns a `KernelError::AppNotFound` error if the application
+    /// This function returns a `KernelError::AppNotScheduled` error if the application
     /// to be removed is not found in the task list.
     ///
     /// # Behavior
@@ -269,7 +261,6 @@ impl Scheduler {
     /// - If the task does not exist, no changes are made to the list.
     pub fn remove_periodic_app(&mut self, p_name: &'static str) -> KernelResult<()> {
         if let Some(l_index) = self.app_exists(p_name) {
-            Kernel::apps().stop_app(self.tasks[l_index].app_id)?;
             self.tasks.swap_remove(l_index);
             Ok(())
         } else {
@@ -312,26 +303,15 @@ impl Scheduler {
     /// # Panics
     ///
     /// May panic if the internal `tasks_to_remove` buffer overflows (more than 8 tasks
-    /// ending in a single cycle) or if `remove_periodic_app` fails unexpectedly.
+    /// ending in a single cycle) or if `Kernel::apps().stop_app` fails unexpectedly.
     pub fn periodic_task(&mut self) {
-        let mut l_tasks_to_remove: Vec<&'static str, 8> = Vec::new();
+        let mut l_tasks_to_remove: Vec<u32, 8> = Vec::new();
 
         // Run all tasks
         for (l_id, l_task) in self.tasks.iter_mut().enumerate() {
             if self.cycle_counter.is_multiple_of(l_task.app_period) && l_task.active {
                 self.current_task_id = Some(l_id);
                 self.current_task_has_error = false;
-
-                // Try to initialize the app at the first call
-                if let Some(l_init_func) = l_task.app_init {
-                    match l_init_func() {
-                        Ok(..) => l_task.app_init = None,
-                        Err(l_e) => {
-                            Kernel::errors().error_handler(&l_e);
-                            continue;
-                        }
-                    }
-                }
 
                 // Execute the task
                 match (l_task.app)() {
@@ -349,7 +329,7 @@ impl Scheduler {
                 if l_task.ends_in.is_some() {
                     l_task.ends_in = l_task.ends_in.map(|l_e| l_e - 1);
                     if l_task.ends_in.unwrap() == 0 {
-                        l_tasks_to_remove.push(l_task.name).unwrap();
+                        l_tasks_to_remove.push(l_task.app_id).unwrap();
 
                         // Apply closure
                         if let Some(l_c) = l_task.app_closure {
@@ -368,8 +348,8 @@ impl Scheduler {
         }
 
         // Remove tasks that have ended
-        for l_task_name in l_tasks_to_remove {
-            self.remove_periodic_app(l_task_name).unwrap();
+        for l_task_id in l_tasks_to_remove {
+            Kernel::apps().stop_app(l_task_id).unwrap();
         }
 
         // Increment cycle counter
