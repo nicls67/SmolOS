@@ -1,7 +1,8 @@
 use crate::KernelError::{
     AppAlreadyScheduled, AppInitError, AppNeedsNoParam, AppNotFound, AppNotScheduled,
     AppParamTooLong, CannotAddNewPeriodicApp, DeviceLocked, DeviceNotOwned, DisplayError, HalError,
-    TerminalError, TooManyAppParams, WrongSyscallArgs,
+    TerminalError, TestCriticalError, TestError, TestFatalError, TooManyAppParams,
+    WrongSyscallArgs,
 };
 use crate::KernelErrorLevel::{Critical, Error, Fatal};
 use crate::{K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS};
@@ -48,6 +49,12 @@ pub enum KernelError {
     AppParamTooLong,
     /// App should not receive any parameters.
     AppNeedsNoParam(&'static str),
+    /// Error generated for testing purposes (Error level).
+    TestError,
+    /// Error generated for testing purposes (Critical level).
+    TestCriticalError,
+    /// Error generated for testing purposes (Fatal level).
+    TestFatalError,
 }
 
 impl KernelError {
@@ -180,6 +187,18 @@ impl KernelError {
                     )
                     .unwrap();
             }
+            TestError => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str("Test error").unwrap();
+            }
+            TestCriticalError => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str("Test critical error").unwrap();
+            }
+            TestFatalError => {
+                l_msg.push_str(self.severity().as_str()).unwrap();
+                l_msg.push_str("Test fatal error").unwrap();
+            }
         }
         l_msg
     }
@@ -215,6 +234,9 @@ impl KernelError {
             TooManyAppParams => Error,
             AppParamTooLong => Error,
             AppNeedsNoParam(_) => Error,
+            TestError => Error,
+            TestCriticalError => Critical,
+            TestFatalError => Fatal,
         }
     }
 }
