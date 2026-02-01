@@ -282,7 +282,11 @@ impl Scheduler {
     /// - `Ok(())`: If the application was successfully removed.
     /// - `Err(KernelError::AppNotFound)`: If no application with the specified ID exists.
     pub fn remove_periodic_app_by_id(&mut self, p_app_id: u32) -> KernelResult<()> {
-        if let Some(l_index) = self.tasks.iter().position(|l_task| l_task.app_id == p_app_id) {
+        if let Some(l_index) = self
+            .tasks
+            .iter()
+            .position(|l_task| l_task.app_id == p_app_id)
+        {
             self.tasks.swap_remove(l_index);
             Ok(())
         } else {
