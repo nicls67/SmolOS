@@ -102,6 +102,7 @@ impl AppConfig {
                 self.end_fn,
                 l_period,
                 l_ends_in,
+                true,
             )?;
             self.id = Some(l_app_id);
             self.app_status = Running;

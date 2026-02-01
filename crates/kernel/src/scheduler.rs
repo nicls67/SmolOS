@@ -76,6 +76,7 @@ struct AppWrapper {
     ends_in: Option<u32>,
     active: bool,
     app_id: u32,
+    managed_by_apps: bool,
 }
 /// Struct representing a Scheduler, which manages tasks and their execution
 /// in a cyclic time period.
@@ -210,6 +211,7 @@ impl Scheduler {
         p_app_closure: Option<App>,
         p_period: Milliseconds,
         p_ends_in: Option<Milliseconds>,
+        p_managed_by_apps: bool,
     ) -> KernelResult<u32> {
         // Check if the app already exists
         if (self.app_exists(p_name)).is_some() {
@@ -229,6 +231,7 @@ impl Scheduler {
                 active: true,
                 ends_in: p_ends_in.map(|l_e| l_e.to_u32() / p_period.to_u32()),
                 app_id: self.next_id,
+                managed_by_apps: p_managed_by_apps,
             })
             .map_err(|_| CannotAddNewPeriodicApp(p_name))?;
 
@@ -265,6 +268,25 @@ impl Scheduler {
             Ok(())
         } else {
             Err(KernelError::AppNotScheduled(p_name))
+        }
+    }
+
+    /// Removes a periodic application from the task list using its unique ID.
+    ///
+    /// This function searches for a task by its ID. If the task exists, it is removed
+    /// from the internal task list. Otherwise, an error is returned.
+    ///
+    /// # Parameters
+    /// - `app_id`: The unique identifier of the application to be removed.
+    /// # Returns
+    /// - `Ok(())`: If the application was successfully removed.
+    /// - `Err(KernelError::AppNotFound)`: If no application with the specified ID exists.
+    pub fn remove_periodic_app_by_id(&mut self, p_app_id: u32) -> KernelResult<()> {
+        if let Some(l_index) = self.tasks.iter().position(|l_task| l_task.app_id == p_app_id) {
+            self.tasks.swap_remove(l_index);
+            Ok(())
+        } else {
+            Err(KernelError::AppNotFound)
         }
     }
 
@@ -331,13 +353,16 @@ impl Scheduler {
                     if l_task.ends_in.unwrap() == 0 {
                         l_tasks_to_remove.push(l_task.app_id).unwrap();
 
-                        // Apply closure
-                        if let Some(l_c) = l_task.app_closure {
-                            match l_c() {
-                                Ok(..) => {}
-                                Err(l_e) => {
-                                    if !self.current_task_has_error {
-                                        Kernel::errors().error_handler(&l_e);
+                        // Apply closure only for internal tasks
+                        // (managed apps handle it in their stop() logic)
+                        if !l_task.managed_by_apps {
+                            if let Some(l_c) = l_task.app_closure {
+                                match l_c() {
+                                    Ok(..) => {}
+                                    Err(l_e) => {
+                                        if !self.current_task_has_error {
+                                            Kernel::errors().error_handler(&l_e);
+                                        }
                                     }
                                 }
                             }
@@ -349,7 +374,18 @@ impl Scheduler {
 
         // Remove tasks that have ended
         for l_task_id in l_tasks_to_remove {
-            Kernel::apps().stop_app(l_task_id).unwrap();
+            match Kernel::apps().stop_app(l_task_id) {
+                Ok(()) => {}
+                Err(KernelError::AppNotFound) => {
+                    // Internal task, remove it directly from scheduler
+                    self.remove_periodic_app_by_id(l_task_id).unwrap();
+                }
+                Err(l_e) => {
+                    if !self.current_task_has_error {
+                        Kernel::errors().error_handler(&l_e);
+                    }
+                }
+            }
         }
 
         // Increment cycle counter
