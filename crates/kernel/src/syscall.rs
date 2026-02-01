@@ -6,10 +6,15 @@ use hal_interface::{
     InterfaceCallback, InterfaceReadAction, InterfaceReadResult, InterfaceWriteActions,
 };
 
+/// Represents the actions that can be performed via a HAL syscall.
 pub enum SysCallHalActions<'a> {
+    /// Write data to a HAL interface.
     Write(InterfaceWriteActions<'a>),
+    /// Read data from a HAL interface into the provided result buffer.
     Read(InterfaceReadAction, &'a mut InterfaceReadResult),
+    /// Retrieve the ID of a HAL interface by its name.
     GetID(&'static str, &'a mut usize),
+    /// Configure a callback for a HAL interface.
     ConfigureCallback(InterfaceCallback),
 }
 
@@ -77,14 +82,23 @@ pub fn syscall_hal(
     }
 }
 
+/// Represents the arguments and operations for a display-related syscall.
 pub enum SysCallDisplayArgs<'a> {
+    /// Clear the display with a specific color.
     Clear(Colors),
+    /// Set the default drawing color.
     SetColor(Colors),
+    /// Set the active font size.
     SetFont(display::FontSize),
+    /// Set the cursor position in pixels (x, y).
     SetCursorPos(u16, u16),
+    /// Write a character at the current cursor position.
     WriteCharAtCursor(char, Option<Colors>),
+    /// Write a character at a specific position (char, x, y, color).
     WriteChar(char, u16, u16, Option<Colors>),
+    /// Write a string at the current cursor position.
     WriteStrAtCursor(&'a str, Option<Colors>),
+    /// Write a string at a specific position (string, x, y, color).
     WriteStr(&'a str, u16, u16, Option<Colors>),
 }
 
@@ -179,9 +193,13 @@ pub fn syscall_terminal(p_formatting: ConsoleFormatting, p_caller_id: u32) -> Ke
     }
 }
 
+/// Represents the operations for a device-management syscall.
 pub enum SysCallDevicesArgs<'a> {
+    /// Request an exclusive lock on the device.
     Lock,
+    /// Release an exclusive lock on the device.
     Unlock,
+    /// Query the lock state of the device.
     GetState(&'a mut bool),
 }
 

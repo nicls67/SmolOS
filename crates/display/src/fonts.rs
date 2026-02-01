@@ -1,4 +1,6 @@
+/// The first ASCII character available in the font tables (space).
 pub const K_FIRST_ASCII_CHAR: u8 = 0x20;
+/// The last ASCII character available in the font tables (tilde).
 pub const K_LAST_ASCII_CHAR: u8 = 0x7E;
 
 const K_FONT_ASCII_12: [u8; 1140] = [
@@ -7233,11 +7235,16 @@ const K_FONT_ASCII_24: [u32; 2280] = [
     0x00000000, //
 ];
 
+/// Represents the available font sizes for text rendering.
 #[derive(Copy, Clone)]
 pub enum FontSize {
+    /// 7x12 pixel font.
     Font12,
+    /// 11x16 pixel font.
     Font16,
+    /// 14x20 pixel font.
     Font20,
+    /// 17x24 pixel font.
     Font24,
 }
 

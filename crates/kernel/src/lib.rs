@@ -29,6 +29,9 @@ pub use types::Milliseconds;
 pub use types::*;
 
 /// Returns a mutable reference to the global [`AppsManager`].
+///
+/// # Returns
+/// A mutable reference to the static `AppsManager` instance.
 pub fn apps() -> &'static mut AppsManager {
     Kernel::apps()
 }

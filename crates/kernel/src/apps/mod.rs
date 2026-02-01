@@ -9,7 +9,9 @@ pub use self::app_config::{
 
 const K_MAX_APPS: usize = 32;
 
+/// Manages the registration and lifecycle of user applications.
 pub struct AppsManager {
+    /// Internal list of registered application configurations.
     apps: Vec<AppConfig, K_MAX_APPS>,
 }
 

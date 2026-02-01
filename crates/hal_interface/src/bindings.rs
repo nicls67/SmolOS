@@ -7,16 +7,25 @@ use crate::{
     RxBuffer,
 };
 
+/// Represents the result codes returned by the underlying C HAL.
 #[repr(u8)]
 #[allow(dead_code)]
 pub enum HalInterfaceResult {
+    /// Operation successful.
     OK = 0,
+    /// The specified interface was not found.
     ErrInterfaceNotFound = 1,
+    /// The provided interface ID is invalid.
     ErrWrongInterfaceId = 2,
+    /// Attempted to write to a read-only interface.
     ErrReadOnlyInterface = 3,
+    /// Attempted to read from a write-only interface.
     ErrWriteOnlyInterface = 4,
+    /// The requested action is not compatible with the interface type.
     ErrIncompatibleAction = 5,
+    /// An error occurred during a write operation.
     ErrWriteError = 6,
+    /// No buffer is associated with the interface for reading.
     ErrNoBuffer = 7,
 }
 

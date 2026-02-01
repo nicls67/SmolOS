@@ -10,20 +10,31 @@ pub const K_MAX_APP_PARAMS: usize = 8;
 /// Maximum byte length for each parameter (ASCII expected).
 pub const K_MAX_APP_PARAM_SIZE: usize = 16;
 
+/// Defines the execution periodicity of an application.
 #[derive(Copy, Clone)]
 pub enum CallPeriodicity {
+    /// The application runs once and then stops.
     Once,
+    /// The application runs periodically at the specified interval.
     Periodic(Milliseconds),
+    /// The application runs periodically at the first interval until the total duration (second interval) elapses.
     PeriodicUntil(Milliseconds, Milliseconds),
 }
 
+/// Represents the current runtime status of an application.
 #[derive(PartialEq, Copy, Clone)]
 pub enum AppStatus {
+    /// The application is currently scheduled and running.
     Running,
+    /// The application is stopped and not scheduled.
     Stopped,
 }
 
 impl AppStatus {
+    /// Returns a string representation of the application status.
+    ///
+    /// # Returns
+    /// A static string: "Running" or "Stopped".
     pub fn as_str(&self) -> &'static str {
         match self {
             Running => "Running",
@@ -32,17 +43,24 @@ impl AppStatus {
     }
 }
 
+/// Configuration for a kernel-managed application.
 #[derive(Copy, Clone)]
 pub struct AppConfig {
+    /// The unique name of the application.
     pub name: &'static str,
+    /// The execution periodicity of the application.
     pub periodicity: CallPeriodicity,
+    /// The main function of the application.
     pub app_fn: App,
     /// Optional initialization hook invoked before scheduling the app.
     /// Receives the assigned scheduler id and parsed parameters.
     pub init_fn:
         Option<fn(u32, Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS>) -> KernelResult<()>>,
+    /// Optional cleanup function invoked when the application is stopped.
     pub end_fn: Option<App>,
+    /// The current operational status of the application.
     pub app_status: AppStatus,
+    /// The scheduler identifier assigned to the application when running.
     pub id: Option<u32>,
 }
 

@@ -13,15 +13,39 @@ use display::{Colors, Display};
 use hal_interface::Hal;
 use heapless::format;
 
+/// Configuration parameters for the kernel boot process.
 pub struct BootConfig {
+    /// The scheduling period for the kernel scheduler.
     pub sched_period: Milliseconds,
+    /// Timing configuration including core frequency and systick period.
     pub kernel_time_data: KernelTimeData,
+    /// The Hardware Abstraction Layer instance.
     pub hal: Hal,
+    /// The name of the terminal interface to use for system output.
     pub system_terminal: &'static str,
+    /// Optional name of the LED interface to use for error indication.
     pub err_led_name: Option<&'static str>,
+    /// Optional name of the display interface to use for system output.
     pub display_name: Option<&'static str>,
 }
 
+/// Initializes and starts the kernel.
+///
+/// This function performs the following steps:
+/// 1. Initializes global kernel data (scheduler, hal, terminal, etc.).
+/// 2. Configures the HAL locker with the kernel master ID.
+/// 3. Initializes the error manager and display.
+/// 4. Starts the system terminal and logs boot information.
+/// 5. Initializes and starts the SysTick timer.
+/// 6. Starts the kernel scheduler.
+/// 7. Registers core kernel applications.
+///
+/// # Parameters
+/// - `p_config`: The [`BootConfig`] containing all necessary parameters for booting.
+///
+/// # Panics
+/// This function will panic if any critical initialization step fails (e.g., terminal
+/// initialization, display initialization, or scheduler startup).
 pub fn boot(p_config: BootConfig) {
     //////////////////////////
     // Kernel initialization

@@ -26,14 +26,23 @@ use hal_interface::LcdRead::LcdSize;
 /// - Text rendering using the selected [`FontSize`]
 /// - A text cursor and default text color
 pub struct Display {
+    /// The HAL interface ID for the LCD.
     hal_id: Option<usize>,
+    /// The master ID used for locking the interface.
     kernel_master_id: u32,
+    /// Reference to the HAL implementation.
     hal: Option<&'static mut Hal>,
+    /// Screen dimensions (width, height) in pixels.
     size: Option<(u16, u16)>,
+    /// Double frame buffer manager.
     frame_buffer: Option<FrameBuffer>,
+    /// Whether the display has been initialized.
     initialized: bool,
+    /// Current text cursor position (x, y) in pixels.
     cursor_pos: (u16, u16),
+    /// Active font size for text rendering.
     font: FontSize,
+    /// Active default color for text rendering.
     color: Colors,
 }
 

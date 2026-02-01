@@ -62,6 +62,10 @@ pub type App = fn() -> KernelResult<()>;
 ///   tracking and managing the application's lifecycle and interactions with other
 ///   components of the system.
 ///
+/// * `managed_by_apps` (`bool`) -
+///   A flag indicating whether the application is managed by the `AppsManager`.
+///   If true, cleanup is handled by the `AppsManager`; otherwise, it's handled internally.
+///
 /// # Usage
 ///
 /// The `AppWrapper` structure is used to manage the state and metadata of applications
@@ -87,7 +91,7 @@ struct AppWrapper {
 ///
 /// # Fields
 /// * `tasks` - A fixed-size vector containing the scheduled tasks (`AppWrapper`) managed by the scheduler.
-///   Limited to a size of 128.
+///   Limited to a size of 32.
 /// * `cycle_counter` - A counter representing the number of completed execution cycles.
 /// * `sched_period` - The scheduling period, represented in milliseconds, specifying the frequency
 ///   at which the scheduler cycles through tasks.
@@ -304,14 +308,10 @@ impl Scheduler {
     ///
     /// For each active task whose execution period has elapsed:
     ///
-    /// 1. **Initialization**: If the task has a pending `app_init` function, it is called
-    ///    first. On success, the init function is cleared (runs only once). On failure,
-    ///    the error is handled and the task is skipped for this cycle.
-    ///
-    /// 2. **Execution**: The main application function is invoked. Errors are routed through
+    /// 1. **Execution**: The main application function is invoked. Errors are routed through
     ///    the kernel error handler unless an error was already flagged for this task.
     ///
-    /// 3. **Lifetime management**: If the task has a finite lifetime (`ends_in`), the
+    /// 2. **Lifetime management**: If the task has a finite lifetime (`ends_in`), the
     ///    remaining count is decremented. When it reaches zero:
     ///    - The `app_closure` callback is invoked (if configured) for cleanup.
     ///    - The task is marked for removal.
@@ -415,7 +415,7 @@ impl Scheduler {
     ///
     /// # Usage
     /// This function should be called during the PendSV exception handler to
-    /// handle tasks that encounter
+    /// handle tasks that encounter a hardware exception or a runtime error.
     pub fn abort_task_on_error(&mut self) {
         if SCB::vect_active() == VectActive::Exception(Exception::PendSV) {
             // Set the current task as inactive

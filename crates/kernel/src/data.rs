@@ -73,6 +73,15 @@ pub struct KernelTimeData {
 /// * `errors` - An optional field for the error manager, which tracks and manages system errors
 ///   or exceptions. Provides mechanisms for error logging or recovery during runtime.
 ///
+/// * `display` - An optional field representing the display driver, used for rendering
+///   graphical or textual information to the screen.
+///
+/// * `apps` - An optional field for the applications manager, which handles the registration,
+///   lifecycle, and execution of user applications.
+///
+/// * `devices` - An optional field for the devices manager, which controls access to
+///   hardware peripherals and manages device locking.
+///
 /// # Usage
 ///
 /// The `Kernel` struct serves as a container for all critical system components. Each field
@@ -108,6 +117,7 @@ impl Kernel {
     /// * `scheduler` - A `Scheduler` instance responsible for managing task scheduling.
     /// * `errors` - An `ErrorsManager` instance for managing and reporting errors throughout the kernel.
     /// * `apps_manager` - An `AppsManager` instance for managing kernel applications.
+    /// * `p_devices` - A `DevicesManager` instance for managing system device access.
     ///
     /// # Safety
     ///
