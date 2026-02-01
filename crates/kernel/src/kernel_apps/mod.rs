@@ -3,6 +3,7 @@ use crate::{AppConfig, AppStatus, CallPeriodicity, KernelResult, Milliseconds, a
 use self::reboot::K_REBOOT_DELAY;
 
 mod app_ctrl;
+mod err_gen;
 mod led_blink;
 mod reboot;
 
@@ -14,7 +15,7 @@ mod reboot;
 /// - the function to execute (`app_fn`),
 /// - optional lifecycle hooks (`init_fn`, `end_fn`),
 /// - and the current status/id fields used by the scheduler.
-const K_DEFAULT_APPS: [AppConfig; 3] = [
+const K_DEFAULT_APPS: [AppConfig; 4] = [
     AppConfig {
         name: "app_ctrl",
         periodicity: CallPeriodicity::Once,
@@ -42,6 +43,15 @@ const K_DEFAULT_APPS: [AppConfig; 3] = [
         app_fn: reboot::reboot_periodic,
         init_fn: Some(reboot::reboot_init),
         end_fn: Some(reboot::reboot_end),
+        app_status: AppStatus::Stopped,
+        id: None,
+    },
+    AppConfig {
+        name: "err_gen",
+        periodicity: CallPeriodicity::Once,
+        app_fn: err_gen::err_gen,
+        init_fn: Some(err_gen::err_gen_init),
+        end_fn: None,
         app_status: AppStatus::Stopped,
         id: None,
     },
