@@ -27,8 +27,9 @@ This file orients coding agents working in this repo. Keep changes focused, avoi
 - Prefer small, targeted edits; avoid sweeping refactors unless asked.
 - Keep ASCII in new content unless the file already uses non-ASCII.
 - Add comments only when logic is non-obvious.
-- Update or create documentation when needed.
+- Update or create documentation when needed. Methods and functions documentation needs to include : functionality description, parameters description, return description, error handling, panicking (when concerned).
 - If you need to touch multiple crates, explain why in the final response.
+- Always ask for user review after generating a action plan. Never update code by yourself.
 
 ## Naming rules
 1. Respect Rust, C and Python naming conventions.
@@ -37,7 +38,18 @@ This file orients coding agents working in this repo. Keep changes focused, avoi
 4. Constants starts with "K_"
 5. Functions and methods parameters starts with "p_"
 
-## Shell commands usage
-You are allowed to run shell commands without explicit permission, only if the command does not modify the repository. For example, the following commands are allowed : 
-- Git commands that does not modify the tree (git status for example). 
-- Build commands (for example "cargo build", "cargo clippy", "cargo fmt")
+## Git rules
+This rule applies each time a git branch needs to be created or renamed
+
+### Instructions
+1. Never ask for a branch name, define it by yourself
+2. Analyse the task : 
+  - In case of a new feature : /feat/task-name
+  - In case of bug fix : /fix/task-name
+3. Always lower case
+4. When the pull request is linked to a Github issue, add 'Closes #ID' to the pull request message. 
+
+### End of task
+After each successful merge :
+1. Always delete the associated branch
+2. Confirm that the associated GitHub issue is closed
