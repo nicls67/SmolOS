@@ -20,6 +20,10 @@ pub enum KernelErrorLevel {
 }
 
 impl KernelErrorLevel {
+    /// Returns a string representation of the error level.
+    ///
+    /// # Returns
+    /// A static string slice representing the error level prefix.
     pub fn as_str(&self) -> &str {
         match self {
             Fatal => "Fatal error : ",
@@ -29,19 +33,30 @@ impl KernelErrorLevel {
     }
 }
 
+/// Represents various errors that can occur within the system kernel.
 #[derive(Debug)]
 pub enum KernelError {
+    /// Errors originating from the Hardware Abstraction Layer (HAL).
     HalError(HalErrorDef),
+    /// Errors originating from the display driver.
     DisplayError(DisplayErrorDef),
+    /// Errors related to terminal I/O operations.
     TerminalError(KernelErrorLevel, &'static str),
+    /// Failed to add a new periodic application to the scheduler.
     CannotAddNewPeriodicApp(&'static str),
     /// Initialization failure with a captured error message and app name.
     AppInitError(&'static str),
+    /// Invalid arguments passed to a system call.
     WrongSyscallArgs(&'static str),
+    /// The specified application is not scheduled.
     AppNotScheduled(&'static str),
+    /// The specified application is already scheduled.
     AppAlreadyScheduled(&'static str),
+    /// The specified application was not found.
     AppNotFound,
+    /// The requested device is currently locked by another process.
     DeviceLocked(&'static str),
+    /// The caller does not own the requested device.
     DeviceNotOwned(&'static str),
     /// App was invoked with too many parameters.
     TooManyAppParams,
@@ -58,6 +73,10 @@ pub enum KernelError {
 }
 
 impl KernelError {
+    /// Formats the error into a human-readable string.
+    ///
+    /// # Returns
+    /// A `heapless::String` containing the formatted error message.
     pub fn to_string(&self) -> String<256> {
         let mut l_msg = String::new();
         match self {

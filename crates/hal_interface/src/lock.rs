@@ -2,15 +2,21 @@ use crate::HalResult;
 use crate::bindings::interface_name;
 use heapless::Vec;
 
+/// Represents the lock status of a hardware interface.
 #[derive(Debug)]
 enum LockStatus {
+    /// The interface is locked by the entity with the given ID.
     Locked(u32),
+    /// The interface is unlocked and available for use.
     Unlocked,
 }
 
+/// Represents a lock on a specific hardware interface.
 #[derive(Debug)]
 struct Lock {
+    /// The current status of the lock.
     status: LockStatus,
+    /// The ID of the interface this lock corresponds to.
     interface_id: usize,
 }
 
@@ -20,7 +26,9 @@ struct Lock {
 /// It allows locking and unlocking interfaces based on a `locker_id`.
 /// A master lock ID is provided at creation to override locks.
 pub struct Locker {
+    /// Internal list of managed locks.
     locks: Vec<Lock, 64>,
+    /// The ID with master privileges, capable of overriding any lock.
     master_lock_id: u32,
 }
 

@@ -12,6 +12,20 @@ use cortex_m_rt::entry;
 use hal_interface::Hal;
 use kernel::{BootConfig, KernelTimeData, Mhz, Milliseconds};
 
+/// Main entry point of the Smolos operating system.
+///
+/// This function is responsible for:
+/// 1. Initializing the Cortex-M core peripherals.
+/// 2. Initializing the system tick timer with a default value.
+/// 3. Initializing the Hardware Abstraction Layer (HAL).
+/// 4. Booting the kernel with a specific configuration.
+/// 5. Entering an infinite loop as the kernel takes over execution.
+///
+/// # Returns
+/// This function never returns.
+///
+/// # Panics
+/// Panics if HAL initialization or kernel booting fails.
 #[entry]
 fn main() -> ! {
     // Initialize Cortex-M core

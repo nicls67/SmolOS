@@ -60,20 +60,34 @@ impl HalErrorLevel {
     }
 }
 
+/// Represents various errors that can occur within the Hardware Abstraction Layer (HAL).
 #[derive(Debug)]
 pub enum HalError {
+    /// The HAL has already been initialized.
     HalAlreadyInitialized,
+    /// The specified hardware interface was not found.
     InterfaceNotFound(&'static str),
+    /// The provided interface ID is invalid.
     WrongInterfaceId(usize),
+    /// Attempted to write to a read-only interface.
     ReadOnlyInterface(&'static str),
+    /// Attempted to read from a write-only interface.
     WriteOnlyInterface(&'static str),
+    /// The requested action is not compatible with the specified interface.
     IncompatibleAction(&'static str, &'static str),
+    /// An error occurred during a write operation.
     WriteError(&'static str),
+    /// An error occurred during a read operation.
     ReadError(&'static str),
+    /// The interface is currently locked and cannot be accessed.
     LockedInterface(&'static str),
+    /// The interface is already locked by another application.
     InterfaceAlreadyLocked(&'static str),
+    /// The locker mechanism has already been configured.
     LockerAlreadyConfigured,
+    /// The interface has an invalid configuration for the requested operation.
     InterfaceBadConfig(&'static str, &'static str),
+    /// An unknown error occurred within the HAL.
     UnknownError,
 }
 

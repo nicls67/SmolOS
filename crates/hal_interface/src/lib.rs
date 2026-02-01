@@ -24,10 +24,15 @@ pub const K_BUFFER_SIZE: usize = 32;
 
 static G_HAL_INIT: AtomicBool = AtomicBool::new(false);
 
+/// High-level interface to the Hardware Abstraction Layer (HAL).
 pub struct Hal {
+    /// Optional locking mechanism to manage exclusive access to hardware interfaces.
     locker: Option<Locker>,
 }
 
+/// Type definition for a HAL callback function.
+///
+/// The callback receives a single `u8` parameter representing the interface ID.
 pub type InterfaceCallback = extern "C" fn(u8);
 
 impl Hal {
@@ -362,18 +367,23 @@ impl Hal {
                 l_read_result = InterfaceReadResult::LcdRead(l_lcd_result);
             }
             InterfaceReadAction::BufferRead => {
-                // Initialize the buffer pointer
+                // Initialize the buffer pointer with a null structure.
+                // The HAL will populate this with the address of the actual hardware buffer.
                 let mut l_buffer: &mut RxBuffer = &mut RxBuffer {
                     buffer: core::ptr::null_mut(),
                     size: 0,
                 };
 
-                // Get buffer address
+                // Retrieve the buffer address from the HAL for the given resource.
                 unsafe {
                     l_interface_res = get_read_buffer(p_ressource_id as u8, &mut l_buffer);
                 }
-                // Copy buffer content into Vec
+
+                // Create a heapless::Vec to store the data from the raw C buffer.
                 let mut l_vec: Vec<u8, K_BUFFER_SIZE> = Vec::new();
+
+                // Copy each byte from the C buffer into the Rust Vec.
+                // We use size from the RxBuffer structure which the HAL updated.
                 for l_i in 0..l_buffer.size {
                     unsafe {
                         l_vec
@@ -382,7 +392,9 @@ impl Hal {
                     }
                 }
                 l_read_result = InterfaceReadResult::BufferRead(l_vec);
-                // Re-initialize buffer
+
+                // Reset the buffer size in the HAL's memory after reading to indicate
+                // that the data has been consumed.
                 l_buffer.size = 0;
             }
         };
