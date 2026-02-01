@@ -1,3 +1,11 @@
+"""
+Drivers Allocation Generator
+
+This script generates C source and header files, as well as Rust bindings, for
+driver allocation based on a YAML configuration file. It uses templates to
+produce consistent code for peripheral initialization and interrupt handling.
+"""
+
 import os.path
 import sys
 from datetime import datetime
