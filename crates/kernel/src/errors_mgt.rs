@@ -223,6 +223,7 @@ impl ErrorsManager {
                                 Some(reset_err_led),
                                 Milliseconds(100),
                                 Some(Milliseconds(10000)),
+                                false,
                             )
                             .unwrap_or(0);
                     } else {

@@ -64,7 +64,7 @@ impl AppsManager {
     /// # Errors
     /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches the parsed name,
     /// or propagates any error returned by [`AppConfig::start`].
-    pub fn start_app(&mut self, p_app: &str) -> KernelResult<u32> {
+    pub(crate) fn start_app(&mut self, p_app: &str) -> KernelResult<u32> {
         // App name is the first argument
         let l_app_name = p_app.split_ascii_whitespace().next().unwrap_or_default();
 
@@ -89,7 +89,7 @@ impl AppsManager {
     /// # Errors
     /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `app_id`,
     /// or propagates any error returned by [`AppConfig::stop`].
-    pub fn stop_app(&mut self, p_app_id: u32) -> KernelResult<()> {
+    pub(crate) fn stop_app(&mut self, p_app_id: u32) -> KernelResult<()> {
         self.apps
             .iter_mut()
             .find(|l_app| l_app.id == Some(p_app_id))
