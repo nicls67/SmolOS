@@ -5,3 +5,4 @@
 /drivers/startup_stm32f769xx.s
 /drivers/STM32F769XX_FLASH.ld
 /.cache/
+compile_commands.json
