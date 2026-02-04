@@ -20,6 +20,28 @@ static G_APP_CTRL_ID_STORAGE: AtomicU32 = AtomicU32::new(0);
 static G_APP_CTRL_PARAM_STORAGE: Mutex<Vec<String<K_MAX_APP_PARAM_SIZE>, K_MAX_APP_PARAMS>> =
     Mutex::new(Vec::new());
 
+/// Checks if an app has one-shot periodicity and displays an error if so.
+///
+/// # Arguments
+/// * `p_app` - App name to check.
+///
+/// # Returns
+/// `true` if the app has `CallPeriodicity::Once` (error message displayed),
+/// `false` if the app can be started/stopped.
+///
+/// # Errors
+/// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `p_app`.
+fn reject_one_shot_app(p_app: &str) -> KernelResult<bool> {
+    if Kernel::apps().get_app_periodicity(p_app)? == CallPeriodicity::Once {
+        syscall_terminal(
+            ConsoleFormatting::StrNewLineBefore("One-shot apps cannot be controlled"),
+            G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+        )?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 /// Kernel app entry point for the control command.
 ///
 /// Supported actions:
@@ -87,6 +109,11 @@ pub fn app_ctrl() -> KernelResult<()> {
                 }
 
                 if let Some(l_app) = l_storage.get(1) {
+                    // Check periodicity - only allow Periodic and PeriodicUntil
+                    if reject_one_shot_app(l_app)? {
+                        return Ok(());
+                    }
+
                     match Kernel::apps().start_app(l_app) {
                         Ok(_) => {
                             syscall_terminal(
@@ -124,6 +151,11 @@ pub fn app_ctrl() -> KernelResult<()> {
                 }
 
                 if let Some(l_app) = l_storage.get(1) {
+                    // Check periodicity - only allow Periodic and PeriodicUntil
+                    if reject_one_shot_app(l_app)? {
+                        return Ok(());
+                    }
+
                     if let Some(l_id) = Kernel::apps().get_app_id(l_app)? {
                         Kernel::apps().stop_app(l_id)?;
                         syscall_terminal(
