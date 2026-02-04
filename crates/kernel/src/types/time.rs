@@ -9,7 +9,7 @@ use core::fmt::Display;
 ///
 /// * `0` - The inner `u32` value representing the duration in milliseconds.
 ///
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Milliseconds(pub u32);
 
 impl Display for Milliseconds {

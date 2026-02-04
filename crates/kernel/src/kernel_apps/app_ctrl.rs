@@ -10,8 +10,8 @@ use spin::Mutex;
 use heapless::{String, Vec};
 
 use crate::{
-    ConsoleFormatting, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS, KernelResult, data::Kernel,
-    syscall_terminal,
+    CallPeriodicity, ConsoleFormatting, K_MAX_APP_PARAM_SIZE, K_MAX_APP_PARAMS, KernelResult,
+    data::Kernel, syscall_terminal,
 };
 
 /// Last assigned scheduler ID for the control app.
@@ -41,21 +41,51 @@ pub fn app_ctrl() -> KernelResult<()> {
     if let Some(l_action) = l_storage.get(0) {
         match l_action.as_str() {
             "status" => {
+                // Check for optional '-a' parameter to show all apps
+                let l_show_all = match l_storage.get(1) {
+                    Some(l_param) if l_param == "-a" => true,
+                    Some(l_param) => {
+                        syscall_terminal(
+                            ConsoleFormatting::StrNewLineBefore(
+                                format!(50; "Invalid parameter: {}", l_param)
+                                    .unwrap()
+                                    .as_str(),
+                            ),
+                            G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                        )?;
+                        return Ok(());
+                    }
+                    None => false,
+                };
+
                 // Print status of all apps
                 for l_app in Kernel::apps().list_apps() {
-                    let l_status = Kernel::apps().get_app_status(l_app)?;
-                    syscall_terminal(
-                        ConsoleFormatting::StrNewLineBefore(
-                            format!(50; "{} -> {}", l_app, l_status.as_str())
-                                .unwrap()
-                                .as_str(),
-                        ),
-                        G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
-                    )?;
+                    let l_periodicity = Kernel::apps().get_app_periodicity(l_app)?;
+
+                    if l_show_all || l_periodicity != CallPeriodicity::Once {
+                        let l_status = Kernel::apps().get_app_status(l_app)?;
+
+                        syscall_terminal(
+                            ConsoleFormatting::StrNewLineBefore(
+                                format!(50; "{} -> {}", l_app, l_status.as_str())
+                                    .unwrap()
+                                    .as_str(),
+                            ),
+                            G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                        )?;
+                    }
                 }
             }
             "start" => {
                 // Start an app
+                if l_storage.len() > 2 {
+                    syscall_terminal(
+                        ConsoleFormatting::StrNewLineBefore("Too many parameters"),
+                        G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                    )?;
+                    return Ok(());
+                }
+
                 if let Some(l_app) = l_storage.get(1) {
                     match Kernel::apps().start_app(l_app) {
                         Ok(_) => {
@@ -64,7 +94,7 @@ pub fn app_ctrl() -> KernelResult<()> {
                                 G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
                             )?;
                         }
-                        Err(e) => match e {
+                        Err(l_e) => match l_e {
                             crate::KernelError::AppAlreadyScheduled(_) => {
                                 syscall_terminal(
                                     ConsoleFormatting::StrNewLineBefore("App already running"),
@@ -72,7 +102,7 @@ pub fn app_ctrl() -> KernelResult<()> {
                                 )?;
                             }
                             _ => {
-                                return Err(e);
+                                return Err(l_e);
                             }
                         },
                     }
@@ -85,6 +115,14 @@ pub fn app_ctrl() -> KernelResult<()> {
             }
             "stop" => {
                 // Stop an app
+                if l_storage.len() > 2 {
+                    syscall_terminal(
+                        ConsoleFormatting::StrNewLineBefore("Too many parameters"),
+                        G_APP_CTRL_ID_STORAGE.load(Ordering::Relaxed),
+                    )?;
+                    return Ok(());
+                }
+
                 if let Some(l_app) = l_storage.get(1) {
                     if let Some(l_id) = Kernel::apps().get_app_id(l_app)? {
                         Kernel::apps().stop_app(l_id)?;

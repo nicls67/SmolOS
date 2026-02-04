@@ -11,7 +11,7 @@ pub const K_MAX_APP_PARAMS: usize = 8;
 pub const K_MAX_APP_PARAM_SIZE: usize = 16;
 
 /// Defines the execution periodicity of an application.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum CallPeriodicity {
     /// The application runs once and then stops.
     Once,
