@@ -144,4 +144,23 @@ impl AppsManager {
             .ok_or(crate::KernelError::AppNotFound)?
             .id)
     }
+
+    /// Returns the call periodicity for a given app name.
+    ///
+    /// # Arguments
+    /// * `p_app` - App name to query.
+    ///
+    /// # Returns
+    /// The [`CallPeriodicity`] configured for the matching app.
+    ///
+    /// # Errors
+    /// Returns [`crate::KernelError::AppNotFound`] if no registered app matches `p_app`.
+    pub(crate) fn get_app_periodicity(&self, p_app: &str) -> KernelResult<CallPeriodicity> {
+        Ok(self
+            .apps
+            .iter()
+            .find(|l_app| l_app.name == p_app)
+            .ok_or(crate::KernelError::AppNotFound)?
+            .periodicity)
+    }
 }
